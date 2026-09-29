@@ -52,7 +52,7 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 - **TODO(VERIFY):**
   - hackathon deadline/timezone;
   - Agora bounty text;
-  - a Monad multisig (before broader exposure);
+  - a test Safe via the UI before transferring ownership (Safe v1.4.1 is verified on 143, VERIFIED §4.3);
   - ownership of `everpiece.xyz` + HTTPS (before freezing the rpId);
   - SMS provider;
   - the `@noble/curves` key API (link package).

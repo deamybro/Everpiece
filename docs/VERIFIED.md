@@ -367,9 +367,25 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Checked by:** Everpiece team
 - **Notes:** TODO(VERIFY): exact submission time and timezone from the logged-in dashboard (Maris). Until then, treat Oct 12 as the hard internal deadline.
 
+### 4.3 Safe multisig on Monad mainnet (escrow owner candidate, D8)
+- **Fact:** A Monad-compatible multisig exists on chain 143
+- **Value:**
+  - Safe **v1.4.1** canonical deployments: `SafeL2` `0x29fcB43b46531BcA003ddC8FCB67FFE91900C762`, `Safe` `0x41675C099F32341bf84BFc5382aF534df5C7461a`, `SafeProxyFactory` `0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67`, `CompatibilityFallbackHandler` `0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99`, `MultiSendCallOnly` `0x9641d764fc13c8B624c04430C7356C1C7C8102e2`.
+  - Safe v1.3.0 (canonical + EIP-155) are also deployed.
+- **Official source:**
+  - Monad docs, Multisig Wallets (mainnet tab lists Safe → https://app.safe.global): https://docs.monad.xyz/tooling-and-infra/wallets/multisig-wallets
+  - Monad protocol registry: https://github.com/monad-crypto/protocols/blob/main/mainnet/safe.jsonc
+  - Safe registry: https://github.com/safe-global/safe-deployments (v1.4.1 `networkAddresses["143"] = "canonical"`)
+- **Explorer / verified-source reference:** On-chain `keccak256(eth_getCode)` on `rpc.monad.xyz` **matches the registry `codeHash`** for SafeL2 (24,421 B, `0xb1f9…81ff`), SafeProxyFactory, CompatibilityFallbackHandler and MultiSendCallOnly.
+- **Date checked:** 2026-09-29
+- **Checked by:** Everpiece team
+- **Notes:**
+  - The Safe web UI / Transaction Service support for 143 is listed by Monad docs but not yet exercised. TODO(VERIFY) by creating a test Safe before ownership transfer.
+  - Ownership handoff: the current owner calls `transferOwnership(safe)`; the Safe then executes `acceptOwnership()` (Ownable2Step). The Safe gets exactly the same minimal powers; nothing new is added (D8).
+
 ## 5. Pending verification
 
 - TODO(VERIFY): exact submission time/timezone (dashboard) · Agora bounty text (BOUNTIES.md).
-- TODO(VERIFY): Monad-compatible multisig (e.g. Safe deployment on 143) — before broader real-user exposure (D8).
+- TODO(VERIFY): Safe UI/Transaction Service on 143 via a test Safe, before transferring escrow ownership (see §4.3).
 - TODO(VERIFY): `@noble/curves` random secp256k1 key API name in the installed version (link package, Oct 4).
 - TODO(VERIFY): USDC / CCTP on Monad — Circle docs (only if cash-out via CCTP is pursued).
