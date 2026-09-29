@@ -1,0 +1,26 @@
+# claims server | anvil --network monad fork | node v26.4.0 | 2026-09-29T13:18:40Z | SMS provider in fork tests: SIMULATED
+▶ claims server on a Monad mainnet fork (real AUSD, simulated SMS)
+  ✔ full two-factor flow: invite → code → approval → on-chain claimLinkPayment pays the recipient in real AUSD (3115.8313ms)
+  ✔ invite: sender-only, immutable, link-only, E.164, bounded deadline (927.4188ms)
+  ✔ start requires the link: wrong salt / foreign key / forged sig refused; no SMS sent (1180.3543ms)
+  ✔ resend cooldown is progressive and never permanent (736.2094ms)
+  ✔ wrong codes are throttled, never lock the payment; approval bound to the starting wallet (831.2748ms)
+  ✔ session expiry and cancelled payments (2203.798ms)
+  ✔ per-phone daily cap (SMS pumping) (1326.7396ms)
+  ✔ startup refuses: wrong chain, key that is not the escrow approver, approver == owner (88.9088ms)
+  ✔ privacy: phone never stored in plaintext, never logged; codes never logged (1.503ms)
+✔ claims server on a Monad mainnet fork (real AUSD, simulated SMS) (17919.585ms)
+✔ Twilio Verify: exact endpoints, Basic auth, form encoding, status mapping (9.4414ms)
+✔ Twilio Verify: start failures throw (no silent success) (0.6772ms)
+✔ Termii: documented fields; verified 'True' → approved; otherwise not approved (1.1856ms)
+✔ Simulated provider: codes only via sink, single use, expiry (0.9678ms)
+✔ PhoneVault: AES-GCM round trip, random IV, tamper detection, keyed lookup, masking (1.509ms)
+✔ config: simulated SMS refused unless explicitly allowed AND local RPC; providers need credentials (1.2141ms)
+ℹ tests 15
+ℹ suites 1
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24004.8527

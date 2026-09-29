@@ -69,6 +69,15 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
 - D7 **Sender-assisted fallback** (master §12.4). Only with Maris approval, and it is weaker: the sender relays a second secret over a different channel. It must never be described as equivalent to independent phone verification.
 - D8 **Phone data** is sensitive: encryption at rest, strict access, redacted logs, minimal retention, deletion policy, never on-chain in any form (ESCROW_SPEC v0.2 removed the contact commitment).
 - D9 The service worker never caches OTP responses, approvals or secret-bearing requests (master §2.6).
+- D10 **Implemented (server/claims v0):**
+  - Only a holder of the link claim key can trigger an SMS: a `ClaimStart` signature plus the commitment opening. This blocks SMS pumping by outsiders.
+  - The provider generates and checks the code (Twilio Verify / Termii), so Everpiece stores no OTP. The simulated provider keeps only an HMAC, with a 10-minute expiry.
+  - Progressive resend cooldowns (30/60/120/300/600 s), a per-phone daily cap, and 5 wrong attempts per session. After that, a new code can be requested after the cooldown; the payment is never locked (§13.1).
+  - The approval is bound to the wallet that started the session, with a 300 s deadline.
+  - Phones are AES-256-GCM at rest with HKDF subkeys and HMAC lookup keys; they are masked in responses and never logged.
+  - The invite is sender-signed and immutable (a wrong phone means cancel and resend).
+  - The service refuses to start unless its key is the escrow's current `claimApprover` and is not the owner.
+  - **Nigeria delivery is unproven** (VERIFIED §4.4): until live-tested, link claims to NG numbers may fail. The funds stay safe (cancel/refund), but the UX breaks.
 
 ## E. Relayer threats (master §26)
 

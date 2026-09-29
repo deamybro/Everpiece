@@ -14,7 +14,8 @@ Everpiece is a mobile-first web app / installable PWA on Monad for protected per
 | `contracts/`: EverpieceEscrow v1 | Implemented; 177 tests green incl. a Monad mainnet fork against real AUSD; Slither 0 high/medium. **Not deployed.** Awaiting the adversarial review |
 | `packages/shared` | ABI, EIP-712 typed data, commitments, account recipe, canonical vectors |
 | `server/relayer` | Implemented: allow-listed gasless relayer with simulation, serialized nonces and finality-gated confirmation; 24 tests incl. a Monad fork with real AUSD. Not deployed |
-| `web/`, `server/claims`, `indexer/` | Not started |
+| `server/claims` | Implemented: link-mode recipient verification (SMS OTP via Twilio Verify or Termii; SIMULATED for local tests only) and short-lived ClaimApproval signing; 15 tests incl. an end-to-end on-chain link claim on a Monad fork. Live SMS not yet configured |
+| `web/`, `indexer/` | Not started |
 | Optional integrations | All disabled (`docs/INTEGRATION_LEDGER.md`) |
 
 ## Layout
@@ -26,6 +27,7 @@ contracts/        Foundry project (network = "monad")
   script/         deploy script (asserts verified facts; simulate before any broadcast)
 packages/shared/  the ONLY source of ABI / typed data / vectors for apps
 server/relayer/   gasless relayer (see its README)
+server/claims/    claims/approver server (see its README)
 docs/             the eight project documents (start with docs/HANDOFF.md)
 evidence/         non-secret test/fork/analysis evidence
 scripts/          generators

@@ -4,6 +4,39 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 5 — 2026-09-29 — claims/approver server
+
+- **Branch:** `feat/escrow-v1` (local only).
+- **Decision (owner):** the claims/approver server is assigned to the core team.
+- **Completed:**
+  - **SMS provider research** (master §12.2), in VERIFIED §4.4–4.5:
+    - Twilio Verify and Termii Token APIs verified from official docs.
+    - **Nigeria constraint:** MTN, Airtel and 9mobile reject numeric international senders; alphanumeric sender IDs need 2–3 weeks of registration; DND can filter OTPs. UK is fine with a branded dynamic sender, but generic IDs such as "OTP" or "Verify" are blocked.
+  - `@everpiece/shared`: `InviteRegistration` + `ClaimStart` EIP-712 ("Everpiece Claims" v1), `phoneHash`, E.164, and cast vectors reproduced by viem (shared 8/8).
+  - **`server/claims`:**
+    - sender-signed invite, with the phone AES-GCM at rest;
+    - only a link-key holder can trigger an SMS;
+    - the provider does the OTP, so we store none;
+    - progressive cooldowns with no permanent lockout, and a per-phone daily cap;
+    - the approval (300 s) is bound to the wallet that started the session;
+    - startup guards (chain, escrow, key == `claimApprover`, key != owner);
+    - adapters: Twilio Verify, Termii, and SIMULATED (localhost plus explicit opt-in only).
+- **Tests run:**
+  - claims: 6 offline + 9 fork. The fork run includes a full invite → code → approval → on-chain `claimLinkPayment` paying 20 AUSD to the verified recipient.
+  - Offline workspace (shared 8, relayer 6, claims 6) and typecheck are clean.
+  - Evidence: `evidence/claims-v0/`.
+- **Open / blocked:**
+  - **SMS provider BLOCKED for Nigeria** until the owner chooses a provider, creates the account, registers a sender ID, and a live test send to NG and UK numbers succeeds.
+  - Termii adapter TODO(VERIFY): body encoding, phone format, failure shape.
+  - The approver key and `PHONE_ENC_KEY` are env vars → KMS/secret manager before mainnet.
+- **Decisions needed from owner:**
+  1. SMS provider (Twilio Verify vs Termii) and account setup; start sender-ID registration now given the lead time.
+  2. If Nigerian delivery isn't proven by about Oct 7: approve or reject the §12.4 sender-assisted fallback, which is weaker and must be labeled as such.
+  3. Commit identity for the history rewrite (still pending).
+- **Next recommended action:** the PWA (Mera onboarding; send/claim/cancel against the relayer and claims server), then the Envio indexer.
+
+---
+
 ## Session 4 — 2026-09-29 — ops verification + gasless relayer
 
 - **Agent:** Everpiece team

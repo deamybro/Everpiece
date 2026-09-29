@@ -383,6 +383,40 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - The Safe web UI / Transaction Service support for 143 is listed by Monad docs but not yet exercised. TODO(VERIFY) by creating a test Safe before ownership transfer.
   - Ownership handoff: the current owner calls `transferOwnership(safe)`; the Safe then executes `acceptOwnership()` (Ownable2Step). The Safe gets exactly the same minimal powers; nothing new is added (D8).
 
+### 4.4 Twilio Verify (SMS OTP provider candidate)
+- **Fact:** API used by `server/claims` TwilioVerifyProvider
+- **Value:**
+  - Start: `POST https://verify.twilio.com/v2/Services/{ServiceSid}/Verifications` with `To`, `Channel` (`sms` | `call` | `email` | `whatsapp` | `sna` | `auto`) → `sid` (`VE…`), `status`.
+  - Check: `POST …/Services/{ServiceSid}/VerificationCheck` with `To` (or `VerificationSid`) + `Code` (4–10 chars) → `status` ∈ `pending | approved | canceled | max_attempts_reached | deleted | failed | expired`.
+  - A verification is **deleted** after 10 min, on approval, or at max check attempts; a later check returns **404**. A new verification can then be started, so there is no permanent lock.
+  - Auth: HTTP Basic (Account SID + Auth Token, or API Key SID + secret). Bodies are `application/x-www-form-urlencoded`; replies are JSON.
+- **Official source:** https://www.twilio.com/docs/verify/api/verification ; https://www.twilio.com/docs/verify/api/verification-check ; https://www.twilio.com/docs/usage/requests-to-twilio
+- **Explorer / verified-source reference:** n/a (docs only; no live account yet)
+- **Date checked:** 2026-09-29
+- **Checked by:** Everpiece team
+- **Notes:**
+  - Delivery rules (Twilio SMS guidelines):
+    - **Nigeria:** alphanumeric sender ID needs pre-registration: international ~3 weeks, domestic 2–3 weeks (major networks only). "Numeric International sender ID is not supported to the MTN, Airtel and 9 Mobile networks". The DND registry "can block notifications and OTPs" through aggressive telco filtering. No two-way SMS. Sources: https://www.twilio.com/en-us/guidelines/ng/sms, and Twilio Help "Alphanumeric Sender ID for Verify" (Nigeria is pre-registration-required for Verify).
+    - **UK:** dynamic alphanumeric sender IDs are allowed; generic IDs ("OTP", "2FA", "Verify", "SMS", …) are blocked; protected IDs need registration. Source: https://www.twilio.com/en-us/guidelines/gb/sms
+  - Pricing, rate limits and actual NG/UK delivery: TODO(VERIFY) via a live account and test sends.
+
+### 4.5 Termii Token API (Nigeria-focused SMS OTP provider candidate)
+- **Fact:** API used by `server/claims` TermiiProvider
+- **Value:**
+  - Send: `POST https://{BASE_URL}/api/sms/otp/send` with `api_key`, `message_type` (NUMERIC|ALPHANUMERIC), `to` (international format), `from` (**approved** sender ID), `channel` (`dnd` | `generic`), `pin_attempts`, `pin_time_to_live` (minutes), `pin_length` (4–8), `pin_placeholder`, `message_text`, `pin_type` → `pinId`, `to`, `smsStatus`.
+  - Verify: `POST https://{BASE_URL}/api/sms/otp/verify` with `api_key`, `pin_id`, `pin` → `pinId`, `verified` ("True" in the example), `msisdn`.
+  - `BASE_URL` is account-specific (dashboard).
+- **Official source:** https://developers.termii.com/send-token ; https://developers.termii.com/verify-token
+- **Explorer / verified-source reference:** n/a (docs only)
+- **Date checked:** 2026-09-29
+- **Checked by:** Everpiece team
+- **Notes:** TODO(VERIFY) before enabling:
+  - request body encoding (the adapter sends JSON);
+  - whether `to` takes a leading "+" (the adapter strips it);
+  - the failed/expired `verified` response shape (the adapter treats anything but true/"True" as not approved, and "Expired" as dead);
+  - sender-ID approval time;
+  - pricing.
+
 ## 5. Pending verification
 
 - TODO(VERIFY): exact submission time/timezone (dashboard) · Agora bounty text (BOUNTIES.md).
