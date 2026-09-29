@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/shared",
-    "server/relayer"
+    "server/relayer",
+    "server/claims"
   ],
   "engines": {
     "node": ">=24"

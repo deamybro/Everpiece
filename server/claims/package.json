@@ -1,0 +1,24 @@
+{
+  "name": "@everpiece/claims",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Everpiece claims/approver server: link-mode recipient verification (SMS OTP via provider) and short-lived ClaimApproval signing.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "start": "node src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 test/*.test.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@everpiece/shared": "0.2.0",
+    "viem": "2.56.9"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
+  }
+}
