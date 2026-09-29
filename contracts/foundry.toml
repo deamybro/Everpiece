@@ -1,0 +1,40 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+
+# Toolchain pinned per docs/VERIFIED.md §1.11–1.12 (Foundry >= 1.8, Monad execution rules)
+network = "monad"
+solc_version = "0.8.28"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10000
+via_ir = true
+bytecode_hash = "none"
+cbor_metadata = false
+
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/",
+]
+
+[fuzz]
+runs = 1024
+seed = "0x1"
+
+[invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
+
+[profile.ci.fuzz]
+runs = 10000
+
+[profile.ci.invariant]
+runs = 1024
+depth = 128
+
+[rpc_endpoints]
+monad = "${MONAD_RPC}"
