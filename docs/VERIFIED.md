@@ -417,6 +417,27 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - sender-ID approval time;
   - pricing.
 
+### 4.6 Twilio Programmable Messaging (plain SMS) and trial restrictions
+- **Fact:** API used by `server/claims` TwilioSmsProvider, and what a trial account can do
+- **Value:**
+  - Send: `POST https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json` with `To`, `From` (or `MessagingServiceSid`), `Body` → `sid`, `status`, `error_code`, `error_message`.
+  - Fetch: `GET …/Accounts/{AccountSid}/Messages/{Sid}.json`.
+  - Statuses: queued, sending, sent, failed, delivered, undelivered, …
+  - API Key SID + secret works for auth, with the AccountSid kept in the URL.
+  - **Trial accounts:** "You must use Twilio-provided templates. Custom message bodies, email content, and WhatsApp templates aren't available during trial."
+  - **Verify Services also require an upgraded account.**
+  - Upgrade: minimum starting balance $20 (options $20/$50/$100/custom), with auto-recharge pre-enabled at $50.
+- **Official source:** https://www.twilio.com/docs/messaging/api/message-resource ; https://www.twilio.com/docs/messaging/guides/how-to-use-your-free-trial-account ; https://www.twilio.com/en-us/verify/pricing ($0.05 per successful verification + channel fees)
+- **Explorer / verified-source reference:** Live, owner's trial account, 2026-09-29, two sends refused, **nothing sent**:
+  - a Restricted key with only Verify permissions → `HTTP 401, 8001 "actor doesn't have any assertions"`;
+  - after granting Messaging → `HTTP 400, 572006 "Invalid template name. Trial accounts can only use predefined SMS templates."`
+  - Seen in the owner's Twilio console: "Verify … Upgrade to create and manage your own Verify service"; the upgrade screen shows a $20 minimum with auto-recharge checked.
+- **Date checked:** 2026-09-29
+- **Checked by:** Everpiece team
+- **Notes:**
+  - Everpiece OTP texts (custom body, or Verify) need an upgraded Twilio account.
+  - The trial console "Send an SMS" with a predefined template can still be used to test **delivery** to a Nigerian number for free.
+
 ## 5. Pending verification
 
 - TODO(VERIFY): exact submission time/timezone (dashboard) · Agora bounty text (BOUNTIES.md).

@@ -40,15 +40,17 @@ const res = await fetch(`${base}/Messages.json`, {
 const created = (await res.json()) as { sid?: string; status?: string; code?: number; message?: string };
 if (!res.ok) {
   console.log(`send refused: HTTP ${res.status}, Twilio error ${created.code ?? "?"}: ${created.message ?? ""}`);
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  await track(created.sid!, created.status);
 }
-console.log(`sent to ${masked} from ${from}: message ${created.sid}, initial status ${created.status}`);
-
+async function track(sid: string, initial?: string) {
+console.log(`sent to ${masked} from ${from}: message ${sid}, initial status ${initial}`);
 // Poll delivery status for up to ~90 s (Fetch a Message).
-let last = created.status;
+let last = initial;
 for (let i = 0; i < 30; i++) {
   await new Promise((r) => setTimeout(r, 3000));
-  const m = (await (await fetch(`${base}/Messages/${created.sid}.json`, { headers: { authorization: auth } })).json()) as {
+  const m = (await (await fetch(`${base}/Messages/${sid}.json`, { headers: { authorization: auth } })).json()) as {
     status?: string;
     error_code?: number | null;
     error_message?: string | null;
@@ -58,3 +60,4 @@ for (let i = 0; i < 30; i++) {
   if (["delivered", "undelivered", "failed", "canceled"].includes(m.status ?? "")) break;
 }
 console.log(`final status: ${last}. Did the text arrive on the phone, reading "Your Everpiece code is ••••••. …"?`);
+}
