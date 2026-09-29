@@ -16,3 +16,7 @@ crytic-export/
 # os
 .DS_Store
 Thumbs.db
+# relayer runtime state
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
