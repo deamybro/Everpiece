@@ -167,3 +167,17 @@ test("EVERPIECE_ACCOUNT_V1 derivation (synthetic PRF fixtures)", () => {
   }
   assert.throws(() => deriveEverpieceAccountV1(new Uint8Array(31)));
 });
+
+test("claims-server messages: InviteRegistration and ClaimStart (cast vectors)", async () => {
+  const { claimsDomain, inviteRegistration, claimStart, phoneHash } = await import("../src/index.ts");
+  const c = V.claims;
+  assert.equal(domainSeparator({ domain: claimsDomain(ESCROW, V.chainId) }), c.domainSeparator);
+  assert.equal(phoneHash(c.phone), c.phoneHash);
+  assert.throws(() => phoneHash("08000000000"));
+  const inv = inviteRegistration(ESCROW, { paymentId: c.paymentId, phoneHash: c.phoneHash, deadline: BigInt(c.deadline) });
+  assert.equal(hashTypedData(inv), c.inviteDigest);
+  assert.equal(await key("sender").signTypedData(inv), c.inviteSig);
+  const cs = claimStart(ESCROW, { paymentId: c.paymentId, recipient: V.keys.recipient.address, deadline: BigInt(c.deadline) });
+  assert.equal(hashTypedData(cs), c.claimStartDigest);
+  assert.equal(await key("claimKey").signTypedData(cs), c.claimStartSig);
+});
