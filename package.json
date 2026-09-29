@@ -4,13 +4,15 @@
   "workspaces": [
     "packages/shared",
     "server/relayer",
-    "server/claims"
+    "server/claims",
+    "web"
   ],
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "test": "npm test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:stack": "node scripts/dev-stack.mjs"
   }
 }

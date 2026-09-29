@@ -20,3 +20,9 @@ Thumbs.db
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+web/.env.local
+web/.next/
+web/next-env.d.ts
+web/test-results/
+web/playwright-report/
+*.tsbuildinfo
