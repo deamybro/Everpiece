@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomInt } from "node:crypto";
+import { createHmac, hkdfSync, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import type { ClaimsConfig } from "./config.ts";
 
 /**
@@ -123,41 +123,126 @@ export class TermiiProvider implements VerificationProvider {
 }
 
 /**
- * SIMULATED provider for local/fork tests ONLY (config refuses it unless ALLOW_SIMULATED_SMS=1 and the RPC is
- * localhost). Codes go to an injected sink, never to logs; only an HMAC of the code is kept, 10-minute expiry.
+ * Everpiece-generated one-time codes (for plain SMS channels that do not check codes themselves).
+ * Master §13: the code is never stored — only HMAC-SHA256(key, ref:code) with a 10-minute expiry; single use;
+ * constant-time comparison. Pending codes live in process memory: a restart only means "request a new code".
  */
-export class SimulatedProvider implements VerificationProvider {
-  readonly name = "SIMULATED";
-  readonly live = false;
-  private readonly secret = randomBytes(32);
-  private readonly pending = new Map<string, { mac: string; exp: number }>();
-  private readonly sink: (e164: string, code: string) => void;
+export class LocalOtp {
+  private readonly key: Buffer;
+  private readonly pending = new Map<string, { mac: Buffer; exp: number }>();
   private readonly now: () => number;
-  constructor(sink: (e164: string, code: string) => void, now: () => number = Date.now) {
-    this.sink = sink;
+  static readonly TTL_MS = 600_000;
+  constructor(key: Buffer, now: () => number = Date.now) {
+    this.key = key;
     this.now = now;
   }
-  private mac(ref: string, code: string) {
-    return createHmac("sha256", this.secret).update(`${ref}:${code}`).digest("hex");
+  private mac(ref: string, code: string): Buffer {
+    return createHmac("sha256", this.key).update(`${ref}:${code}`).digest();
   }
-  async start(e164: string): Promise<{ ref: string }> {
-    const ref = "SIM" + randomBytes(12).toString("hex");
+  issue(prefix: string): { ref: string; code: string } {
+    const ref = prefix + randomBytes(12).toString("hex");
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    this.pending.set(ref, { mac: this.mac(ref, code), exp: this.now() + 600_000 });
-    this.sink(e164, code);
-    return { ref };
+    this.pending.set(ref, { mac: this.mac(ref, code), exp: this.now() + LocalOtp.TTL_MS });
+    return { ref, code };
   }
-  async check(_e164: string, code: string, ref: string): Promise<CheckResult> {
+  forget(ref: string): void {
+    this.pending.delete(ref);
+  }
+  check(ref: string, code: string): CheckResult {
     const p = this.pending.get(ref);
-    if (!p || this.now() > p.exp) return "dead";
-    if (p.mac !== this.mac(ref, code)) return "wrong";
+    if (!p || this.now() > p.exp) {
+      this.pending.delete(ref);
+      return "dead";
+    }
+    if (!timingSafeEqual(p.mac, this.mac(ref, code))) return "wrong";
     this.pending.delete(ref);
     return "approved";
   }
 }
 
+/** One GSM-7 segment; the code is the only variable part. */
+export function otpMessage(code: string): string {
+  return `Your Everpiece code is ${code}. It expires in 10 minutes. Never share it with anyone, including the person who sent you money.`;
+}
+
+/**
+ * Twilio Programmable Messaging (VERIFIED §4.6): Everpiece generates the code (LocalOtp) and Twilio only delivers it.
+ *   POST {base}/Accounts/{AccountSid}/Messages.json   To, From, Body   → { sid, status, error_code }
+ *   HTTP Basic (Account SID + Auth Token, or API Key SID + secret with the AccountSid still in the URL), form-encoded.
+ * Works on a Twilio trial (free SMS units; trial accounts can only text verified numbers).
+ */
+export class TwilioSmsProvider implements VerificationProvider {
+  readonly name = "twilio-sms";
+  readonly live = true;
+  private readonly cfg: NonNullable<ClaimsConfig["twilioSms"]>;
+  private readonly otp: LocalOtp;
+  private readonly fetchImpl: typeof fetch;
+  constructor(cfg: NonNullable<ClaimsConfig["twilioSms"]>, otpKey: Buffer, fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
+    this.cfg = cfg;
+    this.otp = new LocalOtp(otpKey, now);
+    this.fetchImpl = fetchImpl;
+  }
+
+  async start(e164: string): Promise<{ ref: string }> {
+    const { ref, code } = this.otp.issue("TSMS");
+    const r = await this.fetchImpl(`${this.cfg.baseUrl}/Accounts/${this.cfg.accountSid}/Messages.json`, {
+      method: "POST",
+      headers: {
+        authorization: "Basic " + Buffer.from(`${this.cfg.user}:${this.cfg.secret}`).toString("base64"),
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ To: e164, From: this.cfg.from, Body: otpMessage(code) }).toString(),
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
+    if (!r.ok) {
+      this.otp.forget(ref);
+      const j = (await r.json().catch(() => ({}))) as { code?: number };
+      throw new ProviderError(`twilio sms HTTP ${r.status}${j.code ? ` code ${j.code}` : ""}`);
+    }
+    const j = (await r.json()) as { sid?: string; status?: string };
+    if (!j.sid || j.status === "failed" || j.status === "undelivered") {
+      this.otp.forget(ref);
+      throw new ProviderError(`twilio sms status ${j.status}`);
+    }
+    return { ref };
+  }
+
+  async check(_e164: string, code: string, ref: string): Promise<CheckResult> {
+    return this.otp.check(ref, code);
+  }
+}
+
+/**
+ * SIMULATED provider for local/fork tests ONLY (config refuses it unless ALLOW_SIMULATED_SMS=1 and the RPC is
+ * localhost). Codes go to an injected sink, never to logs; same LocalOtp storage rules as live SMS.
+ */
+export class SimulatedProvider implements VerificationProvider {
+  readonly name = "SIMULATED";
+  readonly live = false;
+  private readonly otp: LocalOtp;
+  private readonly sink: (e164: string, code: string) => void;
+  constructor(sink: (e164: string, code: string) => void, now: () => number = Date.now) {
+    this.sink = sink;
+    this.otp = new LocalOtp(randomBytes(32), now);
+  }
+  async start(e164: string): Promise<{ ref: string }> {
+    const { ref, code } = this.otp.issue("SIM");
+    this.sink(e164, code);
+    return { ref };
+  }
+  async check(_e164: string, code: string, ref: string): Promise<CheckResult> {
+    return this.otp.check(ref, code);
+  }
+}
+
+/** OTP MAC key: HKDF from PHONE_ENC_KEY with its own label (independent of the phone enc/lookup subkeys). */
+export function otpKeyFrom(phoneEncKey: `0x${string}`): Buffer {
+  return Buffer.from(hkdfSync("sha256", Buffer.from(phoneEncKey.slice(2), "hex"), Buffer.alloc(0), "everpiece.claims.otp.mac.v1", 32));
+}
+
 export function providerFromConfig(cfg: ClaimsConfig, simulatedSink?: (e164: string, code: string) => void): VerificationProvider {
   if (cfg.smsProvider === "twilio") return new TwilioVerifyProvider(cfg.twilio!);
+  if (cfg.smsProvider === "twilio-sms") return new TwilioSmsProvider(cfg.twilioSms!, otpKeyFrom(cfg.phoneEncKey));
   if (cfg.smsProvider === "termii") return new TermiiProvider(cfg.termii!);
   return new SimulatedProvider(simulatedSink ?? (() => {}));
 }

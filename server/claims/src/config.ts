@@ -1,7 +1,7 @@
 import { getAddress, isAddress, isHex, type Address, type Hex } from "viem";
 import { MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
 
-export type SmsProviderName = "twilio" | "termii" | "simulated";
+export type SmsProviderName = "twilio" | "twilio-sms" | "termii" | "simulated";
 
 export type ClaimsConfig = {
   rpcUrl: string;
@@ -15,6 +15,8 @@ export type ClaimsConfig = {
   dbPath: string;
   smsProvider: SmsProviderName;
   twilio?: { user: string; secret: string; serviceSid: string; baseUrl: string };
+  /** Plain Twilio SMS; Everpiece generates/checks the code (LocalOtp). */
+  twilioSms?: { user: string; secret: string; accountSid: string; from: string; baseUrl: string };
   termii?: { baseUrl: string; apiKey: string; senderId: string };
   /** Approval lifetime: short (master §14). */
   approvalTtlSec: number;
@@ -58,7 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ClaimsConfig {
   const escrow = req(env, "ESCROW_ADDRESS");
   if (!isAddress(escrow, { strict: false })) throw new Error("config: ESCROW_ADDRESS must be an address");
   const smsProvider = (env.SMS_PROVIDER ?? "twilio") as SmsProviderName;
-  if (!["twilio", "termii", "simulated"].includes(smsProvider)) throw new Error("config: SMS_PROVIDER must be twilio | termii | simulated");
+  if (!["twilio", "twilio-sms", "termii", "simulated"].includes(smsProvider)) throw new Error("config: SMS_PROVIDER must be twilio | twilio-sms | termii | simulated");
   const rpcUrl = req(env, "MONAD_RPC");
 
   // A simulated provider must never back a real deployment (master §0.5: never present SIMULATED as LIVE).
@@ -97,6 +99,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ClaimsConfig {
       secret: req(env, "TWILIO_API_SECRET"), // Auth Token, or API Key secret
       serviceSid: req(env, "TWILIO_VERIFY_SERVICE_SID"),
       baseUrl: env.TWILIO_VERIFY_BASE_URL ?? "https://verify.twilio.com/v2",
+    };
+  }
+  if (smsProvider === "twilio-sms") {
+    const accountSid = req(env, "TWILIO_ACCOUNT_SID");
+    if (!/^AC[0-9a-fA-F]{32}$/.test(accountSid)) throw new Error("config: TWILIO_ACCOUNT_SID must look like AC + 32 hex");
+    const from = req(env, "TWILIO_FROM_NUMBER");
+    if (!/^\+[1-9][0-9]{7,14}$/.test(from)) throw new Error("config: TWILIO_FROM_NUMBER must be E.164");
+    cfg.twilioSms = {
+      user: req(env, "TWILIO_API_USER"), // API Key SID (SK…) or Account SID
+      secret: req(env, "TWILIO_API_SECRET"),
+      accountSid,
+      from,
+      baseUrl: env.TWILIO_MESSAGES_BASE_URL ?? "https://api.twilio.com/2010-04-01",
     };
   }
   if (smsProvider === "termii") {

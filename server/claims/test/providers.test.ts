@@ -120,3 +120,55 @@ test("config: simulated SMS refused unless explicitly allowed AND local RPC; pro
   assert.equal(ok.approvalTtlSec, 300);
   assert.deepEqual(ok.resendCooldownsSec, [30, 60, 120, 300, 600]);
 });
+
+test("Twilio SMS (LocalOtp): exact Messages URL, auth, fields and wording; code single-use, expiring, never in the URL", async () => {
+  const { TwilioSmsProvider, otpMessage } = await import("../src/index.ts");
+  let t = 1_000;
+  const { f, calls } = mockFetch([
+    { status: 201, json: { sid: "SM1", status: "queued" } },
+    { status: 201, json: { sid: "SM2", status: "queued" } },
+    { status: 400, json: { code: 21608 } },
+    { status: 201, json: { sid: "SM3", status: "failed" } },
+  ]);
+  const cfg = { user: "SKkey", secret: "sec", accountSid: "AC" + "0".repeat(32), from: "+17372508034", baseUrl: "https://api.twilio.com/2010-04-01" };
+  const p = new TwilioSmsProvider(cfg, Buffer.alloc(32, 7), f, () => t);
+  const { ref } = await p.start("+2348000000000");
+  assert.equal(calls[0].url, `https://api.twilio.com/2010-04-01/Accounts/${cfg.accountSid}/Messages.json`);
+  const h = calls[0].init.headers as Record<string, string>;
+  assert.equal(h.authorization, "Basic " + Buffer.from("SKkey:sec").toString("base64"));
+  assert.equal(h["content-type"], "application/x-www-form-urlencoded");
+  const form = new URLSearchParams(String(calls[0].init.body));
+  assert.equal(form.get("To"), "+2348000000000");
+  assert.equal(form.get("From"), "+17372508034");
+  const code = /code is ([0-9]{6})\./.exec(form.get("Body")!)![1];
+  assert.equal(form.get("Body"), otpMessage(code));
+  assert.ok(form.get("Body")!.includes("Never share it with anyone, including the person who sent you money."));
+  assert.ok(form.get("Body")!.length <= 160); // one SMS segment
+  assert.ok(!calls[0].url.includes(code));
+
+  assert.equal(await p.check("", code === "000000" ? "111111" : "000000", ref), "wrong");
+  assert.equal(await p.check("", code, ref), "approved");
+  assert.equal(await p.check("", code, ref), "dead"); // single use
+
+  const second = await p.start("+2348000000000");
+  const code2 = /code is ([0-9]{6})\./.exec(new URLSearchParams(String(calls[1].init.body)).get("Body")!)![1];
+  t += 600_001;
+  assert.equal(await p.check("", code2, second.ref), "dead"); // 10-minute expiry
+
+  await assert.rejects(p.start("+2348000000000"), /HTTP 400 code 21608/); // e.g. trial: unverified destination
+  await assert.rejects(p.start("+2348000000000"), /status failed/);
+});
+
+test("config: twilio-sms needs account SID, API credentials and an E.164 From number", () => {
+  const base = {
+    MONAD_RPC: "https://rpc.monad.xyz", ESCROW_ADDRESS: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+    APPROVER_PRIVATE_KEY: "0x" + "11".repeat(32), PHONE_ENC_KEY: "0x" + "22".repeat(32), SMS_PROVIDER: "twilio-sms",
+    TWILIO_API_USER: "SK1", TWILIO_API_SECRET: "s",
+  };
+  assert.throws(() => loadConfig(base), /TWILIO_ACCOUNT_SID/);
+  assert.throws(() => loadConfig({ ...base, TWILIO_ACCOUNT_SID: "AC123" }), /AC \+ 32 hex/);
+  assert.throws(() => loadConfig({ ...base, TWILIO_ACCOUNT_SID: "AC" + "a".repeat(32) }), /TWILIO_FROM_NUMBER/);
+  assert.throws(() => loadConfig({ ...base, TWILIO_ACCOUNT_SID: "AC" + "a".repeat(32), TWILIO_FROM_NUMBER: "17372508034" }), /E.164/);
+  const c = loadConfig({ ...base, TWILIO_ACCOUNT_SID: "AC" + "a".repeat(32), TWILIO_FROM_NUMBER: "+17372508034" });
+  assert.equal(c.twilioSms!.baseUrl, "https://api.twilio.com/2010-04-01");
+});
