@@ -1,0 +1,28 @@
+{
+  "name": "@everpiece/shared",
+  "version": "0.2.0",
+  "private": true,
+  "description": "EverpieceEscrow ABI, EIP-712 typed data, commitments, account derivation and shared test vectors (ESCROW_SPEC v0.2).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vectors.json": "./vectors.json"
+  },
+  "scripts": {
+    "gen:abi": "node ../../scripts/gen-shared-abi.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@scure/bip32": "2.4.0",
+    "@scure/bip39": "2.4.0",
+    "viem": "2.56.9"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
+  }
+}
