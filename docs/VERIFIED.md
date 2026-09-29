@@ -129,6 +129,20 @@ Legend for "Checked by": `Everpiece team` = engineering session 1 (2026-09-29).
 
 ---
 
+### 1.13 Pinned contract / tooling dependencies
+- **Fact:** Dependency versions used by `contracts/` and `packages/shared`
+- **Value:**
+  - OpenZeppelin Contracts **v5.7.0** (latest release, published 2026-07-29), git submodule at commit `cab19933c33c2ad1d4c7a84864a3601dddfd16f3`
+  - forge-std **v1.16.2** (latest release, 2026-06-30)
+  - solc 0.8.28
+  - Slither **0.11.6** (PyPI, scratch virtualenv)
+  - `packages/shared`: viem **2.56.9**, @scure/bip39 **2.4.0**, @scure/bip32 **2.4.0**, TypeScript **7.0.2**, Node ≥ 24 (local 26.4.0)
+- **Official source:** https://github.com/OpenZeppelin/openzeppelin-contracts/releases ; https://github.com/foundry-rs/forge-std/releases ; npm registry ; PyPI
+- **Explorer / verified-source reference:** `git -C contracts/lib/openzeppelin-contracts describe --tags` → v5.7.0; `package.json` version 5.7.0
+- **Date checked:** 2026-09-29
+- **Checked by:** Everpiece team
+- **Notes:** APIs used were read from the pinned source, not from memory: `ECDSA.tryRecoverCalldata` (65-byte only, low-s enforced), `EIP712`, `Pausable`, `ReentrancyGuard`, `Ownable2Step`, `SafeERC20`.
+
 ## 2. AUSD (Agora Dollar) on Monad Mainnet
 
 All §2 facts were verified against **Sourcify-verified deployed source** (full match, runtime + creation) and **live reads**, and behaviorally on a **mainnet fork** (see §2.12).
@@ -287,7 +301,7 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Reference:** security-model page
 - **Date checked:** 2026-09-29
 - **Checked by:** Everpiece team
-- **Notes:** **The production domain must be chosen before any real user signs up and must never change.** Preview/staging domains create different accounts. TODO(VERIFY): final domain (e.g. `everpiece.xyz`) — Maris.
+- **Notes:** **The production domain must be chosen before any real user signs up and must never change.** Preview/staging domains create different accounts. **Target rpId: `everpiece.xyz` (Maris, 2026-09-29). NOT frozen.** Freeze and onboard real users only after Maris controls the domain and HTTPS is live. TODO(VERIFY): domain ownership + HTTPS deployment.
 
 ### 3.6 Signing sessions / prompts
 - **Fact:** Prompt-per-action behavior
@@ -339,7 +353,6 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 
 - TODO(VERIFY): exact submission time/timezone (dashboard) · Agora bounty text (BOUNTIES.md).
 - TODO(VERIFY): Monad RPC receipt/block-tag semantics for speculative vs finalized state — https://docs.monad.xyz/reference/json-rpc (before relayer).
-- TODO(VERIFY): OpenZeppelin Contracts current release to pin — https://github.com/OpenZeppelin/openzeppelin-contracts/releases (at implementation).
 - TODO(VERIFY): Monad-compatible multisig (e.g. Safe deployment on 143) — before broader real-user exposure (D8).
 - TODO(VERIFY): `@noble/curves` random secp256k1 key API name in the installed version (link package, Oct 4).
 - TODO(VERIFY): USDC / CCTP on Monad — Circle docs (only if cash-out via CCTP is pursued).

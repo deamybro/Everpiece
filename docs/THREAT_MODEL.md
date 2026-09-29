@@ -131,6 +131,11 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
   - **Inflow risk:** if `isReceiveWithAuthorizationUpgraded` is set, the payee check may vanish. A griefer could then consume a sender's authorization directly and strand funds in the escrow with no payment, which is unrecoverable because there is no sweep.
   - Mitigation (proposed): `createPayment` reverts `AusdSemanticsChanged` while that flag is set (ESCROW_SPEC §7.4). Monitor all AUSD flag bits.
 - Consumer copy must not claim funds are immune to issuer action.
+- **Everpiece guarantees contract-level accounting, not immunity from external AUSD issuer/admin intervention.** Agora can, per the verified token permissions: pause transfers and signatures, freeze any account (including the escrow), upgrade AUSD (the implementation, and per-function proxy flags), and burn from any account via BURNER_ROLE. Implemented defenses:
+  - Every AUSD failure reverts the whole Everpiece action, so there is never a false CLAIMED/CANCELLED/REFUNDED.
+  - Exact balance-delta checks on every inflow and outflow.
+  - The fail-closed creation guard on the receive-upgrade flag.
+  - All of these are fork-tested against live AUSD (`contracts/test/fork/`).
 
 ## I. Provider threats (post-claim, optional)
 

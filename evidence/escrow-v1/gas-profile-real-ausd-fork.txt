@@ -1,0 +1,6 @@
+  gas.createPayment(username): 284545
+  gas.claimUsernamePayment: 174438
+  gas.createPayment(link): 284035
+  gas.claimLinkPayment: 197223
+  gas.cancel: 156170
+  gas.refundExpired: 117089

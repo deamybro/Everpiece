@@ -1,6 +1,6 @@
 # ESCROW_SPEC.md — EverpieceEscrow (v0.2, reconciled)
 
-Status: **Reconciled with full MASTER PROMPT v3.2 and Maris decisions D1–D10 (2026-09-29). Awaiting Codex review → Maris GO. No contract code exists.**
+Status: **Reconciled with full MASTER PROMPT v3.2 and Maris decisions D1–D10 (2026-09-29). Maris GO given 2026-09-29. Implemented in `contracts/src/EverpieceEscrow.sol` (branch `feat/escrow-v1`). Implementation notes and deviations: §22. Codex adversarial review pending. Not deployed.**
 External facts: `VERIFIED.md`. Attacks: `THREAT_MODEL.md`. Evidence: `evidence/milestone1/`.
 Items still needing Maris confirmation are marked **[CONFIRM]**.
 
@@ -617,3 +617,38 @@ Unit tests use a mock AUSD that mirrors the verified semantics: payee check, str
 | Confirmation rule | — | §17 | D9 |
 | Account derivation | open | frozen `EVERPIECE_ACCOUNT_V1` + vectors | D6 |
 | Toolchain | Foundry 1.6 | Foundry 1.8.3, `network = "monad"`, evidence re-run | D10 |
+
+---
+
+## 22. Implementation notes (v1 code, 2026-09-29)
+
+Code: `contracts/src/EverpieceEscrow.sol`, `contracts/src/interfaces/{IEverpieceEscrow,IAUSD}.sol`. Shared ABI/types/vectors: `packages/shared`.
+
+Deviations from, or tightenings of, §1–§21. None changes who can receive funds, how much, or when:
+
+| # | Spec | Code | Why |
+|---|---|---|---|
+| 1 | §5 `payments` public mapping | `_payments` private; read via `getPayment(id)` returning the full struct | A single typed getter; the ABI stays clean for viem |
+| 2 | §9.3 claimKey `!= 0` | claimKey `∉ {0, p.approver}` → new error `InvalidClaimKey` | Guarantees the approver key can never satisfy both factors, even if a sender commits to the approver's address (test T53) |
+| 3 | §9.1 step 15 emit after transfer | `PaymentCreated` emitted after effects, **before** the AUSD call; the balance-delta check follows | Checks-effects-events-interactions (Slither); the transaction is still atomic |
+| 4 | §15 `EnforcedPause` custom | OZ `Pausable.EnforcedPause`; OZ `OwnableUnauthorizedAccount` / `OwnableInvalidOwner` | Reuse audited OZ errors |
+| 5 | §6.4 65-byte ECDSA | OZ `ECDSA.tryRecoverCalldata`: 65-byte, low-s only; 64-byte EIP-2098 compact rejected | Matches spec "EOA 65-byte"; test T45 |
+| 6 | §7.4 guard "proposed" | Implemented: `createPayment` reverts `AusdSemanticsChanged` if `isReceiveWithAuthorizationUpgraded()` returns true **or the read reverts** | Owner item 8: the switch is present on the deployed system, readable on-chain, and in VERIFIED §2.3/§2.10. Safe/unsafe/unreadable modes tested (T47, fork) |
+| 7 | — | Views `isExpired(id)`, `DOMAIN_SEPARATOR()`, public constants (typehashes, tags, ceilings, expiry bounds) | Frontend/relayer parity |
+| 8 | §18 constructor | `(IAUSD ausd, address owner, address initialClaimApprover)`; caps start at the ceilings; emits `CapsUpdated` + `ClaimApproverUpdated` | As §20 |
+
+Toolchain: solc 0.8.28, `evm_version = cancun`, via-IR, optimizer 10,000 runs, `bytecode_hash = none`, Foundry 1.8.3 `network = "monad"`, OpenZeppelin Contracts **v5.7.0** (commit cab19933c33c2ad1d4c7a84864a3601dddfd16f3), forge-std v1.16.2.
+Runtime size 11,827 B (Monad limit 128 KB).
+
+Execution gas against **real AUSD** (mainnet fork, Monad rules; excludes intrinsic 21,000 + calldata ≈ 3.9k for create):
+
+| Action | Execution gas |
+|---|---|
+| createPayment (username / link) | 284,545 / 284,035 |
+| claimUsernamePayment | 174,438 |
+| claimLinkPayment | 197,223 |
+| cancel | 156,170 |
+| refundExpired | 117,089 |
+| deploy (script simulation) | ≈ 3.55M total |
+
+Relayer note: Monad charges the full gas limit (VERIFIED §1.5). Suggested starting limits are observed value × ~1.2, e.g. create 350k, username claim 215k, link claim 240k, cancel 195k, refund 145k. Re-measure on the deployed contract before fixing them.

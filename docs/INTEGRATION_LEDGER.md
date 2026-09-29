@@ -8,8 +8,9 @@ Feature flags all start `false` (master §36): RAMP, AURORA, PAYOUT, PIECES, PRI
 
 | Integration | Core? | Status | Evidence | Blockers / next step | Last checked | Owner |
 |---|---|---|---|---|---|---|
-| Monad mainnet | Core | VERIFIED_DOCS | Chain 143 via live RPC; gas / reserve-balance / async docs read; Foundry 1.8.3 with `network = "monad"` installed (VERIFIED §1) | RPC block-tag/finality semantics for relayer; claim QuickNode/Tenderly perks | 2026-09-29 | core team |
-| AUSD | Core | **VERIFIED_FORK** | Sourcify source; live reads; 21/21 fork tests under Monad rules incl. live acceptance of vector V_U3 (`evidence/milestone1/ausd-fork-probe`) | Port to `contracts/test/fork/`; mainnet canary after GO | 2026-09-29 | core team |
+| Monad mainnet | Core | VERIFIED_FORK | Chain 143 via live RPC; docs read; EverpieceEscrow suite green under Foundry 1.8.3 `network = "monad"` on a mainnet fork; deploy script simulated against mainnet (VERIFIED §1) | RPC block-tag/finality semantics for relayer; claim QuickNode/Tenderly perks | 2026-09-29 | core team |
+| AUSD | Core | **VERIFIED_FORK** | Sourcify source; live reads; the **real EverpieceEscrow** runs create/claim/link-claim/cancel/refund with the published vectors on live AUSD, plus freeze/burn/guard (`contracts/test/fork/`, 28 tests) | Mainnet canary after Maris GO | 2026-09-29 | core team |
+| EverpieceEscrow | Core | VERIFIED_LOCAL + VERIFIED_FORK | 177/177 tests (CI profile, fork included); Slither: 0 high/medium (`evidence/escrow-v1/`) | Codex adversarial suite; Maris deploy GO | 2026-09-29 | core team |
 | Mera | Core | VERIFIED_CODE | `@category-labs/mera@0.2.0` types; official recipe frozen as `EVERPIECE_ACCOUNT_V1` with 3-implementation vectors (`evidence/milestone1/account-derivation`) | Real devices: budget Android/Chrome+GPM, iOS Safari, WhatsApp/Telegram WebViews; production rpId | 2026-09-29 | core team |
 | Envio | Core-support | VERIFIED_DOCS | Envio lists Monad 143 as first-class mainnet (VERIFIED §4.1) | Read HyperIndex config docs at indexer milestone | 2026-09-29 | Codex (Phase B) |
 | SMS provider | Core (link mode) | UNKNOWN | — | Choose provider; verify NG/UK/intl delivery, pricing, limits, sender-ID, auth (master §12.2) | 2026-09-29 | Codex |

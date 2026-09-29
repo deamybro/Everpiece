@@ -1,0 +1,56 @@
+'forge clean' running (wd: C:\monadmetr\contracts)
+'forge config --json' running
+'forge build --build-info --deny never --skip ./test/** ./script/** --force' running (wd: C:\monadmetr\contracts)
+INFO:Detectors:
+Detector: reentrancy-balance
+Reentrancy in EverpieceEscrow.createPayment(IEverpieceEscrow.PaymentIntent,bytes) (src/EverpieceEscrow.sol#89-154):
+	External call allowing reentrancy:
+	- AUSD.receiveWithAuthorization(sender,address(this),amount,intent.validAfter,intent.validBefore,paymentId,ausdSignature) (src/EverpieceEscrow.sol#150-152)
+	Balance read before the call:
+	- balanceBefore = AUSD.balanceOf(address(this)) (src/EverpieceEscrow.sol#149)
+	Possible stale balance used after the call in a condition:
+	- AUSD.balanceOf(address(this)) != balanceBefore + amount (src/EverpieceEscrow.sol#153)
+		- stale variable `balanceBefore`
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities
+INFO:Detectors:
+Detector: unused-return
+EverpieceEscrow._isSignedBy(bytes32,bytes,address) (src/EverpieceEscrow.sol#410-413) ignores return value by (recovered,err,None) = ECDSA.tryRecoverCalldata(digest,signature) (src/EverpieceEscrow.sol#411)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+INFO:Detectors:
+Detector: timestamp
+EverpieceEscrow.createPayment(IEverpieceEscrow.PaymentIntent,bytes) (src/EverpieceEscrow.sol#89-154) uses timestamp for comparisons
+	Dangerous comparisons:
+	- expiresAt < block.timestamp + MIN_EXPIRY || expiresAt > block.timestamp + MAX_EXPIRY || intent.validBefore > expiresAt (src/EverpieceEscrow.sol#107-108)
+	- block.timestamp <= intent.validAfter (src/EverpieceEscrow.sol#110)
+	- block.timestamp >= intent.validBefore (src/EverpieceEscrow.sol#111)
+EverpieceEscrow.claimUsernamePayment(bytes32,address,bytes32,bytes32,uint256,bytes) (src/EverpieceEscrow.sol#161-183) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > deadline (src/EverpieceEscrow.sol#171)
+EverpieceEscrow.claimLinkPayment(bytes32,address,address,bytes32,bytes32,uint256,bytes,bytes32,uint256,bytes) (src/EverpieceEscrow.sol#186-226) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > deadline (src/EverpieceEscrow.sol#208)
+	- block.timestamp > approvalDeadline (src/EverpieceEscrow.sol#215)
+EverpieceEscrow.cancel(bytes32,bytes32,uint256,bytes) (src/EverpieceEscrow.sol#233-248) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > deadline (src/EverpieceEscrow.sol#238)
+EverpieceEscrow.refundExpired(bytes32) (src/EverpieceEscrow.sol#251-259) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < p.expiresAt (src/EverpieceEscrow.sol#254)
+EverpieceEscrow.isExpired(bytes32) (src/EverpieceEscrow.sol#352-355) uses timestamp for comparisons
+	Dangerous comparisons:
+	- p.status == Status.ACTIVE && block.timestamp >= p.expiresAt (src/EverpieceEscrow.sol#354)
+EverpieceEscrow._activeUnexpired(bytes32) (src/EverpieceEscrow.sol#403-407) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= p.expiresAt (src/EverpieceEscrow.sol#406)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: cyclomatic-complexity
+EverpieceEscrow.createPayment(IEverpieceEscrow.PaymentIntent,bytes) (src/EverpieceEscrow.sol#89-154) has a high cyclomatic complexity (13).
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cyclomatic-complexity
+INFO:Detectors:
+Detector: naming-convention
+Function EverpieceEscrow.DOMAIN_SEPARATOR() (src/EverpieceEscrow.sol#358-360) is not in mixedCase
+Variable EverpieceEscrow.AUSD (src/EverpieceEscrow.sol#55) is not in mixedCase
+Function IEverpieceEscrow.DOMAIN_SEPARATOR() (src/interfaces/IEverpieceEscrow.sol#167) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+INFO:Slither:. analyzed (25 contracts with 102 detectors), 13 result(s) found

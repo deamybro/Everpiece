@@ -1,0 +1,245 @@
+# forge forge Version: 1.8.3 | network=monad | 2026-09-29T02:58:31Z | fork block 108923472
+No files changed, compilation skipped
+
+Ran 13 tests for test/Vectors.t.sol:VectorsTest
+[PASS] test_T90_crossChainVector() (gas: 31655)
+[PASS] test_T90_fixtureAddresses() (gas: 20112)
+[PASS] test_T90_linkVectors() (gas: 80638)
+[PASS] test_T90_metadataCommitment() (gas: 461)
+[PASS] test_T90_negativeVectors() (gas: 107520)
+[PASS] test_T90_usernameVectors() (gas: 80632)
+[PASS] test_T91_link_V_L7_redirectToStellaRejected() (gas: 380128)
+[PASS] test_T91_link_V_L8_rotatedApproverRejected() (gas: 641810)
+[PASS] test_T91_link_createAndClaim_withPublishedSigs() (gas: 533904)
+[PASS] test_T91_negative_V_N1_tamperedAmountRejected() (gas: 226192)
+[PASS] test_T91_username_V_U5_senderClaimRejected() (gas: 352746)
+[PASS] test_T91_username_createAndCancel_withPublishedSigs() (gas: 458398)
+[PASS] test_T91_username_createAndClaim_withPublishedSigs() (gas: 476709)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 44.41ms (17.85ms CPU time)
+
+Ran 28 tests for test/Expiry.t.sol:ExpiryTest
+[PASS] test_T10_linkClaim_atExpiryMinus1_succeeds() (gas: 305883)
+[PASS] test_T10_linkClaim_atExpiry_fails() (gas: 132125)
+[PASS] test_T10_usernameClaim_atExpiryMinus1_succeeds() (gas: 243381)
+[PASS] test_T10_usernameClaim_atExpiry_fails() (gas: 106613)
+[PASS] test_T11_cancel_atExpiryMinus1_succeeds() (gas: 224725)
+[PASS] test_T11_cancel_atExpiry_fails() (gas: 96553)
+[PASS] test_T12_refund_atExpiryMinus1_fails() (gas: 71851)
+[PASS] test_T12_refund_atExpiryPlus1_succeeds() (gas: 162682)
+[PASS] test_T12_refund_atExpiry_succeeds() (gas: 162450)
+[PASS] test_T12_refund_longAfterExpiry_succeeds() (gas: 159907)
+[PASS] test_T13_expiryCheckedAtExecutionTime() (gas: 116274)
+[PASS] test_T13_expiryInPast_fails() (gas: 115709)
+[PASS] test_T13_maxExpiry_exact_ok() (gas: 304967)
+[PASS] test_T13_maxExpiry_plus1_fails() (gas: 116314)
+[PASS] test_T13_minExpiry_exact_ok() (gas: 304901)
+[PASS] test_T13_minExpiry_minus1_fails() (gas: 115957)
+[PASS] test_T14_validBeforeAfterExpiry_fails() (gas: 115651)
+[PASS] test_T14_validBeforeEqualsExpiry_ok() (gas: 304911)
+[PASS] test_T15_approvalDeadline_equalNow_ok() (gas: 294785)
+[PASS] test_T15_approvalDeadline_past_fails() (gas: 139885)
+[PASS] test_T15_cancelDeadline_past_fails() (gas: 86107)
+[PASS] test_T15_claimDeadline_equalNow_ok() (gas: 220992)
+[PASS] test_T15_claimDeadline_past_fails() (gas: 96129)
+[PASS] test_T15_linkClaimKeyDeadline_past_fails() (gas: 133154)
+[PASS] test_T16_validAfterEqualsNow_fails() (gas: 116322)
+[PASS] test_T16_validAfterJustPast_ok() (gas: 305430)
+[PASS] test_T16_validBeforeEqualsNow_fails() (gas: 115845)
+[PASS] test_T16_validBeforeNowPlus1_ok() (gas: 305925)
+Suite result: ok. 28 passed; 0 failed; 0 skipped; finished in 65.07ms (22.07ms CPU time)
+
+Ran 18 tests for test/RaceAndAccounting.t.sol:RaceAndAccountingTest
+[PASS] test_T20_liabilityOverMixedSequence() (gas: 3164559)
+[PASS] test_T23_unsolicitedAusd_doesNotBreakAccounting_andIsStranded() (gas: 1151061)
+[PASS] test_T24_payoutReturnsFalse_reverts() (gas: 576826)
+[PASS] test_T24_payoutRevert_claimStateUnchanged() (gas: 849145)
+[PASS] test_T24_refundTransferFails_stateUnchanged() (gas: 691092)
+[PASS] test_T25_fundingShortfall_reverts() (gas: 447750)
+[PASS] test_T25_payoutShortfall_reverts() (gas: 629960)
+[PASS] test_T57_cancelThenClaim() (gas: 634338)
+[PASS] test_T57_claimThenCancel() (gas: 644000)
+[PASS] test_T57_linkClaimThenCancel_andReverse() (gas: 1357907)
+[PASS] test_T80_escrowFrozen_allOutflowsRevert_thenRecover() (gas: 969055)
+[PASS] test_T81_recipientFrozen_claimReverts_senderCanCancel() (gas: 791320)
+[PASS] test_T82_issuerBurnFromEscrow_breaksSolvency_payoutsRevertNotPartial() (gas: 1099756)
+[PASS] test_T83_signaturePause_blocksCreate_payoutsContinue() (gas: 831304)
+[PASS] test_T83_transferPause_blocksEverything() (gas: 777217)
+[PASS] test_claimThenRefund_refundFails() (gas: 602644)
+[PASS] test_claimVsRefund_atBoundary() (gas: 573916)
+[PASS] test_reentrancy_tokenCallbackCannotReenter() (gas: 591561)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 78.95ms (52.13ms CPU time)
+
+Ran 48 tests for test/Authorization.t.sol:AuthorizationTest
+[PASS] test_T30_duplicateCreate_reverts() (gas: 440917)
+[PASS] test_T30_recreateAfterTerminal_reverts() (gas: 615659)
+[PASS] test_T31_crossChain_claimSigRejected() (gas: 442013)
+[PASS] test_T31_crossChain_fundingSigRejected() (gas: 358649)
+[PASS] test_T32_crossContract_fundingAndClaimRejected() (gas: 780143)
+[PASS] test_T33_changedAmount() (gas: 347558)
+[PASS] test_T34_changedExpiry() (gas: 347350)
+[PASS] test_T35_changedRecipient() (gas: 378225)
+[PASS] test_T36_changedMetadata() (gas: 347405)
+[PASS] test_T37_changedSalt() (gas: 347756)
+[PASS] test_T38_changedValidAfter() (gas: 348605)
+[PASS] test_T38_changedValidBefore() (gas: 347934)
+[PASS] test_T39_changedApprover() (gas: 413076)
+[PASS] test_T39_changedMode() (gas: 365058)
+[PASS] test_T39_changedSender() (gas: 441448)
+[PASS] test_T40_authorizationForPaymentA_usedForPaymentB() (gas: 640825)
+[PASS] test_T41_authorizationCancelledOnAusd() (gas: 457898)
+[PASS] test_T42_directAusdConsumptionByThirdParty_blockedByPayeeCheck() (gas: 424400)
+[PASS] test_T42_transferWithAuthorizationSig_rejected() (gas: 347699)
+[PASS] test_T43_claimSigReplayAfterClaim() (gas: 611355)
+[PASS] test_T43_crossTerminalTransitions() (gas: 1291670)
+[PASS] test_T43_doubleClaimLink_doubleCancel_doubleRefund() (gas: 1745041)
+[PASS] test_T44_approvalNonceReuseAcrossPayments() (gas: 1152469)
+[PASS] test_T44_recipientNonceReuseAcrossPayments() (gas: 935244)
+[PASS] test_T44_senderCancelNonceReuse() (gas: 907068)
+[PASS] test_T45_highS_rejected() (gas: 435029)
+[PASS] test_T45_malformedSignatures_rejected() (gas: 678343)
+[PASS] test_T46_approverSignsWrongType_rejected() (gas: 535069)
+[PASS] test_T46_cancelSigCannotClaim_claimSigCannotCancel() (gas: 515367)
+[PASS] test_T46_claimKeySignsWrongType_rejected() (gas: 527808)
+[PASS] test_T50_senderCannotClaimForRecipient_withOwnSignature() (gas: 440566)
+[PASS] test_T50_senderCannotClaimUsernamePayment_asSelf() (gas: 434471)
+[PASS] test_T50_wrongRecipientSalt_rejected() (gas: 433873)
+[PASS] test_T51_relayerRedirectsLinkClaim() (gas: 505048)
+[PASS] test_T51_relayerRedirectsUsernameClaim() (gas: 435112)
+[PASS] test_T52_linkKeyOnly_claimKeySignsItsOwnApproval() (gas: 512906)
+[PASS] test_T52_linkKeyOnly_noValidApproval() (gas: 577616)
+[PASS] test_T53_approvalOnly_attackerRevealsOwnKey() (gas: 497560)
+[PASS] test_T53_approvalOnly_forgedClaimKeySig() (gas: 505186)
+[PASS] test_T53_approverCannotActAsClaimKey() (gas: 477778)
+[PASS] test_T54_approvalForMama_redirectedToStella() (gas: 815761)
+[PASS] test_T55_wrongLinkSalt() (gas: 498653)
+[PASS] test_T55_zeroClaimKey() (gas: 497944)
+[PASS] test_T56_cancelByNonSender_rejected() (gas: 625984)
+[PASS] test_T56_cancelRefundGoesToSender_notCaller() (gas: 578776)
+[PASS] test_T58_wrongModeClaims() (gas: 834820)
+[PASS] test_invalidRecipient_zeroOrEscrow() (gas: 889463)
+[PASS] test_unknownPayment_allPathsRevert() (gas: 219305)
+Suite result: ok. 48 passed; 0 failed; 0 skipped; finished in 24.96s (87.87ms CPU time)
+
+Ran 16 tests for test/fork/AusdProbe.t.sol:AusdProbe
+[PASS] test_cancelAuthorization_blocks_use() (gas: 225345)
+[PASS] test_changed_amount_reverts() (gas: 129891)
+[PASS] test_compact_64byte_signature_accepted() (gas: 213465)
+[PASS] test_decimals() (gas: 30174)
+[PASS] test_erc1271_contract_from_supported() (gas: 440245)
+[PASS] test_high_s_malleated_signature_accepted() (gas: 223462)
+[PASS] test_issuer_burner_can_burn_escrow_balance_without_allowance() (gas: 177069)
+[PASS] test_issuer_freeze_on_escrow_blocks_outflows() (gas: 202227)
+[PASS] test_issuer_freeze_on_recipient_blocks_claim_transfer() (gas: 230254)
+[PASS] test_issuer_signature_pause_blocks_receiveWithAuthorization_but_not_transfer() (gas: 292332)
+[PASS] test_issuer_transfer_pause_blocks_receive_and_transfer() (gas: 182691)
+[PASS] test_permit_fallback_works() (gas: 362496)
+[PASS] test_receiveWithAuthorization_contractPayee_ok_and_replay_blocked() (gas: 371404)
+[PASS] test_receiveWithAuthorization_thirdPartyCaller_reverts_InvalidPayee() (gas: 94836)
+[PASS] test_receive_sig_is_not_valid_as_transferWithAuthorization() (gas: 119233)
+[PASS] test_validity_window_boundaries() (gas: 358085)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 24.96s (36.74s CPU time)
+
+Ran 12 tests for test/fork/EscrowFork.t.sol:EscrowForkTest
+[PASS] test_fork_escrowFrozen_outflowsRevert_stateUnchanged() (gas: 841424)
+[PASS] test_fork_gasProfile() (gas: 947982)
+[PASS] test_fork_gasProfile_cancelRefund() (gas: 856624)
+[PASS] test_fork_guard_receiveUpgradedFlag_blocksCreateOnly() (gas: 591429)
+[PASS] test_fork_issuerBurnFromEscrow_payoutReverts() (gas: 639352)
+[PASS] test_fork_link_createClaim_publishedVectors() (gas: 545121)
+[PASS] test_fork_recipientFrozen_claimReverts_cancelWorks() (gas: 741771)
+[PASS] test_fork_refundExpired() (gas: 442735)
+[PASS] test_fork_tamperedAmount_rejectedByRealAusd() (gas: 257766)
+[PASS] test_fork_thirdPartyCannotConsumeAuthorizationDirectly() (gas: 341658)
+[PASS] test_fork_username_createCancel_publishedVectors() (gas: 469767)
+[PASS] test_fork_username_createClaim_publishedVectors() (gas: 601878)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 24.96s (31.49s CPU time)
+
+Ran 9 tests for test/Fuzz.t.sol:FuzzTest
+[PASS] testFuzz_anyIntentChangeInvalidatesAuthorization(uint256,uint256) (runs: 10000, μ: 293335, ~: 292992)
+[PASS] testFuzz_create_amountBounds(uint256) (runs: 10000, μ: 297981, ~: 384284)
+[PASS] testFuzz_create_expiryWindow(uint256) (runs: 10000, μ: 203455, ~: 133111)
+[PASS] testFuzz_linkNeedsBothFactors(uint256,uint256) (runs: 10000, μ: 505674, ~: 505654)
+[PASS] testFuzz_onlyRecipientCanClaim(uint256) (runs: 10000, μ: 434755, ~: 433523)
+[PASS] testFuzz_onlySenderCanCancel(uint256,address) (runs: 10000, μ: 435628, ~: 432222)
+[PASS] testFuzz_recipientCommitmentBinding(address,bytes32,address,bytes32) (runs: 10000, μ: 66113, ~: 66113)
+[PASS] testFuzz_setCaps(uint256,uint256) (runs: 10000, μ: 81109, ~: 80327)
+[PASS] testFuzz_timeBoundaries(uint256,uint8) (runs: 10000, μ: 491904, ~: 456397)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 24.96s (83.42s CPU time)
+
+Ran 1 test for test/invariant/EscrowInvariant.t.sol:EscrowInvariantTest
+[PASS]
+EscrowInvariantTest invariants:
+[PASS] invariant_attackerNeverClaims
+[PASS] invariant_cancelAndRefundNeverBlocked
+[PASS] invariant_capsWithinCeilings
+[PASS] invariant_conservation
+[PASS] invariant_liabilityEqualsSumOfActive
+[PASS] invariant_solvency
+[PASS] invariant_storedTermsImmutable
+[PASS] invariant_terminalStatesAreFinal
+ EscrowInvariantTest invariants (runs: 1024, calls: 131072, reverts: 16362)
+
+╭---------------+----------------+-------+---------+----------╮
+| Contract      | Selector       | Calls | Reverts | Discards |
++=============================================================+
+| EscrowHandler | attackerClaim  | 11809 | 0       | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | cancel         | 11967 | 0       | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | claimLink      | 12030 | 4010    | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | claimUsername  | 11954 | 4067    | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | create         | 11830 | 7670    | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | donate         | 11800 | 0       | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | refund         | 11993 | 0       | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | rotateApprover | 12042 | 0       | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | setCaps        | 11965 | 615     | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | togglePause    | 11873 | 0       | 0        |
+|---------------+----------------+-------+---------+----------|
+| EscrowHandler | warp           | 11809 | 0       | 0        |
+╰---------------+----------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 243.21s (243.19s CPU time)
+
+Ran 32 tests for test/EverpieceEscrow.t.sol:EverpieceEscrowTest
+[PASS] test_T01_createUsername() (gas: 462609)
+[PASS] test_T02_usernameClaim() (gas: 650182)
+[PASS] test_T03_linkClaim() (gas: 766194)
+[PASS] test_T04_cancel() (gas: 593102)
+[PASS] test_T05_refundExpired_byStranger() (gas: 564575)
+[PASS] test_T22_aggregateCap() (gas: 3085241)
+[PASS] test_T22_loweringCapsDoesNotAffectExistingPayments() (gas: 1071255)
+[PASS] test_T22_perPaymentCap() (gas: 451473)
+[PASS] test_T22_setCaps_boundedByCeilings() (gas: 309122)
+[PASS] test_T47_guard_safeMode_allowsCreate() (gas: 375689)
+[PASS] test_T47_guard_unreadableFlag_failsClosed() (gas: 212249)
+[PASS] test_T47_guard_unsafeMode_blocksCreate_butNotExistingLiabilities() (gas: 1998142)
+[PASS] test_T59_linkClaim_senderSelfDesignated() (gas: 661300)
+[PASS] test_T60_T61_approverRotation() (gas: 1548323)
+[PASS] test_T62_linkIntentApproverMustMatchCurrent() (gas: 189275)
+[PASS] test_T63_usernameIntentMustHaveZeroApprover() (gas: 134180)
+[PASS] test_T70_pause_blocksCreateAndClaims_allowsCancelAndRefund() (gas: 1942079)
+[PASS] test_T71_onlyOwnerAdmin() (gas: 218470)
+[PASS] test_T73_ownable2Step_and_renounceDisabled() (gas: 194845)
+[PASS] test_constructor_rejectsZeroAddresses() (gas: 20295)
+[PASS] test_constructor_state() (gas: 95118)
+[PASS] test_create_insufficientBalance_reverts() (gas: 406768)
+[PASS] test_create_rejectsBadSender() (gas: 152153)
+[PASS] test_create_rejectsBadSignature() (gas: 326210)
+[PASS] test_create_rejectsInvalidMode() (gas: 152411)
+[PASS] test_create_rejectsZeroAmount() (gas: 106657)
+[PASS] test_create_rejectsZeroRecipientCommitment() (gas: 107462)
+[PASS] test_create_zeroMetadataAllowed() (gas: 350704)
+[PASS] test_isExpired_unknownPaymentFalse() (gas: 27796)
+[PASS] test_setClaimApprover_rejectsZero() (gas: 59940)
+[PASS] test_usernameClaim_senderIsCommittedRecipient_canClaim() (gas: 573226)
+[PASS] test_views_domainAndTypehashes() (gas: 110973)
+Suite result: ok. 32 passed; 0 failed; 0 skipped; finished in 243.28s (57.05ms CPU time)
+
+Ran 9 test suites in 243.33s (586.51s CPU time): 177 tests passed, 0 failed, 0 skipped (177 total tests)

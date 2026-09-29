@@ -1,0 +1,15 @@
+✔ keys and addresses (42.2407ms)
+✔ constants: tags, typehash-bearing domain separators (2.0118ms)
+✔ metadata commitment (0.3321ms)
+✔ username: commitment, paymentId, funding, claim, cancel (20.8199ms)
+✔ negative: every change yields a different paymentId and invalidates the funding signature (44.1435ms)
+✔ link: commitment, paymentId, both factors, role separation, redirect (27.4069ms)
+✔ EVERPIECE_ACCOUNT_V1 derivation (synthetic PRF fixtures) (87.9034ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1210.6942

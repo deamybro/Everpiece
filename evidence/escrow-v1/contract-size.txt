@@ -1,0 +1,2 @@
+| Contract           | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
+| EverpieceEscrow    | 11,827           | 12,755            | 119,245            | 249,389             |

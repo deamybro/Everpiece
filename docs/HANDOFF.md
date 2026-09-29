@@ -4,6 +4,74 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 3 — 2026-09-29 — EverpieceEscrow v1 implementation
+
+- **Date/time:** 2026-09-29
+- **Agent:** Everpiece team
+- **Branch:** `feat/escrow-v1` (from `main` @ 4b223f5). Not merged, not pushed; no remote configured.
+- **Completed:**
+  1. Initialized git; committed the docs, `MASTER_PROMPT.md` (transcribed verbatim from Maris's chat paste; Maris please diff against your original) and Milestone 1 evidence on `main`.
+  2. Foundry project `contracts/`: `network = "monad"`, solc 0.8.28, cancun, via-IR; OZ v5.7.0 and forge-std v1.16.2 pinned as submodules.
+  3. `EverpieceEscrow.sol` per ESCROW_SPEC v0.2, including:
+     - single-signature ERC-3009 funding (nonce = paymentId, all AUSD arguments derived from the intent, exact balance deltas);
+     - username claim;
+     - two-factor link claim with the approver snapshot;
+     - cancel and refund that pause can never block;
+     - V1 cap ceilings;
+     - the fail-closed AUSD security-mode guard;
+     - Ownable2Step with renounce disabled;
+     - no admin fund path.
+  4. Tests: 177 in total. Unit, exact boundaries, authorization/replay, race/accounting, vectors, fuzz, invariants, and fork against real AUSD.
+  5. Slither 0.11.6: 0 high/medium, 13 informational (triaged below).
+  6. `packages/shared`: generated ABI, EIP-712 typed data, commitments, `deriveEverpieceAccountV1`, `vectors.json`, and a viem test suite (7/7; 4th independent implementation).
+  7. Deploy script with VERIFIED-fact assertions, simulated against mainnet. **Nothing broadcast.**
+- **Files changed:**
+  - `contracts/{foundry.toml,foundry.lock}`
+  - `contracts/src/**`
+  - `contracts/test/**` (`adversarial/` has a README only)
+  - `contracts/script/DeployEverpieceEscrow.s.sol`
+  - `packages/shared/**`
+  - `scripts/gen-shared-abi.mjs`
+  - `evidence/escrow-v1/**`
+  - `docs/{ESCROW_SPEC §22, VERIFIED §1.13/§3.5, THREAT_MODEL §H, INTEGRATION_LEDGER, HANDOFF}`
+  - `.gitmodules`
+- **Tests run:**
+  - `RUN_FORK_TESTS=true FOUNDRY_PROFILE=ci forge test`: **177 passed, 0 failed**.
+    - Fuzz: 9 properties × 10,000 runs.
+    - Invariants: 8 invariants over 1,024 runs × 128 depth = 131,072 calls.
+    - Fork block ≈ 108.92M.
+  - `forge test` offline: 149 passed, 2 fork suites skipped.
+  - `packages/shared`: `node --test` 7/7; `tsc --noEmit` clean.
+  - Outputs are in `evidence/escrow-v1/`.
+- **Facts verified:** OZ/forge-std/viem/Slither versions (VERIFIED §1.13). The AUSD receive-upgrade flag is readable on the live system and the guard works on a fork.
+- **Open findings:** none CRITICAL/HIGH/MEDIUM known. Slither informational triage:
+  - `reentrancy-balance`: the balance-delta check is intentional; `nonReentrant` everywhere; fail-safe.
+  - `unused-return`: `tryRecover` error argument ignored on purpose.
+  - `timestamp` ×7: expiry semantics by design.
+  - `cyclomatic-complexity` (createPayment 13) and naming (`AUSD`, `DOMAIN_SEPARATOR`): accepted.
+- **TODO(VERIFY):**
+  - hackathon deadline/timezone;
+  - Agora bounty text;
+  - Monad RPC finality tags for the relayer;
+  - a Monad multisig (before broader exposure);
+  - ownership of `everpiece.xyz` + HTTPS (before freezing the rpId);
+  - SMS provider;
+  - the `@noble/curves` key API (link package).
+- **Blocked integrations:** all optional integrations DISABLED.
+- **Decisions (Maris, this session):** expiry 1 d / 30 d / default 30 d; caps $500 / $5,000 as absolute ceilings; username claim to the committed recipient only; two-factor link claim with approver snapshot; owner-only pause that never blocks cancel/refund; no withdraw/rescue/proxy; single-signature ERC-3009 funding; implement the AUSD security-mode guard (conditions met: present, readable, documented); `EVERPIECE_ACCOUNT_V1` unchanged; no custom recovery; target rpId `everpiece.xyz`, not frozen; git initialized; inclusion ≠ success.
+- **Deviations from spec:** ESCROW_SPEC §22 (8 items). None alters money semantics. The notable one: `claimKey` may not equal the snapshotted approver (`InvalidClaimKey`).
+- **Next recommended action:**
+  1. **Codex Phase A**: an adversarial review and suite against `contracts/src/EverpieceEscrow.sol` in `contracts/test/adversarial/` (prompt below).
+  2. Maris: push to GitHub, open a PR `feat/escrow-v1 → main`.
+  3. Add CI (forge offline suite + `packages/shared` test/typecheck).
+  4. After Codex is green, Maris GO → mainnet deploy + canaries A/B/C at about $10 with `setCaps` lowered first.
+
+### Codex Phase A prompt (paste into Codex)
+
+> Read MASTER_PROMPT.md, docs/ESCROW_SPEC.md (v0.2 + §22), docs/THREAT_MODEL.md and contracts/. Assume contracts/src/EverpieceEscrow.sol is vulnerable. Do not edit contracts/src/. Write your attack suite in contracts/test/adversarial/ (you may reuse test/utils/EscrowBase.t.sol and MockAUSD). Execute the full master §44.2 matrix, independently of the core team's tests. Report every issue in the §44.3 format with a regression test. CRITICAL/HIGH block mainnet.
+
+---
+
 ## Session 2 — 2026-09-29 — Milestone 1 reconciliation
 
 - **Date/time:** 2026-09-29
