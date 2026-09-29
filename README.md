@@ -15,7 +15,8 @@ Everpiece is a mobile-first web app / installable PWA on Monad for protected per
 | `packages/shared` | ABI, EIP-712 typed data, commitments, account recipe, canonical vectors |
 | `server/relayer` | Implemented: allow-listed gasless relayer with simulation, serialized nonces and finality-gated confirmation; 24 tests incl. a Monad fork with real AUSD. Not deployed |
 | `server/claims` | Implemented: link-mode recipient verification (SMS OTP via Twilio Verify or Termii; SIMULATED for local tests only) and short-lived ClaimApproval signing; 15 tests incl. an end-to-end on-chain link claim on a Monad fork. Live SMS not yet configured |
-| `web/`, `indexer/` | Not started |
+| `web/` | Implemented (local): Next.js 16 PWA with a Mera passkey account, send by link, claim with a texted code, cancel and expiry return; nonce CSP. Playwright E2E passes on the local dev stack with a PRF virtual authenticator. Not hosted |
+| `indexer/` | Not started |
 | Optional integrations | All disabled (`docs/INTEGRATION_LEDGER.md`) |
 
 ## Layout
@@ -28,9 +29,10 @@ contracts/        Foundry project (network = "monad")
 packages/shared/  the ONLY source of ABI / typed data / vectors for apps
 server/relayer/   gasless relayer (see its README)
 server/claims/    claims/approver server (see its README)
+web/              the Everpiece PWA (Next.js 16)
 docs/             the eight project documents (start with docs/HANDOFF.md)
 evidence/         non-secret test/fork/analysis evidence
-scripts/          generators
+scripts/          generators; dev-stack.mjs (local fork stack: `npm run dev:stack`)
 ```
 
 ## Quick start

@@ -4,6 +4,42 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 6 — 2026-09-29 — PWA (web) + local dev stack
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Decision (owner):** the PWA is reassigned to the core team. SMS provider setup is parked ("build other things first"). The chat/voice "send message intent" ("Send Mama $200" → review screen → fingerprint) is deferred.
+- **Completed:**
+  - **`web/`** (Next.js 16.3.7, React 19.3):
+    - Mera 0.2.0 `EVERPIECE_ACCOUNT_V1` passkey account, with one passkey prompt per money action.
+    - Home: balance, sent list, cancel, return-expired.
+    - Send by link: amount → phone → review with fees → one fingerprint signs both the AUSD authorization and the InviteRegistration → WhatsApp / share / copy link.
+    - Claim page `/c/[paymentId]#pkg`: the fragment is wiped from the address bar on load; the recipient creates an account, gets the texted code, and claims.
+    - Per-request nonce CSP (`proxy.ts`), `no-store` on `/c/*`, Referrer-Policy `no-referrer`, a manifest and a conservative service worker.
+  - **Money-safety rule in the send flow:** once `createPayment` is CONFIRMED, the flow retries the invite 3× and never offers a retry that could fund a second payment. If the invite still fails, it shows a "money is protected, cancel from Home" state, and the link is never shown, so nobody can claim it.
+  - **Bug fixed:** the invite deadline was `now + 3000` s, but the claims server caps it at 600 s (BadDeadline). It is now `now + 540`.
+  - **`scripts/dev-stack.mjs`** (`npm run dev:stack`): anvil Monad fork with Monad-like finality, fresh random in-memory keys, escrow deploy, relayer :8787, claims :8788 (simulated SMS), faucet :8790 (test AUSD, `/sms` viewer), web :3000.
+- **Tests run:**
+  - Playwright E2E `web/e2e/flow.spec.ts`: **1/1 pass** (54 s) against the dev stack, using a CDP virtual authenticator with PRF, so Mera runs its real code path. The run covers:
+    - two passkey accounts, the faucet, and a $25 link send;
+    - a wrong code is refused, the right code claims, and the recipient balance shows $25;
+    - a second $10 payment is cancelled and the money returns;
+    - the dead link and a fragment-less link are refused;
+    - zero CSP console errors.
+  - Production `next build` + `next start`: nonce CSP present on `/`, `/send` and `/c/*`, with **no console errors**.
+  - Workspace offline tests (shared 8, relayer 6, claims 8) and typecheck (including web) are clean.
+- **Open / known limits:**
+  - SMS is still BLOCKED for real users (Twilio trial is templates only; see VERIFIED §4.6).
+  - Username mode has no UI yet. It needs a small username directory.
+  - The sent list is kept in `localStorage` only (lost on a new device). The Envio indexer fixes this.
+  - The web app has no hosting or domain set up yet (everpiece.xyz is not frozen).
+  - Demo persona names in tests/docs still include the owner's name. Waiting on the owner's scrub choice together with the history rewrite.
+- **Decisions needed from owner:**
+  1. New commit name/email for the history rewrite before any push.
+  2. SMS provider path (Twilio upgrade / Termii / wait).
+- **Next recommended action:** username payments (directory + UI), then the Envio indexer (sent/received history across devices).
+
+---
+
 ## Session 5 — 2026-09-29 — claims/approver server
 
 - **Branch:** `feat/escrow-v1` (local only).
