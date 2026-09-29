@@ -13,7 +13,8 @@ Everpiece is a mobile-first web app / installable PWA on Monad for protected per
 |---|---|
 | `contracts/`: EverpieceEscrow v1 | Implemented; 177 tests green incl. a Monad mainnet fork against real AUSD; Slither 0 high/medium. **Not deployed.** Awaiting the adversarial review |
 | `packages/shared` | ABI, EIP-712 typed data, commitments, account recipe, canonical vectors |
-| `web/`, `server/`, `indexer/` | Not started |
+| `server/relayer` | Implemented: allow-listed gasless relayer with simulation, serialized nonces and finality-gated confirmation; 24 tests incl. a Monad fork with real AUSD. Not deployed |
+| `web/`, `server/claims`, `indexer/` | Not started |
 | Optional integrations | All disabled (`docs/INTEGRATION_LEDGER.md`) |
 
 ## Layout
@@ -24,6 +25,7 @@ contracts/        Foundry project (network = "monad")
   test/           unit, boundary, authorization, race, vectors, fuzz, invariant, fork; adversarial/ (reviewer-owned)
   script/         deploy script (asserts verified facts; simulate before any broadcast)
 packages/shared/  the ONLY source of ABI / typed data / vectors for apps
+server/relayer/   gasless relayer (see its README)
 docs/             the eight project documents (start with docs/HANDOFF.md)
 evidence/         non-secret test/fork/analysis evidence
 scripts/          generators
@@ -35,7 +37,8 @@ scripts/          generators
 git clone --recurse-submodules <repo> && cd <repo>/contracts
 forge test                                   # offline suites
 RUN_FORK_TESTS=true forge test               # + real Monad AUSD fork (uses https://rpc.monad.xyz or $MONAD_RPC)
-cd ../packages/shared && npm ci && npm test   # vectors via viem
+cd .. && npm ci && npm test                    # shared vectors (viem) + relayer unit tests
+RUN_FORK_TESTS=true npm test -w @everpiece/relayer   # relayer vs anvil fork with real AUSD
 ```
 
 Requires Foundry ≥ 1.8 (pinned 1.8.3) and Node ≥ 24.

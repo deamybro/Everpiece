@@ -84,6 +84,7 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
 - E7 **Nonce races.** Serialized submission per relayer EOA; workers never race for a nonce.
 - E8 **Arbitrary calldata relay.** Never; method allow-list only.
 - E9 **Idempotency.** Every financial request has an idempotency key (the action nonce / paymentId). Retries never duplicate value movement.
+- E10 **Implemented (server/relayer v0):** E1/E4/E6–E9 are enforced in code and fork-tested (`evidence/relayer-v0/`). Remaining: the relayer key is still an env var (move it to KMS before mainnet), and the rate limiter is per-process (run a single instance).
 
 ## F. Frontend / Mera threat boundary (master §22–23)
 

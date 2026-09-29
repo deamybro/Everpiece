@@ -1,0 +1,40 @@
+# relayer fork suite | anvil 1.8.3 --network monad fork of https://rpc.monad.xyz | node v26.4.0 | 2026-09-29T12:59:41Z
+▶ relayer on a Monad mainnet fork (real AUSD)
+  ✔ create: PROCESSING while not final, CONFIRMED only after finality; idempotent retry (3629.0855ms)
+  ✔ username claim → CONFIRMED; recipient receives exact amount (1387.5714ms)
+  ✔ link claim (both factors) → CONFIRMED (907.1763ms)
+  ✔ cancel → CONFIRMED; money returned to sender (940.5096ms)
+  ✔ refundExpired after expiry → CONFIRMED (permissionless) (1443.9637ms)
+  ✔ tampered intent is rejected off-chain; no transaction sent (70.0771ms)
+  ✔ valid signature but on-chain rule violated → 422 with decoded escrow error; no transaction (1351.6957ms)
+  ✔ below application minimum → 422; wrong-signer cancel → 401 (1029.3486ms)
+  ✔ link claim with a forged approval → 401 before any RPC simulation (1345.1289ms)
+  ✔ no arbitrary relay endpoint; strict media type, size, JSON and schema (56.2376ms)
+  ✔ claim/cancel race: both pass simulation, both included — the loser is FAILED (RevertedOnChain), chain state wins (2744.5218ms)
+  ✔ per-IP rate limit → 429 (128.1157ms)
+  ✔ low relayer balance → 503, request REJECTED, nothing broadcast (124.0828ms)
+  ✔ daily gas budget → 503 DailyBudgetExhausted (110.6801ms)
+  ✔ startup refuses wrong chain id and wrong escrow (469.8228ms)
+  ✔ logs never contain the relayer key (0.663ms)
+  ✔ gas observations: every confirmed tx used less than its explicit limit (0.5644ms)
+  ℹ gasUsed createPayment: 265138, 231114, 248492, 231138, 231126, 231138, 231150, 248516, 231126 (limit 350000)
+  ℹ gasUsed claimUsernamePayment: 173992, 156992 (limit 215000)
+  ℹ gasUsed claimLinkPayment: 196625 (limit 240000)
+  ℹ gasUsed cancel: 155572 (limit 195000)
+  ℹ gasUsed refundExpired: 116508 (limit 145000)
+  ✔ health reports chain and relayer (18.6393ms)
+✔ relayer on a Monad mainnet fork (real AUSD) (23452.5126ms)
+✔ parseCreate accepts a canonical request and yields bigints (3.1063ms)
+✔ parseCreate rejects floats, numbers, negatives, overflow, bad mode, unknown/missing fields, bad sig length (2.7312ms)
+✔ other action schemas (3.0434ms)
+✔ config requires key, RPC and escrow; defaults are mainnet-conservative (1.2518ms)
+✔ log redacts secret-looking fields (1.9876ms)
+✔ revertName decodes escrow custom errors, null for non-revert errors (2.8344ms)
+ℹ tests 24
+ℹ suites 1
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25808.2665

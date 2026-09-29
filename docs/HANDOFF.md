@@ -4,6 +4,37 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 4 — 2026-09-29 — ops verification + gasless relayer
+
+- **Agent:** Everpiece team
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Decision (owner):** the **relayer is reassigned from Codex to the core team** (master §43.1 exception). The PWA, claims/approver server, SMS, voice and indexer remain unassigned.
+- **Completed:**
+  - Verified Monad RPC block tags / finality / receipt semantics (VERIFIED §1.14). Resolved the ESCROW_SPEC §17 TODO: success needs `receipt.blockNumber <= "finalized"`.
+  - Verified Safe v1.4.1 on chain 143 (VERIFIED §4.3); bytecode matches the registry.
+  - CI workflow (not yet run: no remote); root `README.md`, `AGENTS.md`.
+  - Added AUSD's verified custom errors to `IAUSD` (declarations only; escrow bytecode unaffected, 149 offline forge tests re-run green) so services decode AUSD reverts from the shared ABI.
+  - npm workspace (root `package.json`): `packages/shared`, `server/relayer`.
+  - **`server/relayer`:** HTTP API for exactly five escrow actions and nothing else. It does strict schemas, off-chain signature prechecks, natural-key idempotency, per-IP/per-signer/daily limits, a MON balance guard and a daily gas budget. It simulates at explicit gas limits (so reverts cost no gas) and uses a serialized nonce queue with persisted raw txs and rebroadcast. The monitor confirms only at finality with the expected event and state; everything is stored in SQLite (`node:sqlite`); logs are redacted.
+- **Tests run:**
+  - relayer offline 6/6;
+  - relayer fork (anvil 1.8.3 `--network monad` fork of mainnet, real AUSD) 18/18, including the claim/cancel race where both are included and the loser is FAILED and reconciled;
+  - shared 7/7; typecheck clean.
+  - Evidence: `evidence/relayer-v0/`.
+- **Gas observed (real AUSD, fork):** create 231–265k, username claim 157–174k, link claim ~197k, cancel ~156k, refund ~117k. Every one is under its limit (350k / 215k / 240k / 195k / 145k).
+- **Open findings / limits:**
+  - The relayer key is an env var: KMS before mainnet.
+  - The rate limiter is in-memory, per process.
+  - anvil models `finalized` as latest−64 (Monad ≈ latest−2); the relayer logic is identical, and the tests mine past it.
+- **TODO(VERIFY):** unchanged from session 3, minus the RPC finality item (resolved) and the multisig item (a test Safe via the UI is still to do).
+- **Git identity:** commits use the owner's chosen identity (set 2026-10-06).
+- **Next recommended action:**
+  1. The owner picks the commit identity → rewrite history → push → CI runs.
+  2. Codex Phase A adversarial suite on the escrow.
+  3. Next unassigned core pieces: the claims/approver server (link-mode OTP → `ClaimApproval`), then the PWA (Mera onboarding, send/claim/cancel).
+
+---
+
 ## Session 3 — 2026-09-29 — EverpieceEscrow v1 implementation
 
 - **Date/time:** 2026-09-29
