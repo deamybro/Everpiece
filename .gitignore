@@ -1,0 +1,18 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# build
+node_modules/
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+packages/shared/node_modules/
+# slither
+crytic-export/
+# os
+.DS_Store
+Thumbs.db

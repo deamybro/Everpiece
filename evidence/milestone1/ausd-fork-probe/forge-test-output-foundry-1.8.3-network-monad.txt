@@ -1,0 +1,35 @@
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 7.16s
+Compiler run successful!
+
+Ran 5 tests for test/Vectors.t.sol:Vectors
+[PASS] test_constants() (gas: 6169)
+[PASS] test_link_vectors() (gas: 40808)
+[PASS] test_receive_upgraded_flag_observable() (gas: 29957)
+[PASS] test_username_vectors() (gas: 44453)
+[PASS] test_vector_U3_accepted_by_live_AUSD() (gas: 560911)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 9.17s (12.91s CPU time)
+
+Ran 16 tests for test/AusdProbe.t.sol:AusdProbe
+[PASS] test_cancelAuthorization_blocks_use() (gas: 238700)
+[PASS] test_changed_amount_reverts() (gas: 139002)
+[PASS] test_compact_64byte_signature_accepted() (gas: 224339)
+[PASS] test_decimals() (gas: 31330)
+[PASS] test_erc1271_contract_from_supported() (gas: 583401)
+[PASS] test_high_s_malleated_signature_accepted() (gas: 234899)
+Logs:
+  NOTE: high-s signature accepted -> never key uniqueness on signature bytes
+
+[PASS] test_issuer_burner_can_burn_escrow_balance_without_allowance() (gas: 184516)
+[PASS] test_issuer_freeze_on_escrow_blocks_outflows() (gas: 212093)
+[PASS] test_issuer_freeze_on_recipient_blocks_claim_transfer() (gas: 239789)
+[PASS] test_issuer_signature_pause_blocks_receiveWithAuthorization_but_not_transfer() (gas: 308824)
+[PASS] test_issuer_transfer_pause_blocks_receive_and_transfer() (gas: 190880)
+[PASS] test_permit_fallback_works() (gas: 378584)
+[PASS] test_receiveWithAuthorization_contractPayee_ok_and_replay_blocked() (gas: 388933)
+[PASS] test_receiveWithAuthorization_thirdPartyCaller_reverts_InvalidPayee() (gas: 103975)
+[PASS] test_receive_sig_is_not_valid_as_transferWithAuthorization() (gas: 126636)
+[PASS] test_validity_window_boundaries() (gas: 383967)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 9.17s (20.15s CPU time)
+
+Ran 2 test suites in 9.25s (18.34s CPU time): 21 tests passed, 0 failed, 0 skipped (21 total tests)
