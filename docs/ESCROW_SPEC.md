@@ -435,11 +435,11 @@ Off-chain request states (relayer DB + UI):
 1. The receipt exists with `status == 1`.
 2. The receipt contains the expected escrow event: `PaymentCreated`, `PaymentClaimed`, `PaymentCancelled` or `PaymentRefunded`, emitted by the escrow address, with the expected `paymentId` (and `recipient`/`sender`/`amount`).
 3. `getPayment(paymentId).status` read at or after the receipt's block equals the expected state.
-4. The block has reached Monad finality (2 slots, VERIFIED §1.8) before the terminal UI state and before any off-chain side effect (notifications, payout hand-off).
+4. The block has reached Monad finality (`receipt.blockNumber <= "finalized"` height, ≈ 2 blocks / 600 ms; VERIFIED §1.8, §1.14) before the terminal UI state and before any off-chain side effect (notifications, payout hand-off).
 
 On failure or revert, show failure and **reconcile to the canonical chain state** (`getPayment`). The backend never overrides chain truth (master §30, §38).
 Envio / history show only **executed** events from finalized blocks. Events are execution outputs and never appear for included-but-reverted transactions. The indexer must still follow finality.
-TODO(VERIFY): which Monad RPC block tags/receipt semantics correspond to "speculative" vs "finalized" state — https://docs.monad.xyz/reference/json-rpc (before relayer implementation, Oct 2).
+Resolved (VERIFIED §1.14): Monad `"latest"` = Proposed (speculative), `"safe"` = Voted, `"finalized"` = Finalized. Rule 4 means `receipt.blockNumber <= eth_getBlockByNumber("finalized").number`, and the step-3 `getPayment` read uses `"finalized"`. A receipt returned by `eth_sendRawTransactionSync` is only PROCESSING until that holds.
 
 ---
 

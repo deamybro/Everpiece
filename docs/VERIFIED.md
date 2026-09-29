@@ -129,6 +129,24 @@ Legend for "Checked by": `Everpiece team` = engineering session 1 (2026-09-29).
 
 ---
 
+### 1.14 JSON-RPC block tags, finality and receipts (relayer "inclusion ≠ success")
+- **Fact:** How Monad RPC exposes block commitment, and what that means for receipts
+- **Value:**
+  - Tags: `"latest"` = **Proposed** (speculatively executed, no vote yet); `"safe"` = **Voted**; `"finalized"` = **Finalized** ("irreversible without a hard fork. Use for value settlement: bridges, deposits, payment crediting"). `"pending"` behaves as `"latest"`.
+  - A 4th state, **Verified** (execution outputs agreed via the delayed merkle root), is `latest_finalized − execution_delay(3)`.
+  - `eth_getTransactionReceipt` / `eth_getTransactionByHash` / `eth_getLogs` can return data from non-finalized blocks, and "the returned blockNumber, log indices, or even the result itself (null) can change".
+  - Docs tip: compare the receipt's `blockNumber` against the client-tracked `"finalized"` height before acting.
+  - `eth_getTransactionByHash` never returns mempool (pending) txs.
+  - `eth_sendRawTransaction` may accept txs with a nonce gap or insufficient balance (deferred validation).
+  - `eth_sendRawTransactionSync(hex_tx, timeout_ms)` exists and returns a receipt.
+  - `eth_maxPriorityFeePerGas` currently returns a hard-coded 2 gwei.
+  - Live batched read: `latest` N, `safe` N−1, `finalized` N−2 (≈ 600 ms lag).
+- **Official source:** https://docs.monad.xyz/monad-arch/consensus/block-states ; https://docs.monad.xyz/reference/json-rpc/overview ; https://docs.monad.xyz/reference/json-rpc/api#eth_sendrawtransactionsync
+- **Explorer / verified-source reference:** Batched `eth_getBlockByNumber` for latest/safe/finalized on `rpc.monad.xyz` → 109037945 / 109037944 / 109037943
+- **Date checked:** 2026-09-29
+- **Checked by:** Everpiece team
+- **Notes:** Relayer/UI rule (ESCROW_SPEC §17): financial success requires a receipt with `status == 1` **and** `receipt.blockNumber <= finalized height`, plus the expected escrow event and `getPayment` state read at `"finalized"`. A receipt from `eth_sendRawTransactionSync` alone is not success; it may be from a Proposed block. Relayers must not trust `eth_sendRawTransaction` acceptance as a nonce/balance check.
+
 ### 1.13 Pinned contract / tooling dependencies
 - **Fact:** Dependency versions used by `contracts/` and `packages/shared`
 - **Value:**
@@ -352,7 +370,6 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 ## 5. Pending verification
 
 - TODO(VERIFY): exact submission time/timezone (dashboard) · Agora bounty text (BOUNTIES.md).
-- TODO(VERIFY): Monad RPC receipt/block-tag semantics for speculative vs finalized state — https://docs.monad.xyz/reference/json-rpc (before relayer).
 - TODO(VERIFY): Monad-compatible multisig (e.g. Safe deployment on 143) — before broader real-user exposure (D8).
 - TODO(VERIFY): `@noble/curves` random secp256k1 key API name in the installed version (link package, Oct 4).
 - TODO(VERIFY): USDC / CCTP on Monad — Circle docs (only if cash-out via CCTP is pursued).

@@ -52,7 +52,6 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 - **TODO(VERIFY):**
   - hackathon deadline/timezone;
   - Agora bounty text;
-  - Monad RPC finality tags for the relayer;
   - a Monad multisig (before broader exposure);
   - ownership of `everpiece.xyz` + HTTPS (before freezing the rpId);
   - SMS provider;
