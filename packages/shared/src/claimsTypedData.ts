@@ -19,6 +19,15 @@ export const claimsTypes = {
     { name: "phoneHash", type: "bytes32" },
     { name: "deadline", type: "uint256" },
   ],
+  /**
+   * Email channel: the sender registers the email that must receive the verification code. A separate type (not a
+   * field on InviteRegistration), so a phone signature can never be replayed as an email one or vice versa.
+   */
+  EmailInviteRegistration: [
+    { name: "paymentId", type: "bytes32" },
+    { name: "emailHash", type: "bytes32" },
+    { name: "deadline", type: "uint256" },
+  ],
   /** Link holder (claim key) asks for a code to be sent, binding the wallet that will receive the approval. */
   ClaimStart: [
     { name: "paymentId", type: "bytes32" },
@@ -34,6 +43,25 @@ export const E164 = /^\+[1-9][0-9]{7,14}$/;
 export function phoneHash(e164: string): Hex {
   if (!E164.test(e164)) throw new Error("phone must be E.164, e.g. +2348000000000");
   return keccak256(stringToHex(e164));
+}
+
+/** Lowercase ASCII only (no homoglyphs); normalizeEmail produces this form. */
+export const EMAIL = /^[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
+
+/** " Mama.Ngozi@Example.com " → "mama.ngozi@example.com"; null if it can't be a valid address. */
+export function normalizeEmail(input: string): string | null {
+  const e = input.trim().toLowerCase();
+  return e.length <= 254 && EMAIL.test(e) ? e : null;
+}
+
+/** emailHash = keccak256(utf8(normalized email)). Signed off-chain only; never put on-chain (master §12.3). */
+export function emailHash(email: string): Hex {
+  if (normalizeEmail(email) !== email) throw new Error("email must be normalized: trimmed, lowercase, e.g. mama@example.com");
+  return keccak256(stringToHex(email));
+}
+
+export function emailInviteRegistration(escrow: Address, m: { paymentId: Hex; emailHash: Hex; deadline: bigint }, chainId: number = MONAD_MAINNET_CHAIN_ID) {
+  return { domain: claimsDomain(escrow, chainId), types: claimsTypes, primaryType: "EmailInviteRegistration" as const, message: m };
 }
 
 export function inviteRegistration(escrow: Address, m: { paymentId: Hex; phoneHash: Hex; deadline: bigint }, chainId: number = MONAD_MAINNET_CHAIN_ID) {

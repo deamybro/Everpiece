@@ -111,7 +111,18 @@
     "inviteDigest": "0x41ea1db98780d95f549d72c685daf1b9f83a3cc5f72119e1a5bf7720db2b7550",
     "inviteSig": "0x1559a4a4fdb7e73b6897ff2cfe2d4d9aa1cb29c6d14b085791cf5d5a8dbc173b6f33ff7a56a3c0931caa9c8c9e239ec4b4cf4b374223f0d4700386efe0b9303d1b",
     "claimStartDigest": "0x60c94984a5e52d05e79b402b0bb14dfec04a94249e40670c5b21980d321423f8",
-    "claimStartSig": "0x117f9c3d370a6ca5cd996d33bfc397cdc5715ff25972de63f967707c7a65a9521da058d75b441cf630f0a0fa7f871b1748f83bc0531a7dab90a039273812413c1c"
+    "claimStartSig": "0x117f9c3d370a6ca5cd996d33bfc397cdc5715ff25972de63f967707c7a65a9521da058d75b441cf630f0a0fa7f871b1748f83bc0531a7dab90a039273812413c1c",
+    "email": {
+      "note": "EmailInviteRegistration (server/claims, email channel). Domain Everpiece Claims v1; same payment/deadline as the phone vectors. Generated with cast.",
+      "domainSeparator": "0x03da32c7a74bfd684f699f08e6d56a2c8aa47cb2a6a62cd5477f917767294aa8",
+      "emailInviteRegistrationTypehash": "0x29965d5c96a48d62b6b24e6b9ca58d9566c9d4dc67dddc8478e53a3093a67f53",
+      "email": "mama.ngozi@example.com",
+      "emailHash": "0x326659478009e600973775e60609e495d51e2b09541047e6377a11dad509a927",
+      "paymentId": "0x0f42b0913d79c00aea97d6fee27a3d0cdd1a655f30fd4a765c746f60ab9b878b",
+      "deadline": "1790812800",
+      "digest": "0xd5584cda982ced1caae3daf3b64c2f516ee4239973ca79b8e203bf12fcc7c51d",
+      "sig": "0x14081de9c75b421505124b5387cb42edb8e54f98dc32c8216036c305f1a14f3003b72adb221f1406effd5dd918f6a4889e3cce979f3b0adaae31ed2ac9af84451c"
+    }
   },
   "accountDerivationV1": [
     {

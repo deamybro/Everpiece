@@ -191,6 +191,24 @@ test("claims-server messages: InviteRegistration and ClaimStart (cast vectors)",
   assert.equal(await key("claimKey").signTypedData(cs), c.claimStartSig);
 });
 
+test("claims-server messages: EmailInviteRegistration (cast vectors) and email normalization", async () => {
+  const { claimsDomain, emailInviteRegistration, emailHash, normalizeEmail, inviteRegistration } = await import("../src/index.ts");
+  const e = V.claims.email;
+  assert.equal(domainSeparator({ domain: claimsDomain(ESCROW, V.chainId) }), e.domainSeparator);
+  assert.equal(normalizeEmail("  Mama.Ngozi@Example.COM "), e.email);
+  assert.equal(emailHash(e.email), e.emailHash);
+  assert.throws(() => emailHash("Mama.Ngozi@example.com")); // must be normalized first
+  for (const bad of ["mama", "mama@", "@example.com", "mama@example", "ma ma@example.com", "mаma@example.com" /* Cyrillic а */, "a".repeat(65) + "@x.com"]) {
+    assert.equal(normalizeEmail(bad), null, bad);
+  }
+  const inv = emailInviteRegistration(ESCROW, { paymentId: e.paymentId, emailHash: e.emailHash, deadline: BigInt(e.deadline) });
+  assert.equal(hashTypedData(inv), e.digest);
+  assert.equal(await key("sender").signTypedData(inv), e.sig);
+  // domain-separated from the phone invite even for the same 32 bytes
+  const asPhone = inviteRegistration(ESCROW, { paymentId: e.paymentId, phoneHash: e.emailHash, deadline: BigInt(e.deadline) });
+  assert.notEqual(hashTypedData(asPhone), e.digest);
+});
+
 test("directory: UsernameRegistration domain/typehash/digest/sig + EVERPIECE_INBOX_V1 inbox key", async () => {
   const d = V.directory;
   assert.equal(domainSeparator({ domain: directoryDomain(ESCROW) }), d.domainSeparator);
