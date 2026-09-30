@@ -38,7 +38,10 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
     - `flow.spec.ts`: the link flow, unchanged.
     - `username.spec.ts` (21 s): both users register; $20 to `@mama` is claimed from Home; the second send is pinned and then cancelled; a tampered pin is blocked; an unknown username is refused; a third user can't take `@mama_…` or its lookalike.
   - Zero CSP errors; zero error-level server logs.
-  - Production `next build` was **not** re-run this session (disk space).
+  - Production `next build` + `next start` (after the commits):
+    - nonce CSP, including the directory in `connect-src`, on `/`, `/send` and `/c/*`; `no-store` on `/c/*`.
+    - In Playwright Chromium: service worker activated, fragment wiped, **zero console errors**.
+    - The desktop app's browser preview pane can't register service workers ("unknown error when fetching the script"). That's a limitation of the pane, not the app.
 - **Open / known limits:**
   - The inbox key is kept in `localStorage` (read-only privacy key). The owner may prefer a fingerprint prompt per inbox check.
   - Usernames can't be changed and there is no re-verification/migration flow.
