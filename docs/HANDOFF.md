@@ -4,6 +4,34 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 8 — 2026-09-30 — Envio indexer (build + test; not yet running on a chain)
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Decision (owner):** the indexer is reassigned to the core team. Build and test it now without Docker; host it later.
+- **Completed:** `indexer/` on **envio 3.12.1** (pinned):
+  - Config keys come from the package's own `evm.schema.json` (VERIFIED §4.7); no guessed syntax.
+  - The four payment events → `Payment`, `PaymentEvent` timeline and `Stats`. `Stats` counts and volumes cover executed events only, and `activeLiability` mirrors the escrow's.
+  - The handlers throw on impossible history: unknown payment, second settle, amount or sender mismatch.
+  - Escrow address, start block and block lag come from the environment. Production lag is 3 (Monad finalizes at head − 2), with reorg rollback on.
+- **Tests run:** in WSL Debian (Node 22; Envio has no Windows build):
+  - `npm ci` from the committed lockfile, codegen, and typecheck are all clean.
+  - vitest **4/4**: ABI drift check against `packages/shared`; created→claimed; cancel/refund/active metrics; impossible-history refusals.
+- **Found and fixed:**
+  - With `block_lag > 0`, Envio's test indexer never finishes, because the simulated head is the last test block. The lag is now configurable and tests use 0.
+  - npm 10.9 crashes resolving vitest's optional peers; the lockfile was made with npm 11.
+- **Open / known limits:**
+  - Not yet run against real chain events. That needs the escrow on mainnet (owner GO), and either Envio Cloud (needs a push, blocked on the commit identity) or Docker/Podman.
+  - The web doesn't read the indexer yet (history is still device-local).
+  - Restoring recipient pins from the indexer on a new device would defeat TOFU, so pins stay local by design.
+- **Disk:** C: had ~5 GB free of 237 GB.
+  - `pagefile.sys` is 16.7 GB, Windows-managed, and grows under memory pressure (7.7 GB RAM, 0.7 GB free during runs). That matches the drops while the stack and browsers ran. No single file over 50 MB was written in the scan window.
+  - Other large items: WSL Debian `ext4.vhdx` 15.3 GB (last written 25/09), `hiberfil.sys` 3.2 GB. System settings are the owner's to change.
+- **Next recommended action:**
+  1. Web history from the indexer's GraphQL, behind a `NEXT_PUBLIC_INDEXER_URL`, with the device-local list as fallback.
+  2. After the escrow GO: deploy the indexer and verify real events.
+
+---
+
 ## Session 7 — 2026-09-30 — Username payments (directory + UI)
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
