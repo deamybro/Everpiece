@@ -28,6 +28,7 @@ services:
     pids_limit: 512
     environment:
       STACK_INFO_FILE: /shared/stack.json
+      STACK_PUBLIC_PORT_BASE: "47300" # browser URLs use 47300-47305, tunnelled 1:1 (README)
     volumes:
       - stack-info:/shared
     # Healthy once the web is built and serving (dev-stack writes the info file last). The indexer services wait for
@@ -87,7 +88,7 @@ services:
       HASURA_GRAPHQL_ENABLE_CONSOLE: "false"
       HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup
-      HASURA_GRAPHQL_CORS_DOMAIN: http://localhost:3000
+      HASURA_GRAPHQL_CORS_DOMAIN: http://localhost:47300
     ports:
       - "127.0.0.1:47306:8080" # GraphQL (public role = read-only)
 

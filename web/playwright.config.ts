@@ -7,5 +7,6 @@ export default defineConfig({
   expect: { timeout: 60_000 },
   workers: 1,
   reporter: [["list"]],
-  use: { baseURL: "http://localhost:3000", trace: "retain-on-failure" },
+  // E2E_BASE_URL: the test stack on a server through its SSH tunnel (deploy/test-stack/README.md).
+  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", trace: "retain-on-failure" },
 });

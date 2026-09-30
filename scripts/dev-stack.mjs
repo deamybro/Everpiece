@@ -23,7 +23,12 @@ const WEB_PROD = process.env.STACK_WEB === "prod";
 // file never points the indexer at a previous run's chain.
 const INFO_FILE = process.env.STACK_INFO_FILE;
 if (INFO_FILE) rmSync(INFO_FILE, { force: true });
-const WEB_ORIGIN = `http://localhost:${P.web}`;
+// Browser-facing ports. STACK_PUBLIC_PORT_BASE (container use) moves them to base+0..5 (web, anvil, relayer, claims,
+// directory, faucet), so an SSH tunnel can use the same numbers on both ends without clashing with other local
+// tunnels. Services still listen on P inside.
+const BASE = process.env.STACK_PUBLIC_PORT_BASE ? Number(process.env.STACK_PUBLIC_PORT_BASE) : null;
+const PUB = BASE === null ? P : { web: BASE, anvil: BASE + 1, relayer: BASE + 2, claims: BASE + 3, directory: BASE + 4, faucet: BASE + 5 };
+const WEB_ORIGIN = `http://localhost:${PUB.web}`;
 const RPC = `http://127.0.0.1:${P.anvil}`;
 const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a";
 const CORE_SLOT = "0x455730fed596673e69db1907be2e521374ba893f1a04cc5f5dd931616cd6b700"; // VERIFIED §2.12
@@ -39,7 +44,7 @@ function run(name, cmd, args, opts = {}) {
       if (!line.trim()) continue;
       if (line.startsWith("SIMULATED_SMS ")) {
         smsOutbox.unshift(JSON.parse(line.slice(14)));
-        say(`simulated text to ${smsOutbox[0].to} — see http://127.0.0.1:${P.faucet}/sms`);
+        say(`simulated text to ${smsOutbox[0].to} — see http://127.0.0.1:${PUB.faucet}/sms`);
       } else if (!opts.quiet) process.stdout.write(`\x1b[2m[${name}]\x1b[0m ${line}\n`);
     }
   };
@@ -101,12 +106,12 @@ writeFileSync(
   [
     "# written by scripts/dev-stack.mjs — LOCAL TEST STACK (not mainnet)",
     "NEXT_PUBLIC_CHAIN_ID=143",
-    `NEXT_PUBLIC_MONAD_RPC=${RPC}`,
+    `NEXT_PUBLIC_MONAD_RPC=http://127.0.0.1:${PUB.anvil}`,
     `NEXT_PUBLIC_ESCROW_ADDRESS=${escrow}`,
-    `NEXT_PUBLIC_RELAYER_URL=http://127.0.0.1:${P.relayer}`,
-    `NEXT_PUBLIC_CLAIMS_URL=http://127.0.0.1:${P.claims}`,
-    `NEXT_PUBLIC_DIRECTORY_URL=http://127.0.0.1:${P.directory}`,
-    `NEXT_PUBLIC_DEV_FAUCET_URL=http://127.0.0.1:${P.faucet}`,
+    `NEXT_PUBLIC_RELAYER_URL=http://127.0.0.1:${PUB.relayer}`,
+    `NEXT_PUBLIC_CLAIMS_URL=http://127.0.0.1:${PUB.claims}`,
+    `NEXT_PUBLIC_DIRECTORY_URL=http://127.0.0.1:${PUB.directory}`,
+    `NEXT_PUBLIC_DEV_FAUCET_URL=http://127.0.0.1:${PUB.faucet}`,
     "",
   ].join("\n"),
 );
@@ -171,9 +176,9 @@ await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
 // 7. web
 const webArgs = [nextBin, WEB_PROD ? "start" : "dev", "--port", String(P.web), ...(process.env.STACK_BIND_HOST ? ["--hostname", BIND] : [])];
 run("web", process.execPath, webArgs, { spawn: { cwd: join(root, "web") }, quiet: false });
-await waitFor(WEB_ORIGIN);
+await waitFor(`http://localhost:${P.web}`);
 if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow, deployBlock: Number(receipt.blockNumber), startedAt: new Date().toISOString() }) + "\n");
 say("");
 say(`✅ Everpiece local test stack is up → open ${WEB_ORIGIN}`);
-say(`   Test Dollars: "Get 100 test Dollars" button on Home. Simulated texts: http://127.0.0.1:${P.faucet}/sms`);
+say(`   Test Dollars: "Get 100 test Dollars" button on Home. Simulated texts: http://127.0.0.1:${PUB.faucet}/sms`);
 say("   Everything runs on a local fork of Monad mainnet; nothing is real money. Ctrl+C to stop.");

@@ -4,7 +4,10 @@
 // Passkeys use Chrome's virtual authenticator WITH the PRF extension, so Mera runs its real code path.
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-const FAUCET = "http://127.0.0.1:8790";
+// E2E_BASE_URL / E2E_FAUCET_URL: the test stack on a server through its SSH tunnel (deploy/test-stack/README.md).
+const FAUCET = process.env.E2E_FAUCET_URL ?? "http://127.0.0.1:8790";
+const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
 async function withPasskeys(context: BrowserContext): Promise<Page> {
   const page = await context.newPage();
@@ -59,7 +62,7 @@ test("send by link → recipient verifies phone → claims; sender cancels anoth
   await expect(stella.getByText("Payment protected ✓")).toBeVisible();
   const wa = await stella.getByRole("link", { name: "Send on WhatsApp" }).getAttribute("href");
   expect(wa).toMatch(/^https:\/\/wa\.me\/2348000000000\?text=/);
-  const link = /(http:\/\/localhost:3000\/c\/0x[0-9a-f]{64}#[A-Za-z0-9_-]+)/.exec(decodeURIComponent(wa!.split("?text=")[1]))![1];
+  const link = new RegExp(`(${escapeRe(BASE)}/c/0x[0-9a-f]{64}#[A-Za-z0-9_-]+)`).exec(decodeURIComponent(wa!.split("?text=")[1]))![1];
 
   // --- Mama opens the link: fragment is removed from the address bar immediately
   await mama.goto(link);
