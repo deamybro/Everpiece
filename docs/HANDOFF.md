@@ -4,6 +4,28 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 11 — 2026-09-30 — Real email for claim codes (Resend)
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Decisions (owner):** provider **Resend**; sending domain **everpiece.xyz**, which the owner says they control. Codes come from `Everpiece <codes@mail.everpiece.xyz>` because Resend recommends a subdomain.
+- **Completed:**
+  - Resend API verified from official docs (VERIFIED §4.8).
+  - `ResendEmailProvider`: Everpiece generates and checks the code; Resend only delivers it. The idempotency key is the OTP ref.
+  - Config `EMAIL_PROVIDER=resend` needs `RESEND_API_KEY` and `EMAIL_FROM`.
+  - The test stack uses Resend when the host `.env` has both, and stays simulated otherwise.
+  - `deploy/test-stack/set-secret.sh`: hidden input over SSH stdin, keeps other lines, mode 600. Verified on the host with a dummy value; the file hash matched after cleanup.
+  - `EMAIL_FROM` is set on the host; `RESEND_API_KEY` is **not** (owner step).
+- **Tests run:** claims **12/12** offline and **22/22** with the fork (Resend adapter against mocked HTTP; config guards). Playwright **3/3** on the VPS; `email.spec` skips itself once email is live.
+- **Owner steps to go live:**
+  1. Create a Resend account.
+  2. Add the domain `mail.everpiece.xyz` and add the DNS records Resend shows to everpiece.xyz's DNS.
+  3. Once it shows Verified, create an API key with sending access.
+  4. Run `deploy/test-stack/set-secret.sh optiongenome RESEND_API_KEY`.
+  5. Restart the stack; then do a live send to a real inbox (TODO(VERIFY) in VERIFIED §4.8).
+- **Limits:** Resend's free plan allows 100 emails a day and 3,000 a month.
+
+---
+
 ## Session 10 — 2026-09-30 — Email claim code (SMS alternative) + passkey wording
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
