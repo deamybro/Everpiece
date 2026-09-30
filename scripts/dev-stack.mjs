@@ -3,6 +3,8 @@
 //   anvil fork of Monad mainnet (real AUSD code, Monad-like finality: finalized = latest-2)
 //   + freshly deployed EverpieceEscrow + relayer + claims server (SIMULATED SMS) + username directory + dev faucet + web (next dev)
 // Fresh random dev keys every run, held in memory only. Usage: npm run dev:stack   (then open http://localhost:3000)
+// Container use (deploy/test-stack): STACK_BIND_HOST=0.0.0.0 listens on the container's interfaces (Docker publishes
+// them on the host's 127.0.0.1 only); STACK_WEB=prod runs next build + next start instead of next dev (far less memory).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -14,6 +16,8 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FORK_URL = process.env.MONAD_RPC ?? "https://rpc.monad.xyz";
 const P = { anvil: 8545, relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, web: 3000 };
+const BIND = process.env.STACK_BIND_HOST ?? "127.0.0.1";
+const WEB_PROD = process.env.STACK_WEB === "prod";
 const WEB_ORIGIN = `http://localhost:${P.web}`;
 const RPC = `http://127.0.0.1:${P.anvil}`;
 const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a";
@@ -66,7 +70,7 @@ if (!existsSync(join(root, "contracts/out/EverpieceEscrow.sol/EverpieceEscrow.js
 
 // 2. anvil fork with Monad-like finality
 say(`starting local fork of Monad mainnet (${FORK_URL})…`);
-run("anvil", "anvil", ["--network", "monad", "--fork-url", FORK_URL, "--port", String(P.anvil), "--slots-in-an-epoch", "1", "--block-time", "1", "--silent"], {
+run("anvil", "anvil", ["--network", "monad", "--fork-url", FORK_URL, "--port", String(P.anvil), "--host", BIND, "--slots-in-an-epoch", "1", "--block-time", "1", "--silent"], {
   spawn: { shell: process.platform === "win32" },
 });
 await waitFor(RPC, '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}');
@@ -101,8 +105,16 @@ writeFileSync(
   ].join("\n"),
 );
 
+// 4b. production web build, before the services start so the build's memory peak doesn't stack on theirs
+const nextBin = join(root, "node_modules/next/dist/bin/next");
+if (WEB_PROD) {
+  say("building the web app (next build)…");
+  const b = spawnSync(process.execPath, [nextBin, "build"], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" } });
+  if (b.status !== 0) throw new Error("next build failed");
+}
+
 // 5. services
-const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: "143", ESCROW_ADDRESS: escrow, ALLOWED_ORIGIN: WEB_ORIGIN, LOG_LEVEL: "info" };
+const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: "143", ESCROW_ADDRESS: escrow, ALLOWED_ORIGIN: WEB_ORIGIN, LOG_LEVEL: "info", HOST: BIND };
 run("relayer", process.execPath, ["server/relayer/src/main.ts"], {
   env: { ...common, RELAYER_PRIVATE_KEY: keys.relayer, RELAYER_DB_PATH: ":memory:", PORT: String(P.relayer), MIN_RELAYER_BALANCE_WEI: parseEther("1").toString(), POLL_INTERVAL_MS: "300" },
 });
@@ -144,14 +156,15 @@ createServer(async (req, res) => {
     }
   }
   res.writeHead(404).end();
-}).listen(P.faucet, "127.0.0.1");
+}).listen(P.faucet, BIND);
 
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);
 await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
 
 // 7. web
-run("web", process.execPath, [join(root, "node_modules/next/dist/bin/next"), "dev", "--port", String(P.web)], { spawn: { cwd: join(root, "web") }, quiet: false });
+const webArgs = [nextBin, WEB_PROD ? "start" : "dev", "--port", String(P.web), ...(process.env.STACK_BIND_HOST ? ["--hostname", BIND] : [])];
+run("web", process.execPath, webArgs, { spawn: { cwd: join(root, "web") }, quiet: false });
 await waitFor(WEB_ORIGIN);
 say("");
 say(`✅ Everpiece local test stack is up → open ${WEB_ORIGIN}`);

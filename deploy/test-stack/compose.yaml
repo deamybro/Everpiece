@@ -1,0 +1,28 @@
+# Everpiece TEST STACK on a SHARED host. Additive only:
+# - every port is published on the host's 127.0.0.1 (reach it with the SSH tunnel in README.md);
+# - hard memory/CPU/process caps, so an overrun kills only this container, never a co-tenant.
+name: everpiece-test
+services:
+  stack:
+    build:
+      context: ./src
+      dockerfile: deploy/test-stack/Dockerfile
+    image: everpiece-test-stack:local
+    container_name: everpiece-test-stack
+    restart: on-failure:3
+    mem_limit: 1200m
+    memswap_limit: 1200m
+    cpus: 1.0
+    pids_limit: 512
+    ports:
+      - "127.0.0.1:47300:3000" # web
+      - "127.0.0.1:47301:8545" # anvil (fork RPC)
+      - "127.0.0.1:47302:8787" # relayer
+      - "127.0.0.1:47303:8788" # claims
+      - "127.0.0.1:47304:8789" # directory
+      - "127.0.0.1:47305:8790" # faucet + simulated SMS
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
