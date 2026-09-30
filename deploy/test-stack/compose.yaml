@@ -30,6 +30,8 @@ services:
       STACK_INFO_FILE: /shared/stack.json
       STACK_PUBLIC_PORT_BASE: "47300" # browser URLs use 47300-47305, tunnelled 1:1 (README)
       # Real claim-code emails via Resend when both are set in the host's .env (set-secret.sh); simulated otherwise.
+      # Public HTTPS test site behind the host's Caddy (README "Public test site"); unset = tunnel-only.
+      STACK_PUBLIC_ORIGIN: ${STACK_PUBLIC_ORIGIN:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
     volumes:

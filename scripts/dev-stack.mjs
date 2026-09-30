@@ -28,7 +28,12 @@ if (INFO_FILE) rmSync(INFO_FILE, { force: true });
 // tunnels. Services still listen on P inside.
 const BASE = process.env.STACK_PUBLIC_PORT_BASE ? Number(process.env.STACK_PUBLIC_PORT_BASE) : null;
 const PUB = BASE === null ? P : { web: BASE, anvil: BASE + 1, relayer: BASE + 2, claims: BASE + 3, directory: BASE + 4, faucet: BASE + 5 };
-const WEB_ORIGIN = `http://localhost:${PUB.web}`;
+// Public test site (deploy/test-stack behind Caddy): STACK_PUBLIC_ORIGIN puts everything on one HTTPS origin, services
+// under /svc/<name> (Caddy strips the prefix). The raw fork RPC is never public: the browser uses the faucet's filtered
+// /rpc (read-only methods, escrow + AUSD only), because anvil's own methods could set balances or impersonate accounts.
+const ORIGIN = process.env.STACK_PUBLIC_ORIGIN ? process.env.STACK_PUBLIC_ORIGIN.replace(/\/$/, "") : null;
+const pubUrl = (svc, port) => (ORIGIN ? `${ORIGIN}/svc/${svc}` : `http://127.0.0.1:${port}`);
+const WEB_ORIGIN = ORIGIN ?? `http://localhost:${PUB.web}`;
 const RPC = `http://127.0.0.1:${P.anvil}`;
 const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a";
 const CORE_SLOT = "0x455730fed596673e69db1907be2e521374ba893f1a04cc5f5dd931616cd6b700"; // VERIFIED §2.12
@@ -45,7 +50,7 @@ function run(name, cmd, args, opts = {}) {
       if (line.startsWith("SIMULATED_SMS ") || line.startsWith("SIMULATED_EMAIL ")) {
         const kind = line.startsWith("SIMULATED_SMS ") ? "text" : "email";
         smsOutbox.unshift({ kind, ...JSON.parse(line.slice(line.indexOf(" ") + 1)) });
-        say(`simulated ${kind} to ${smsOutbox[0].to} — see http://127.0.0.1:${PUB.faucet}/sms`);
+        say(`simulated ${kind} to ${smsOutbox[0].to} — see ${pubUrl("faucet", PUB.faucet)}/sms`);
       } else if (!opts.quiet) process.stdout.write(`\x1b[2m[${name}]\x1b[0m ${line}\n`);
     }
   };
@@ -107,12 +112,12 @@ writeFileSync(
   [
     "# written by scripts/dev-stack.mjs — LOCAL TEST STACK (not mainnet)",
     "NEXT_PUBLIC_CHAIN_ID=143",
-    `NEXT_PUBLIC_MONAD_RPC=http://127.0.0.1:${PUB.anvil}`,
+    `NEXT_PUBLIC_MONAD_RPC=${ORIGIN ? `${ORIGIN}/svc/faucet/rpc` : `http://127.0.0.1:${PUB.anvil}`}`,
     `NEXT_PUBLIC_ESCROW_ADDRESS=${escrow}`,
-    `NEXT_PUBLIC_RELAYER_URL=http://127.0.0.1:${PUB.relayer}`,
-    `NEXT_PUBLIC_CLAIMS_URL=http://127.0.0.1:${PUB.claims}`,
-    `NEXT_PUBLIC_DIRECTORY_URL=http://127.0.0.1:${PUB.directory}`,
-    `NEXT_PUBLIC_DEV_FAUCET_URL=http://127.0.0.1:${PUB.faucet}`,
+    `NEXT_PUBLIC_RELAYER_URL=${pubUrl("relayer", PUB.relayer)}`,
+    `NEXT_PUBLIC_CLAIMS_URL=${pubUrl("claims", PUB.claims)}`,
+    `NEXT_PUBLIC_DIRECTORY_URL=${pubUrl("directory", PUB.directory)}`,
+    `NEXT_PUBLIC_DEV_FAUCET_URL=${pubUrl("faucet", PUB.faucet)}`,
     "",
   ].join("\n"),
 );
@@ -126,7 +131,9 @@ if (WEB_PROD) {
 }
 
 // 5. services
-const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: "143", ESCROW_ADDRESS: escrow, ALLOWED_ORIGIN: WEB_ORIGIN, LOG_LEVEL: "info", HOST: BIND };
+const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: "143", ESCROW_ADDRESS: escrow, ALLOWED_ORIGIN: WEB_ORIGIN, LOG_LEVEL: "info", HOST: BIND,
+  // Behind Caddy every request arrives from the proxy: rate-limit on the visitor's address it forwards instead.
+  ...(ORIGIN ? { TRUST_PROXY: "1" } : {}) };
 run("relayer", process.execPath, ["server/relayer/src/main.ts"], {
   env: { ...common, RELAYER_PRIVATE_KEY: keys.relayer, RELAYER_DB_PATH: ":memory:", PORT: String(P.relayer), MIN_RELAYER_BALANCE_WEI: parseEther("1").toString(), POLL_INTERVAL_MS: "300" },
 });
@@ -146,6 +153,41 @@ run("directory", process.execPath, ["server/directory/src/main.ts"], {
 });
 
 // 6. dev faucet + simulated SMS outbox (LOCAL ONLY)
+// Filtered, read-only JSON-RPC for the public test site: only what the web app reads, only for the escrow and AUSD.
+const RPC_METHODS = new Set(["eth_chainId", "eth_blockNumber", "net_version", "eth_getBlockByNumber", "eth_call"]);
+const BLOCK_TAGS = new Set(["latest", "safe", "finalized", "pending"]);
+function rpcAllowed(m) {
+  if (!m || m.jsonrpc !== "2.0" || !RPC_METHODS.has(m.method)) return false;
+  const p = Array.isArray(m.params) ? m.params : [];
+  if (m.method === "eth_getBlockByNumber") return BLOCK_TAGS.has(p[0]) && p[1] === false;
+  if (m.method === "eth_call") {
+    const to = typeof p[0]?.to === "string" ? p[0].to.toLowerCase() : "";
+    return (to === escrow.toLowerCase() || to === AUSD.toLowerCase()) && (p[1] === undefined || BLOCK_TAGS.has(p[1]));
+  }
+  return true;
+}
+async function publicRpc(req, res) {
+  let body = "";
+  for await (const c of req) {
+    body += c;
+    if (body.length > 16_384) return res.writeHead(413).end();
+  }
+  let msg;
+  try {
+    msg = JSON.parse(body);
+  } catch {
+    return res.writeHead(400).end();
+  }
+  const batch = Array.isArray(msg) ? msg : [msg];
+  if (batch.length === 0 || batch.length > 20 || !batch.every(rpcAllowed)) {
+    res.writeHead(403, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32601, message: "method not allowed on the public test RPC" } }));
+  }
+  const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" }, body }).catch(() => null);
+  res.writeHead(r?.status ?? 502, { "content-type": "application/json" });
+  return res.end(r ? await r.text() : "");
+}
+
 createServer(async (req, res) => {
   res.setHeader("access-control-allow-origin", WEB_ORIGIN);
   res.setHeader("access-control-allow-headers", "content-type");
@@ -155,6 +197,7 @@ createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     return res.end(`<!doctype html><meta name=viewport content="width=device-width"><title>Simulated texts and emails</title><body style="font-family:system-ui;padding:16px"><h2>Simulated texts and emails (local test network — nothing was sent)</h2><p>Latest first. The real app texts or emails the recipient instead.</p><ul>${rows}</ul><p><a href="/sms">Refresh</a></p>`);
   }
+  if (req.method === "POST" && req.url === "/rpc") return publicRpc(req, res);
   if (req.method === "POST" && req.url === "/faucet") {
     let body = "";
     for await (const c of req) body += c;
@@ -185,5 +228,5 @@ await waitFor(`http://localhost:${P.web}`);
 if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow, deployBlock: Number(receipt.blockNumber), startedAt: new Date().toISOString() }) + "\n");
 say("");
 say(`✅ Everpiece local test stack is up → open ${WEB_ORIGIN}`);
-say(`   Test Dollars: "Get 100 test Dollars" button on Home. Simulated texts: http://127.0.0.1:${PUB.faucet}/sms`);
+say(`   Test Dollars: "Get 100 test Dollars" button on Home. Simulated texts: ${pubUrl("faucet", PUB.faucet)}/sms`);
 say("   Everything runs on a local fork of Monad mainnet; nothing is real money. Ctrl+C to stop.");
