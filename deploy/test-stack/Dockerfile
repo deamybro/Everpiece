@@ -4,6 +4,8 @@
 FROM ghcr.io/foundry-rs/foundry:v1.8.3 AS foundry
 
 FROM node:24-bookworm-slim
+# anvil forks over HTTPS and needs the system CA bundle (absent from the slim image).
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
 WORKDIR /app
 RUN chown node:node /app
