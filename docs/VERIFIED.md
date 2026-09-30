@@ -405,7 +405,11 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Notes:**
   - Adapter: `server/claims/src/providers.ts` `ResendEmailProvider`. Everpiece generates and checks the code (LocalOtp); the idempotency key is the OTP ref.
   - The API key format was seen only as `re_…` in the docs, so config checks just the prefix.
-  - TODO(VERIFY): a live send from the owner's verified domain, and the error body shape from a real failure.
+  - **Live-verified 2026-09-30:**
+    - `mail.everpiece.xyz` was verified in Resend: DKIM TXT, two SPF **CNAMEs** (`rsend.mail`→`rsend.forge.rmta.net`, `send.mail`→`send.forge.rmta.net`) and DMARC `p=none`. That's CNAMEs, not the TXT and MX we expected, and receiving was not needed.
+    - A real claim code from `codes@mail.everpiece.xyz` reached a Gmail inbox (Primary tab), and the recipient claimed $5 with it on the test stack.
+  - Real error bodies are JSON `{ name, message }`: 403 `validation_error` "The mail.everpiece.xyz domain is not verified…"; 401 `validation_error` "API key is invalid".
+  - TODO(VERIFY): delivery to Yahoo and Outlook, and to Nigerian ISP mailboxes.
   - TODO(VERIFY): inbox placement at Gmail and Yahoo (with DMARC set).
 
 ### 4.2 Hackathon window

@@ -23,6 +23,19 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
   4. Run `deploy/test-stack/set-secret.sh optiongenome RESEND_API_KEY`.
   5. Restart the stack; then do a live send to a real inbox (TODO(VERIFY) in VERIFIED §4.8).
 - **Limits:** Resend's free plan allows 100 emails a day and 3,000 a month.
+- **Went live (same session):**
+  - **Owner:** created the Resend account, verified `mail.everpiece.xyz` in Namecheap DNS (DKIM TXT, two CNAMEs, DMARC; receiving off), and created a Sending-access key.
+  - **Key handling:** the key reached the host through a Notepad file that was sent with hidden input, confirmed by length on the host, then overwritten and deleted. It was never shown in chat.
+  - **Test stack:** recreated with `"email":"resend"` and `emailLive: true`.
+  - **Live test:** a $5 link payment with the code sent to the owner's Gmail. It arrived in **Primary**, the owner read the code, and the claim went through; the indexer shows it CLAIMED.
+  - **Bug fixed:** `set-secret.sh` silently saved nothing for piped input without a trailing newline (commit 85236a4).
+- **Incident — host-wide OOM at 21:06, not caused by Everpiece:**
+  - Two co-tenant `node` processes (1,340 MB and 1,167 MB) plus graph-node exhausted RAM.
+  - The kernel killed **only Everpiece processes** (all `oom_score_adj 1000`: Hasura, anvil, our Node processes); no co-tenant process was killed.
+  - Hasura used up `restart: on-failure:3` and stayed down, and the indexer exited without it.
+  - Restarted by hand once memory was back (~2 GB free); the indexer re-indexed.
+  - While Hasura was down, the indexer also logged transient `Fork Error … 413` from the fork's upstream public RPC. It did not recur after the restart.
+- **Suggested follow-up:** `restart: unless-stopped` for the indexer services so they come back by themselves after a host OOM (Docker backs off restarts), or a small watchdog. Owner's call, given the shared host.
 
 ---
 
