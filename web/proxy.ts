@@ -22,6 +22,7 @@ export function proxy(request: NextRequest) {
     origin(process.env.NEXT_PUBLIC_MONAD_RPC),
     origin(process.env.NEXT_PUBLIC_RELAYER_URL),
     origin(process.env.NEXT_PUBLIC_CLAIMS_URL),
+    origin(process.env.NEXT_PUBLIC_DIRECTORY_URL),
     origin(process.env.NEXT_PUBLIC_DEV_FAUCET_URL),
   ]
     .filter(Boolean)

@@ -8,10 +8,12 @@ import { Progress, progressText } from "../../components/status";
 import { dollarsOf, formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
 import { claimLink } from "../../lib/link";
-import { FlowError, sendByLink } from "../../lib/flows";
+import { FlowError, sendByLink, sendToUsername } from "../../lib/flows";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
+import { UsernameError, findRecipient, type Pinning, type Recipient } from "../../lib/username";
 
 type Step = "amount" | "who" | "review" | "sending" | "done" | "protectedNoInvite";
+type Method = "phone" | "username";
 
 export default function Send() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -19,6 +21,13 @@ export default function Send() {
   const [step, setStep] = useState<Step>("amount");
   const [amountText, setAmountText] = useState("");
   const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<Method>("phone");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [found, setFound] = useState<{ recipient: Recipient; pinning: Pinning } | null>(null);
+  const [confirmedNew, setConfirmedNew] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [delivered, setDelivered] = useState(true);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -39,10 +48,38 @@ export default function Send() {
   const phoneOk = E164.test(phone.replace(/\s+/g, ""));
   const cleanPhone = phone.replace(/\s+/g, "");
 
+  async function lookUp() {
+    setLooking(true);
+    setLookupError("");
+    setFound(null);
+    setConfirmedNew(false);
+    try {
+      setFound(await findRecipient(usernameInput));
+    } catch (e) {
+      setLookupError(friendlyError(e instanceof UsernameError ? e.code : undefined));
+    } finally {
+      setLooking(false);
+    }
+  }
+
   async function send() {
     if (!account || amount === null) return;
     setStep("sending");
     setError("");
+    if (method === "username") {
+      if (!found) return;
+      try {
+        const r = await sendToUsername(account, amount, found.recipient, (s) => setProgress(progressText(s, "Sending")));
+        setDelivered(r.delivered);
+        setStep("done");
+      } catch (e) {
+        setError(e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e));
+        setStep("review");
+      } finally {
+        setProgress("");
+      }
+      return;
+    }
     try {
       const { paymentId, pkg } = await sendByLink(account, amount, cleanPhone, (s) => setProgress(progressText(s, "Protecting your payment")));
       setLink(claimLink(paymentId, pkg));
@@ -86,13 +123,52 @@ export default function Send() {
       {step === "who" && (
         <div className="stack">
           <h1>Who is it for?</h1>
-          <p className="muted">We&apos;ll text them a code so only they can claim it. You&apos;ll share the link with them yourself.</p>
-          <div>
-            <label htmlFor="phone">Their phone number (with country code)</label>
-            <input id="phone" type="tel" autoComplete="off" placeholder="+234 800 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <div className="row" role="group" aria-label="Send to">
+            <button className={method === "phone" ? "" : "secondary"} aria-pressed={method === "phone"} onClick={() => setMethod("phone")}>Phone number</button>
+            <button className={method === "username" ? "" : "secondary"} aria-pressed={method === "username"} onClick={() => setMethod("username")}>@username</button>
           </div>
-          {phone.length > 3 && !phoneOk && <p className="muted small">Start with + and the country code, e.g. +234 or +44.</p>}
-          <button disabled={!phoneOk} onClick={() => setStep("review")}>Continue</button>
+          {method === "phone" && (
+            <>
+              <p className="muted">We&apos;ll text them a code so only they can claim it. You&apos;ll share the link with them yourself.</p>
+              <div>
+                <label htmlFor="phone">Their phone number (with country code)</label>
+                <input id="phone" type="tel" autoComplete="off" placeholder="+234 800 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              {phone.length > 3 && !phoneOk && <p className="muted small">Start with + and the country code, e.g. +234 or +44.</p>}
+              <button disabled={!phoneOk} onClick={() => setStep("review")}>Continue</button>
+            </>
+          )}
+          {method === "username" && (
+            <>
+              <p className="muted">For people who already have Everpiece. Only their account can claim it — no link or code needed.</p>
+              <div>
+                <label htmlFor="to-username">Their Everpiece username</label>
+                <input
+                  id="to-username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="@username" value={usernameInput}
+                  onChange={(e) => { setUsernameInput(e.target.value); setFound(null); setLookupError(""); }}
+                />
+              </div>
+              {!found && <button className="secondary" disabled={looking || usernameInput.trim().length < 3} onClick={lookUp}>Find</button>}
+              {lookupError && <div className="status bad">{lookupError}</div>}
+              {found && (
+                <div className="card stack">
+                  <div>
+                    <strong>{found.recipient.displayName}</strong> <span className="muted">@{found.recipient.username}</span>
+                  </div>
+                  <div className="muted small">Account {found.recipient.account.slice(0, 6)}…{found.recipient.account.slice(-4)}</div>
+                  {found.pinning === "pinned" ? (
+                    <div className="pill ok">You&apos;ve paid them before ✓</div>
+                  ) : (
+                    <label className="small">
+                      <input type="checkbox" checked={confirmedNew} onChange={(e) => setConfirmedNew(e.target.checked)} />{" "}
+                      This is the person I mean. I&apos;ve checked the username with them.
+                    </label>
+                  )}
+                </div>
+              )}
+              <button disabled={!found || (found.pinning === "new" && !confirmedNew)} onClick={() => setStep("review")}>Continue</button>
+            </>
+          )}
           <button className="ghost" onClick={() => setStep("amount")}>Back</button>
         </div>
       )}
@@ -111,12 +187,13 @@ export default function Send() {
               <dt>They receive</dt>
               <dd>{formatDollars(amount)}</dd>
               <dt>Recipient</dt>
-              <dd>{cleanPhone}</dd>
+              <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : cleanPhone}</dd>
               <dt>Expires</dt>
               <dd>in 30 days</dd>
             </dl>
           </div>
           <p className="muted small">
+            {method === "username" && found ? `Only @${found.recipient.username}'s account can claim it. ` : ""}
             Your money stays protected until they claim it. You can cancel any time before they do. If they never claim it,
             the money comes back to you after 30 days. Free to claim.
           </p>
@@ -138,7 +215,21 @@ export default function Send() {
         </div>
       )}
 
-      {step === "done" && amount !== null && (
+      {step === "done" && amount !== null && method === "username" && found && (
+        <div className="stack">
+          <div className="status ok">Sent to @{found.recipient.username} ✓</div>
+          <p className="muted">
+            {formatDollars(amount)} is waiting for {found.recipient.displayName}. They&apos;ll see it on their Everpiece Home and claim it
+            with their fingerprint. You can cancel from Home until they do.
+          </p>
+          {!delivered && (
+            <p className="muted small">We&apos;re still letting them know. Your money is protected and this retries automatically from Home.</p>
+          )}
+          <Link className="button" href="/">Done</Link>
+        </div>
+      )}
+
+      {step === "done" && amount !== null && method === "phone" && (
         <div className="stack">
           <div className="status ok">Payment protected ✓</div>
           <h1>Now send them the link</h1>

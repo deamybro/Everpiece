@@ -11,6 +11,7 @@ async function post(base: string, path: string, body: unknown): Promise<ApiRespo
 
 export const relayer = (path: string, body: unknown) => post(config.relayerUrl, path, body);
 export const claims = (path: string, body: unknown) => post(config.claimsUrl, path, body);
+export const directory = (path: string, body: unknown) => post(config.directoryUrl, path, body);
 
 export type RelayStatus = "SUBMITTED" | "PROCESSING" | "CONFIRMED" | "FAILED" | "REJECTED";
 
@@ -50,6 +51,18 @@ export function friendlyError(code: string | undefined): string {
     RateLimited: "Too many requests. Please wait a moment.",
     RelayerUnavailable: "Everpiece is busy. Please try again shortly.",
     UpstreamUnavailable: "The network is busy. Please try again shortly.",
+    CannotPaySelf: "That's your own username.",
+    UnknownUsername: "No one on Everpiece has that username. Check the spelling with them.",
+    UsernameTaken: "That username is taken. Try another one.",
+    UsernameTooSimilar: "That's too close to someone else's username. Try a different one.",
+    UsernameReserved: "That username isn't available. Try another one.",
+    InvalidUsername: "Usernames are 3–20 lowercase letters, numbers or _, starting with a letter.",
+    InvalidDisplayName: "Please enter a shorter name without special characters.",
+    AccountHasUsername: "Your account already has a username.",
+    TooManyRegistrations: "Too many new usernames from this network today. Try again tomorrow.",
+    RecipientChanged: "This recipient's security details changed. Verify them before sending.",
+    RecipientUnverified: "We couldn't verify this username. Please don't send to it.",
+    DirectoryUnavailable: "We couldn't look up that username right now. Please try again shortly.",
     VerificationUnavailable: "We couldn't send the code right now. Please try again shortly.",
   };
   return (code && map[code]) || "Something went wrong. Your money is still safe. Please try again.";

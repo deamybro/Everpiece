@@ -7,6 +7,7 @@ export const config = {
   escrow: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS ?? "") as Address,
   relayerUrl: process.env.NEXT_PUBLIC_RELAYER_URL ?? "",
   claimsUrl: process.env.NEXT_PUBLIC_CLAIMS_URL ?? "",
+  directoryUrl: process.env.NEXT_PUBLIC_DIRECTORY_URL ?? "",
   /** Local dev stack only: mints TEST Dollars on a local fork. Never set in production. */
   devFaucetUrl: process.env.NEXT_PUBLIC_DEV_FAUCET_URL ?? "",
 };
