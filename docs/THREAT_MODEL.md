@@ -28,7 +28,48 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
   - After the first successful interaction the browser **pins** `@username → account → encryption public key`.
   - If a later lookup returns a different account or key, automatic send is blocked: "This recipient's security details changed. Verify them before sending."
   - The payment commits to the account, not the username. The sender can cancel until claim.
-- B2 **Lookalike usernames**: confusable-character normalization at registration; "new recipient" warning.
+- B1 **As built (V1, `server/directory` + `web/lib/username.ts`):**
+  - Every directory record carries the account's own EIP-712 `UsernameRegistration` signature (domain "Everpiece Directory" v1, bound to chain + escrow). The **browser re-verifies it** on every lookup, so a malicious directory can map @name only to an account that signed for that exact name. It still cannot be stopped from serving an attacker's *own* validly signed record on first contact (B3).
+  - The first-payment screen shows display name, @username and a shortened account; the sender must tick "This is the person I mean" (no avatar or joined date yet).
+  - The pin is `@username → account` only; there is no recipient encryption key yet. It is set only after the payment is CONFIRMED. A later mismatch blocks sending with the §10.2 message. Covered by `web/e2e/username.spec.ts`.
+  - **One username = one account**, enforced by the database, not just by code: `username` PRIMARY KEY with CHECK lowercase, `account` UNIQUE, and the lookalike key UNIQUE (B2). A simultaneous sign-up race has exactly one winner (tested).
+  - Names are first-come, one per account, immutable in V1 (no migration flow; "legitimate migration requires explicit re-verification" is not built).
+- B2 **Lookalike usernames**: V1 avoids confusables by construction: usernames are lowercase ASCII `^[a-z][a-z0-9_]{2,19}# THREAT_MODEL.md — Everpiece (v0.2)
+
+Status: reconciled with full MASTER PROMPT v3.2 and Maris decisions D1–D10 (2026-09-29). Pairs with `ESCROW_SPEC.md` v0.2.
+Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in `contracts/test/adversarial/`.
+
+## A. Assets and trust boundaries
+
+| Asset | Where | Protected by |
+|---|---|---|
+| Active escrowed AUSD | EverpieceEscrow | Signatures + deterministic contract rules |
+| Claimed AUSD | Recipient's Mera EOA | Recipient's passkey |
+| PRF output / derived EVM key | Browser memory only, never persisted (master §22.2) | Passkey user verification + frontend integrity |
+| Link client package (claim key, voice root, recipient salt) | URL fragment → ephemeral app state | Never sent to server; two-factor claim |
+| Recipient phone | Everpiece DB (encrypted at rest, redacted logs) | Access control; never on-chain |
+| OTP challenge state | Server | Slow/salted verifier storage, throttles |
+| Approver key | Server (KMS/HSM target) | Cannot claim alone |
+| Relayer key + MON | Server (KMS target) | Can only submit allow-listed methods; never holds AUSD |
+| Owner key | Maris-controlled account (canary phase, D8) | Minimal powers; cannot move funds |
+| Voice/message ciphertext | Private object storage | Client-side encryption |
+
+**Trusted for money safety:** escrow code, AUSD (issuer), the user's authenticator, and **the web origin's JavaScript**, which builds what the user signs.
+**Trusted only for liveness:** relayer, RPC, Envio, SMS provider, object storage, and the server (except its approver role in link mode).
+
+## B. Username directory, recipient pinning (master §10.2–10.3)
+
+- B1 **Directory returns the wrong account** (`@mama → attacker`). Mitigations:
+  - The first payment shows username, display name, avatar and joined date; the sender explicitly confirms.
+  - After the first successful interaction the browser **pins** `@username → account → encryption public key`.
+  - If a later lookup returns a different account or key, automatic send is blocked: "This recipient's security details changed. Verify them before sending."
+  - The payment commits to the account, not the username. The sender can cancel until claim.
+, staff-like names are reserved, and display names reject control and bidi-override characters. Plus the "new recipient" confirmation. Common ASCII lookalikes are treated as the **same** name: `usernameSkeleton` drops "_" and folds 0→o, 1/i→l, rn→m, vv→w. The key is stored UNIQUE, so `mama`, `marna`, `mama_` and `m_a_m_a` can have only one holder. Reserved names are checked on the folded key (`adm1n`, `supp0rt`). Other lookalikes (e.g. `mamma`) are still possible; the confirmation and pinning remain the defence.
+- B4 **Inbox privacy.** A USERNAME payment's recipient salt links the payment to its recipient. It is not a theft secret (only the recipient's signature can claim, ESCROW_SPEC §3.1), but it is personal data.
+  - The directory stores an entry only if `(recipient, salt)` opens the on-chain commitment of an ACTIVE USERNAME payment read at "finalized", so nobody can spam or forge inbox entries.
+  - Reading an inbox needs the account's inbox key (EVERPIECE_INBOX_V1 = HKDF-SHA256 of the passkey PRF output, info "everpiece.inbox.v1"). The directory stores only its keccak hash.
+  - The browser keeps the inbox key in `localStorage`. Anyone with access to that browser profile can see which username payments were sent to the account; they cannot move money.
+  - The directory operator sees the full sender → recipient graph for username payments. TODO(REVIEW): with the voice-key derivation (master §23).
 - B3 **TOFU limitation.** Pinning is Trust On First Use:
   - It does not protect the first-ever interaction against a malicious directory.
   - It does not survive a new device or cleared storage.

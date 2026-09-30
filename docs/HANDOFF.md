@@ -4,6 +4,57 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 7 — 2026-09-30 — Username payments (directory + UI)
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Completed:**
+  - **`packages/shared/src/directory.ts`:**
+    - EIP-712 `UsernameRegistration` (domain "Everpiece Directory" v1, bound to chain + escrow), signed by the account.
+    - Username rules: lowercase ASCII `^[a-z][a-z0-9_]{2,19}$`, reserved staff-like names, display-name cleaning (rejects control and bidi characters).
+    - `EVERPIECE_INBOX_V1` inbox key = HKDF-SHA256(PRF output, info "everpiece.inbox.v1"). Domain-separated from the account key.
+    - New dependency: `@noble/hashes` 2.4.0, already in the tree via `@scure/bip32`.
+    - Vectors in `vectors.json` → `directory`, generated independently by `evidence/directory-v0/vectors.sh` (cast + `node:crypto` HKDF).
+  - **`server/directory`** (new workspace, :8789, **holds no keys**). Routes:
+    - `/v1/usernames/register`: first come, one name per account, immutable, per-IP daily cap.
+    - `/v1/usernames/lookup` and `/v1/usernames/by-account`.
+    - `/v1/inbox/deliver`: stored only if `(recipient, salt)` opens the on-chain commitment of an ACTIVE USERNAME payment read at `finalized`.
+    - `/v1/inbox/list`: needs the inbox key; only its hash is stored, compared in constant time.
+  - **`web`:**
+    - The Mera wrapper derives the inbox key in the same ceremony.
+    - `lib/username.ts`: the browser re-verifies every registration signature, plus TOFU pinning (`everpiece.pins.v1`, set only after CONFIRMED).
+    - Home: "Get paid by username" setup card; "Money for you" list with "from @sender" and one-fingerprint claim; automatic retry of undelivered inbox entries.
+    - Send: "Phone number | @username" choice. A new recipient needs an explicit "This is the person I mean" tick; a pinned one shows "You've paid them before ✓"; a changed account is blocked with the §10.2 message.
+    - The directory URL is added to the CSP `connect-src`, the dev stack and `.env.example`.
+  - **`docs/THREAT_MODEL.md` §B:** documents what was actually built (B1/B2) and the new B4 (inbox privacy).
+  - **One username = one person (owner request):**
+    - The database enforces it: username PRIMARY KEY + CHECK lowercase, account UNIQUE, and a new `skeleton` column UNIQUE.
+    - The lookalike key (`usernameSkeleton` in shared) makes `mama`, `marna`, `mama_` and `m_a_m_a` count as the same name; reserved names are also checked on the folded key.
+    - After a lost sign-up race the server re-reads the database for an accurate error, and any non-UNIQUE database error now surfaces as a 500 instead of "UsernameTaken".
+    - New `/v1/usernames/available` route, so the app shows "taken" or "too close to someone else's" before the fingerprint prompt.
+    - An old directory DB file without the `skeleton` column refuses to start. Only `:memory:` DBs exist so far.
+- **Tests run:**
+  - shared **10/10**, directory **7/7** (including a simultaneous-sign-up race and database-level refusal), claims 8/8, relayer 6/6; typecheck clean in all four and in web.
+  - Playwright against the dev stack: **2/2 pass**.
+    - `flow.spec.ts`: the link flow, unchanged.
+    - `username.spec.ts` (21 s): both users register; $20 to `@mama` is claimed from Home; the second send is pinned and then cancelled; a tampered pin is blocked; an unknown username is refused; a third user can't take `@mama_…` or its lookalike.
+  - Zero CSP errors; zero error-level server logs.
+  - Production `next build` was **not** re-run this session (disk space).
+- **Open / known limits:**
+  - The inbox key is kept in `localStorage` (read-only privacy key). The owner may prefer a fingerprint prompt per inbox check.
+  - Usernames can't be changed and there is no re-verification/migration flow.
+  - The pin covers the account only; no recipient encryption key exists yet.
+  - The directory operator sees the username-payment graph. TODO(REVIEW) on the inbox-key derivation, together with the voice keys (§23).
+  - The sent list is still device-local; the Envio indexer is still next.
+  - **Machine:** the C: drive repeatedly filled to 0 MB from something outside the repo (~8 GB consumed during this session's test run). `web/.next` was deleted once to recover.
+- **Decisions (owner, 2026-09-30):**
+  1. The inbox key stays in `localStorage` (no fingerprint prompt per inbox check). Accepted: anyone with that browser profile can see incoming username payments, but can't move money.
+  2. Username rules accepted as built: 3–20 lowercase ASCII, immutable in V1, lookalikes folded.
+  3. Commit, then the Envio indexer.
+- **Decisions still needed from owner:** the commit identity for the history rewrite (before any push), and the SMS provider path.
+- **Next recommended action:** owner review of the decisions above → commit as `feat(shared): username directory typed data + inbox key`, `feat(directory): username directory server`, `feat(web): send to @username, claim from Home` → re-run the production build/CSP check → Envio indexer.
+
+---
+
 ## Session 6 — 2026-09-29 — PWA (web) + local dev stack
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
