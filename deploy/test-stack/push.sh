@@ -14,5 +14,8 @@ ssh "$HOST" 'mkdir -p /opt/everpiece && rm -rf /opt/everpiece/src.new && mkdir /
 git archive --format=tar HEAD | ssh "$HOST" 'tar -x -C /opt/everpiece/src.new'
 tar -cf - "$ART" | ssh "$HOST" 'tar -x -C /opt/everpiece/src.new'
 ssh "$HOST" "echo $REV > /opt/everpiece/src.new/REVISION && rm -rf /opt/everpiece/src.old && { [ ! -d /opt/everpiece/src ] || mv /opt/everpiece/src /opt/everpiece/src.old; } && mv /opt/everpiece/src.new /opt/everpiece/src && cp /opt/everpiece/src/deploy/test-stack/compose.yaml /opt/everpiece/compose.yaml"
-ssh "$HOST" 'cd /opt/everpiece && docker compose build && docker compose up -d --force-recreate'
+# Test-stack secrets live only on the host (0600), generated once; never in git or on this machine.
+ssh "$HOST" 'cd /opt/everpiece && [ -s .env ] || { umask 077; r() { head -c 24 /dev/urandom | od -An -tx1 | tr -d " \n"; }; printf "INDEXER_DB_PASSWORD=%s\nHASURA_ADMIN_SECRET=%s\n" "$(r)" "$(r)" > .env; }'
+# One image at a time: image builds are not under the containers' memory caps.
+ssh "$HOST" 'cd /opt/everpiece && docker compose build stack && docker compose build indexer && docker compose up -d --force-recreate'
 echo "shipped $REV → $HOST:/opt/everpiece (docker compose project everpiece-test)"

@@ -8,7 +8,7 @@
 // STACK_WEB_BUILDER=webpack builds with webpack (peak ~0.75 GB vs >1.15 GB for Turbopack, measured on the test host).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPublicClient, createTestClient, createWalletClient, defineChain, encodeAbiParameters, http, keccak256, parseEther, toHex } from "viem";
@@ -19,6 +19,10 @@ const FORK_URL = process.env.MONAD_RPC ?? "https://rpc.monad.xyz";
 const P = { anvil: 8545, relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, web: 3000 };
 const BIND = process.env.STACK_BIND_HOST ?? "127.0.0.1";
 const WEB_PROD = process.env.STACK_WEB === "prod";
+// Container use: where to publish this run's escrow for the indexer (deploy/test-stack). Removed at start, so a stale
+// file never points the indexer at a previous run's chain.
+const INFO_FILE = process.env.STACK_INFO_FILE;
+if (INFO_FILE) rmSync(INFO_FILE, { force: true });
 const WEB_ORIGIN = `http://localhost:${P.web}`;
 const RPC = `http://127.0.0.1:${P.anvil}`;
 const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a";
@@ -87,7 +91,8 @@ for (const a of [acct.deployer, acct.relayer]) await test.setBalance({ address: 
 const artifact = JSON.parse(readFileSync(join(root, "contracts/out/EverpieceEscrow.sol/EverpieceEscrow.json"), "utf8"));
 const wallet = createWalletClient({ chain, transport: http(RPC), account: acct.deployer });
 const hash = await wallet.deployContract({ abi: artifact.abi, bytecode: artifact.bytecode.object, args: [AUSD, acct.owner.address, acct.approver.address] });
-const escrow = (await pub.waitForTransactionReceipt({ hash })).contractAddress;
+const receipt = await pub.waitForTransactionReceipt({ hash });
+const escrow = receipt.contractAddress;
 say(`EverpieceEscrow deployed on the local fork at ${escrow}`);
 
 // 4. web config
@@ -167,6 +172,7 @@ await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
 const webArgs = [nextBin, WEB_PROD ? "start" : "dev", "--port", String(P.web), ...(process.env.STACK_BIND_HOST ? ["--hostname", BIND] : [])];
 run("web", process.execPath, webArgs, { spawn: { cwd: join(root, "web") }, quiet: false });
 await waitFor(WEB_ORIGIN);
+if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow, deployBlock: Number(receipt.blockNumber), startedAt: new Date().toISOString() }) + "\n");
 say("");
 say(`✅ Everpiece local test stack is up → open ${WEB_ORIGIN}`);
 say(`   Test Dollars: "Get 100 test Dollars" button on Home. Simulated texts: http://127.0.0.1:${P.faucet}/sms`);

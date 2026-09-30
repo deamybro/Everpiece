@@ -8,7 +8,7 @@ FROM node:24-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
 WORKDIR /app
-RUN chown node:node /app
+RUN chown node:node /app && mkdir -p /shared && chown node:node /shared
 USER node
 COPY --chown=node:node . .
 RUN npm ci --no-audit --no-fund && npm cache clean --force

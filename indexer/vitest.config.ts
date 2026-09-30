@@ -8,6 +8,8 @@ export default defineConfig({
     env: {
       ENVIO_ESCROW_START_BLOCK: "1",
       ENVIO_BLOCK_LAG: "0",
+      ENVIO_RPC_URL: "http://127.0.0.1:1",
+      ENVIO_RPC_FOR: "sync",
       ENVIO_ESCROW_ADDRESS: "0x0000000000000000000000000000000000000001",
     },
   },

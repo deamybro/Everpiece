@@ -1,19 +1,35 @@
 # Everpiece TEST STACK on a SHARED host. Additive only:
 # - every port is published on the host's 127.0.0.1 (reach it with the SSH tunnel in README.md);
-# - hard memory/CPU/process caps, so an overrun kills only this container, never a co-tenant.
+# - hard memory/CPU/process caps, so an overrun kills only an Everpiece container;
+# - oom_score_adj 1000: if the whole host ever runs out of memory, the kernel kills Everpiece first, never a co-tenant.
+# Secrets (HASURA_ADMIN_SECRET, INDEXER_DB_PASSWORD) come from /opt/everpiece/.env, generated on the host by push.sh.
 name: everpiece-test
+
+x-shared: &shared
+  restart: on-failure:3
+  oom_score_adj: 1000
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   stack:
+    <<: *shared
     build:
       context: ./src
       dockerfile: deploy/test-stack/Dockerfile
     image: everpiece-test-stack:local
     container_name: everpiece-test-stack
-    restart: on-failure:3
-    mem_limit: 1200m
-    memswap_limit: 1200m
+    mem_limit: 1000m # measured peak 753 MB (web build at start)
+    memswap_limit: 1000m
     cpus: 1.0
     pids_limit: 512
+    environment:
+      STACK_INFO_FILE: /shared/stack.json
+    volumes:
+      - stack-info:/shared
     ports:
       - "127.0.0.1:47300:3000" # web
       - "127.0.0.1:47301:8545" # anvil (fork RPC)
@@ -21,8 +37,82 @@ services:
       - "127.0.0.1:47303:8788" # claims
       - "127.0.0.1:47304:8789" # directory
       - "127.0.0.1:47305:8790" # faucet + simulated SMS
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+
+  indexer-db:
+    <<: *shared
+    image: postgres:18.3 # the version envio 3.12.1 uses for local dev
+    container_name: everpiece-indexer-db
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.5
+    pids_limit: 128
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20", "-c", "work_mem=2MB"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${INDEXER_DB_PASSWORD:?run push.sh}
+      POSTGRES_DB: everpiece_indexer
+    volumes:
+      - indexer-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "everpiece_indexer"]
+      interval: 5s
+      retries: 20
+
+  indexer-hasura:
+    <<: *shared
+    image: hasura/graphql-engine:v2.43.0 # the version envio 3.12.1 uses
+    container_name: everpiece-indexer-hasura
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 0.5
+    pids_limit: 256
+    depends_on:
+      indexer-db:
+        condition: service_healthy
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:${INDEXER_DB_PASSWORD}@indexer-db:5432/everpiece_indexer
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?run push.sh}
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: public # read-only role; envio grants it select with a row limit
+      HASURA_GRAPHQL_STRINGIFY_NUMERIC_TYPES: "true"
+      HASURA_GRAPHQL_NO_OF_RETRIES: "10"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "false"
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup
+      HASURA_GRAPHQL_CORS_DOMAIN: http://localhost:3000
+    ports:
+      - "127.0.0.1:47306:8080" # GraphQL (public role = read-only)
+
+  indexer:
+    <<: *shared
+    build:
+      context: ./src
+      dockerfile: deploy/test-stack/indexer.Dockerfile
+    image: everpiece-test-indexer:local
+    container_name: everpiece-indexer
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpus: 0.5
+    pids_limit: 256
+    depends_on:
+      indexer-db:
+        condition: service_healthy
+      indexer-hasura:
+        condition: service_started
+    environment:
+      STACK_INFO_FILE: /shared/stack.json
+      ENVIO_RPC_URL: http://stack:8545
+      ENVIO_PG_HOST: indexer-db
+      ENVIO_PG_PORT: "5432"
+      ENVIO_PG_USER: postgres
+      ENVIO_PG_PASSWORD: ${INDEXER_DB_PASSWORD}
+      ENVIO_PG_DATABASE: everpiece_indexer
+      ENVIO_PG_SSL_MODE: "false"
+      HASURA_GRAPHQL_ENDPOINT: http://indexer-hasura:8080/v1/metadata
+      HASURA_GRAPHQL_ROLE: admin
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
+    volumes:
+      - stack-info:/shared:ro
+
+volumes:
+  stack-info:
+  indexer-db:
