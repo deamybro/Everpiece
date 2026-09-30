@@ -30,6 +30,12 @@ services:
       STACK_INFO_FILE: /shared/stack.json
     volumes:
       - stack-info:/shared
+    # Healthy once the web is built and serving (dev-stack writes the info file last). The indexer services wait for
+    # it, so their ~0.4 GB never stacks on the web build's ~0.75 GB peak.
+    healthcheck:
+      test: ["CMD", "test", "-s", "/shared/stack.json"]
+      interval: 10s
+      start_period: 900s
     ports:
       - "127.0.0.1:47300:3000" # web
       - "127.0.0.1:47301:8545" # anvil (fork RPC)
@@ -47,6 +53,9 @@ services:
     cpus: 0.5
     pids_limit: 128
     command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20", "-c", "work_mem=2MB"]
+    depends_on:
+      stack:
+        condition: service_healthy
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${INDEXER_DB_PASSWORD:?run push.sh}
