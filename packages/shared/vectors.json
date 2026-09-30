@@ -125,5 +125,19 @@
       "prfOutput": "0x8e820f75e2a9ae67d9f0d77e4ff045a362f944ae28c3a229ab8d8894e34d80d6",
       "address": "0xf7F59911972E5F1F4E25c812f6a3B7F3cAb3A461"
     }
-  ]
+  ],
+  "directory": {
+    "note": "Username directory (server/directory), domain Everpiece Directory v1 bound to chain + escrow. Generated with cast; inbox key with node:crypto hkdfSync.",
+    "domainSeparator": "0xb6039187e7f6c5a869c4c57163088f31438351d7bd758e7a971af57dba14e7b8",
+    "usernameRegistrationTypehash": "0x2ef061772582edc73557cee62e64dbab04ce56e334f152863aa712f713421e2e",
+    "prfOutput": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "inboxKey": "0x3caed2635aa694fa52a26133de0346822085016675a420fa8ac04d867222326c",
+    "inboxKeyHash": "0x3413885194c88a390730771c120d8a00a60549d84f98eb30bea9dc85cca45d0e",
+    "username": "mama",
+    "account": "0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF",
+    "displayName": "Mama Ngozi",
+    "deadline": "1790812800",
+    "digest": "0xec41c68cbff80f8daf1c8cadead8c38b82c35d08dbe2a3d9e554f63304c812fa",
+    "sig": "0xe8b9b2c728d48c78cf0724b4af1db7f77b2bbf1d264cd8c3e27440fe94877b8e78714bead2713505cc7037deb783442cc4fff4e2777a69546123f98819886eba1b"
+  }
 }

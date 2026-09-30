@@ -4,6 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  bytesToHex,
   domainSeparator,
   getAddress,
   hashStruct,
@@ -24,7 +25,15 @@ import {
   cancelIntent,
   claimApproval,
   claimIntent,
+  cleanDisplayName,
   deriveEverpieceAccountV1,
+  deriveEverpieceInboxKeyV1,
+  directoryDomain,
+  inboxKeyHash,
+  normalizeUsername,
+  usernameProblem,
+  usernameSkeleton,
+  usernameRegistration,
   escrowDomain,
   escrowTypes,
   fundingAuthorization,
@@ -180,4 +189,35 @@ test("claims-server messages: InviteRegistration and ClaimStart (cast vectors)",
   const cs = claimStart(ESCROW, { paymentId: c.paymentId, recipient: V.keys.recipient.address, deadline: BigInt(c.deadline) });
   assert.equal(hashTypedData(cs), c.claimStartDigest);
   assert.equal(await key("claimKey").signTypedData(cs), c.claimStartSig);
+});
+
+test("directory: UsernameRegistration domain/typehash/digest/sig + EVERPIECE_INBOX_V1 inbox key", async () => {
+  const d = V.directory;
+  assert.equal(domainSeparator({ domain: directoryDomain(ESCROW) }), d.domainSeparator);
+  assert.equal(keccak256(stringToHex("UsernameRegistration(string username,address account,string displayName,bytes32 inboxKeyHash,uint256 deadline)")), d.usernameRegistrationTypehash);
+  const ik = bytesToHex(deriveEverpieceInboxKeyV1(hexToBytes(d.prfOutput)));
+  assert.equal(ik, d.inboxKey);
+  assert.equal(inboxKeyHash(ik), d.inboxKeyHash);
+  const m = usernameRegistration(ESCROW, { username: d.username, account: d.account, displayName: d.displayName, inboxKeyHash: d.inboxKeyHash, deadline: BigInt(d.deadline) });
+  assert.equal(hashTypedData(m), d.digest);
+  assert.equal(await key("recipient").signTypedData(m), d.sig);
+  assert.equal(await recoverTypedDataAddress({ ...m, signature: d.sig }), getAddress(d.account));
+});
+
+test("directory: username rules (lowercase ASCII, reserved names, display-name spoofing)", () => {
+  assert.equal(normalizeUsername("  @Mama "), "mama");
+  for (const bad of ["ma", "1mama", "mama-ngozi", "mаma" /* Cyrillic а */, "a".repeat(21), "_mama"]) assert.equal(normalizeUsername(bad), null, bad);
+  assert.equal(usernameProblem("support"), "Reserved");
+  assert.equal(usernameProblem("everpiece_help"), "Reserved");
+  assert.equal(usernameProblem("mama_ngozi"), null);
+  // lookalikes fold to one key, so the directory lets only one person hold them
+  for (const alike of ["mama", "marna", "mama_", "m_a_m_a", "rnarna"]) assert.equal(usernameSkeleton(alike), "mama", alike);
+  assert.equal(usernameSkeleton("bi11"), usernameSkeleton("bill"));
+  assert.equal(usernameSkeleton("j0hn"), usernameSkeleton("john"));
+  assert.notEqual(usernameSkeleton("mama"), usernameSkeleton("mama2"));
+  for (const r of ["supp0rt", "adm1n", "s_upport", "everp1ece_help"]) assert.equal(usernameProblem(r), "Reserved", r);
+  assert.equal(cleanDisplayName("  Mama   Ngozi "), "Mama Ngozi");
+  assert.equal(cleanDisplayName("Mama‮izogN"), null);
+  assert.equal(cleanDisplayName(""), null);
+  assert.equal(cleanDisplayName("x".repeat(41)), null);
 });
