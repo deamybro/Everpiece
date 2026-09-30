@@ -5,6 +5,7 @@
     "packages/shared",
     "server/relayer",
     "server/claims",
+    "server/directory",
     "web"
   ],
   "engines": {

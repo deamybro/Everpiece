@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Everpiece LOCAL TEST STACK — test Dollars only, nothing touches mainnet.
 //   anvil fork of Monad mainnet (real AUSD code, Monad-like finality: finalized = latest-2)
-//   + freshly deployed EverpieceEscrow + relayer + claims server (SIMULATED SMS) + dev faucet + web (next dev)
+//   + freshly deployed EverpieceEscrow + relayer + claims server (SIMULATED SMS) + username directory + dev faucet + web (next dev)
 // Fresh random dev keys every run, held in memory only. Usage: npm run dev:stack   (then open http://localhost:3000)
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -13,7 +13,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FORK_URL = process.env.MONAD_RPC ?? "https://rpc.monad.xyz";
-const P = { anvil: 8545, relayer: 8787, claims: 8788, faucet: 8790, web: 3000 };
+const P = { anvil: 8545, relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, web: 3000 };
 const WEB_ORIGIN = `http://localhost:${P.web}`;
 const RPC = `http://127.0.0.1:${P.anvil}`;
 const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a";
@@ -95,6 +95,7 @@ writeFileSync(
     `NEXT_PUBLIC_ESCROW_ADDRESS=${escrow}`,
     `NEXT_PUBLIC_RELAYER_URL=http://127.0.0.1:${P.relayer}`,
     `NEXT_PUBLIC_CLAIMS_URL=http://127.0.0.1:${P.claims}`,
+    `NEXT_PUBLIC_DIRECTORY_URL=http://127.0.0.1:${P.directory}`,
     `NEXT_PUBLIC_DEV_FAUCET_URL=http://127.0.0.1:${P.faucet}`,
     "",
   ].join("\n"),
@@ -110,6 +111,10 @@ run("claims", process.execPath, ["server/claims/src/main.ts"], {
     ...common, APPROVER_PRIVATE_KEY: keys.approver, PHONE_ENC_KEY: generatePrivateKey(), CLAIMS_DB_PATH: ":memory:", PORT: String(P.claims),
     SMS_PROVIDER: "simulated", ALLOW_SIMULATED_SMS: "1", SIMULATED_SMS_STDOUT: "1",
   },
+});
+
+run("directory", process.execPath, ["server/directory/src/main.ts"], {
+  env: { ...common, DIRECTORY_DB_PATH: ":memory:", PORT: String(P.directory) },
 });
 
 // 6. dev faucet + simulated SMS outbox (LOCAL ONLY)
@@ -143,6 +148,7 @@ createServer(async (req, res) => {
 
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);
+await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
 
 // 7. web
 run("web", process.execPath, [join(root, "node_modules/next/dist/bin/next"), "dev", "--port", String(P.web)], { spawn: { cwd: join(root, "web") }, quiet: false });
