@@ -4,7 +4,8 @@
 //   + freshly deployed EverpieceEscrow + relayer + claims server (SIMULATED SMS) + username directory + dev faucet + web (next dev)
 // Fresh random dev keys every run, held in memory only. Usage: npm run dev:stack   (then open http://localhost:3000)
 // Container use (deploy/test-stack): STACK_BIND_HOST=0.0.0.0 listens on the container's interfaces (Docker publishes
-// them on the host's 127.0.0.1 only); STACK_WEB=prod runs next build + next start instead of next dev (far less memory).
+// them on the host's 127.0.0.1 only); STACK_WEB=prod runs next build + next start instead of next dev (far less memory);
+// STACK_WEB_BUILDER=webpack builds with webpack (peak ~0.75 GB vs >1.15 GB for Turbopack, measured on the test host).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -109,7 +110,7 @@ writeFileSync(
 const nextBin = join(root, "node_modules/next/dist/bin/next");
 if (WEB_PROD) {
   say("building the web app (next build)…");
-  const b = spawnSync(process.execPath, [nextBin, "build"], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" } });
+  const b = spawnSync(process.execPath, [nextBin, "build", ...(process.env.STACK_WEB_BUILDER === "webpack" ? ["--webpack"] : [])], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" } });
   if (b.status !== 0) throw new Error("next build failed");
 }
 
