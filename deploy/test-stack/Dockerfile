@@ -14,5 +14,6 @@ COPY --chown=node:node . .
 RUN npm ci --no-audit --no-fund && npm cache clean --force
 ENV STACK_BIND_HOST=0.0.0.0 \
     STACK_WEB=prod \
+    STACK_WEB_BUILDER=webpack \
     NEXT_TELEMETRY_DISABLED=1
 CMD ["node", "scripts/dev-stack.mjs"]

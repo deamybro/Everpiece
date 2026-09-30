@@ -7,7 +7,8 @@ Every start makes **new random keys and a new escrow**, so passkey accounts from
 
 - It is additive only: `/opt/everpiece` plus the compose project `everpiece-test`. Never `docker compose down` other projects, never prune, and never restart shared services.
 - Ports are published on **127.0.0.1 only** (47300–47305). Nothing is public, and the shared Caddy is untouched.
-- Caps: 1200 MB RAM (no swap), 1 CPU, 512 processes, `restart: on-failure:3`, rotated logs (3 × 10 MB). An overrun kills only this container.
+- Caps: 1200 MB RAM (no swap), 1 CPU, 512 processes, `restart: on-failure:3`, rotated logs (3 × 10 MB). An overrun kills only this container. This was verified: a Turbopack build that hit the cap was killed with `CONSTRAINT_MEMCG` and nothing else was touched.
+- The web is built with **webpack** in the container (measured peak 745 MB; Turbopack needed more than 1.15 GB). Local builds still use Turbopack.
 
 ## Deploy (committed code only)
 
