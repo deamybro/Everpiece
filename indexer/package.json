@@ -1,0 +1,25 @@
+{
+  "name": "@everpiece/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "envio": "3.12.1"
+  },
+  "description": "Envio HyperIndex history indexer. Envio ships Linux/macOS binaries only: run these scripts in WSL on Windows.",
+  "scripts": {
+    "codegen": "envio codegen",
+    "dev": "envio dev",
+    "start": "envio start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

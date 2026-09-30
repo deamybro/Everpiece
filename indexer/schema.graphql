@@ -1,0 +1,66 @@
+# One row per payment (id = paymentId). Status mirrors the on-chain enum; EXPIRED is derived by readers
+# (ACTIVE && now >= expiresAt), never stored.
+type Payment {
+  id: ID!
+  sender: String! @index
+  mode: Int!
+  recipientCommitment: String!
+  amount: BigInt!
+  expiresAt: BigInt!
+  status: PaymentStatus! @index
+  "Set on PaymentClaimed only. Before a claim the recipient is a commitment, not an address."
+  recipient: String @index
+  createdAt: Int!
+  createdBlock: Int!
+  createdTx: String!
+  settledAt: Int
+  settledBlock: Int
+  settledTx: String
+  "Who triggered a refund of an expired payment (anyone may)."
+  refundCaller: String
+  events: [PaymentEvent!]! @derivedFrom(field: "payment")
+}
+
+enum PaymentStatus {
+  ACTIVE
+  CLAIMED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentEventKind {
+  CREATED
+  CLAIMED
+  CANCELLED
+  REFUNDED
+}
+
+"Timeline entry (id = chainId_block_logIndex)."
+type PaymentEvent {
+  id: ID!
+  payment: Payment!
+  kind: PaymentEventKind!
+  "sender for CREATED/CANCELLED/REFUNDED, recipient for CLAIMED"
+  actor: String! @index
+  amount: BigInt!
+  blockNumber: Int!
+  timestamp: Int!
+  txHash: String!
+  logIndex: Int!
+}
+
+"Real metrics from executed events only (master §29: never seeded). id = chainId."
+type Stats {
+  id: ID!
+  created: Int!
+  createdVolume: BigInt!
+  claimed: Int!
+  claimedVolume: BigInt!
+  cancelled: Int!
+  cancelledVolume: BigInt!
+  refunded: Int!
+  refundedVolume: BigInt!
+  "Mirrors the escrow's activeLiability: created − claimed − cancelled − refunded."
+  activeCount: Int!
+  activeLiability: BigInt!
+}

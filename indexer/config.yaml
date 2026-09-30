@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+# Everpiece history indexer (master §29): the four canonical EverpieceEscrow payment events on Monad mainnet (143).
+# Keys follow node_modules/envio/evm.schema.json of envio 3.12.1 (pinned). History only: financial truth stays
+# getPayment at "finalized" (ESCROW_SPEC §17).
+name: everpiece-indexer
+description: Everpiece escrow payment history and metrics
+schema: ./schema.graphql
+handlers: ./src/handlers
+address_format: checksum
+bytes_type: hex
+# Monad "finalized" = head − 2 (VERIFIED §1.14). Production: ENVIO_BLOCK_LAG=3 (one block of margin); reorg rollback stays on.
+# Tests use 0: a simulated chain stops at its last block, so a lag would keep the last events out of reach.
+rollback_on_reorg: true
+field_selection:
+  transaction_fields:
+    - hash
+contracts:
+  - name: EverpieceEscrow
+    events:
+      # Must match contracts/src/interfaces/IEverpieceEscrow.sol (checked against the shared ABI in test/abi.test.ts).
+      - event: PaymentCreated(bytes32 indexed paymentId, address indexed sender, bytes32 indexed recipientCommitment, uint8 mode, bytes32 metadataCommitment, address approver, uint256 amount, uint64 expiresAt)
+      - event: PaymentClaimed(bytes32 indexed paymentId, address indexed recipient, uint256 amount)
+      - event: PaymentCancelled(bytes32 indexed paymentId, address indexed sender, uint256 amount)
+      - event: PaymentRefunded(bytes32 indexed paymentId, address indexed sender, uint256 amount, address caller)
+chains:
+  - id: 143
+    start_block: ${ENVIO_ESCROW_START_BLOCK}
+    block_lag: ${ENVIO_BLOCK_LAG}
+    contracts:
+      - name: EverpieceEscrow
+        address: "${ENVIO_ESCROW_ADDRESS}"

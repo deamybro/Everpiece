@@ -356,7 +356,30 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Explorer / verified-source reference:** n/a
 - **Date checked:** 2026-09-29
 - **Checked by:** Everpiece team
-- **Notes:** Config syntax not yet read (indexer milestone, Oct 6; do not invent config — master §53.4).
+- **Notes:** Config syntax read on 2026-09-30 from the pinned package itself; see §4.7.
+
+### 4.7 Envio HyperIndex 3.12.1: config keys, platforms, test framework
+- **Fact:** How the pinned Envio version is configured, where it runs, and how it tests
+- **Value:**
+  - npm `envio` dist-tags on 2026-09-30: `latest` 3.12.1, `next` 3.13.0. Pinned exactly: `envio@3.12.1`; engines `node >=22`.
+  - Native binaries (optionalDependencies) exist only for linux-x64, linux-x64-musl, linux-arm64, darwin-x64 and darwin-arm64. **No Windows build:** `envio codegen` on native Windows fails with "Cannot read properties of null (reading 'runCli')". Runs in WSL.
+  - Config keys come from `node_modules/envio/evm.schema.json`:
+    - top level: `name`, `chains` (required), `contracts`, `schema`, `handlers`, `rollback_on_reorg` (default true), `field_selection.transaction_fields`, `address_format` (checksum|lowercase), `bytes_type` (hex|uint8array);
+    - per chain: `id`, `start_block` (required), `block_lag` ("blocks behind the chain head that the indexer should lag"), `max_reorg_depth`, `rpc` (`for: sync|fallback|realtime`), `contracts[].address`;
+    - events are human-readable signatures.
+  - `${ENV_VAR}` interpolation works in `start_block`, `block_lag` and a *quoted* `address` (verified by codegen). An unquoted `0x…` address fails to parse ("did not match any variant of untagged enum SingleOrList").
+  - Handlers: `indexer.onEvent({ contract, event }, async ({ event, context }) => …)`; `context.<Entity>.get/getOrThrow/getWhere/getOrCreate/set`; relations are set as `<field>_id` (from `index.d.ts`).
+  - Tests: `createTestIndexer().process({ chains: { <id>: { simulate: [...] } } })` runs the real handlers in memory (no Docker, no DB, no network). The simulated head is `endBlock` (default: the max simulated block).
+    - `block_lag > 0` therefore makes `process()` never finish (fetch ceiling = head − lag), which we hit and confirmed in `src/sources/SimulateSource.res`. Tests set the lag to 0.
+  - Local `envio dev` needs Docker or Podman. Envio Cloud deploys via the "Envio Deployments" GitHub App on push.
+- **Official source:** npm package `envio@3.12.1` (`evm.schema.json`, `index.d.ts`, `src/TestIndexer.res`, `src/sources/SimulateSource.res`); https://docs.envio.dev/docs/HyperIndex/running-locally ; https://docs.envio.dev/docs/HyperIndex/hosted-service ; https://docs.envio.dev/blog/envio-developer-update-april-2026
+- **Explorer / verified-source reference:** n/a (no deployed escrow yet)
+- **Date checked:** 2026-09-30
+- **Checked by:** Everpiece team
+- **Notes:**
+  - Finality mapping: Monad `finalized` = head − 2 (§1.14), so production uses `block_lag: 3` (one block of margin) with `rollback_on_reorg: true`. This is a block count, not the `finalized` tag.
+  - TODO(VERIFY): whether HyperIndex can follow the `finalized` tag directly.
+  - TODO(VERIFY): HyperSync's own lag on Monad against the head, on the real chain.
 
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
