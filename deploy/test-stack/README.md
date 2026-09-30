@@ -33,9 +33,33 @@ while true; do ssh -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -L 4
 - **The app:** http://localhost:47300. Passkeys work because the browser sees `localhost`.
 - **Simulated texts:** http://127.0.0.1:47305/sms
 - **Indexer GraphQL:** http://127.0.0.1:47306/v1/graphql. It is read-only with the `public` role and needs no key.
-- **E2E tests against the server:** run `cd web && E2E_BASE_URL=http://localhost:47300 E2E_FAUCET_URL=http://127.0.0.1:47305 npx playwright test` while the tunnel is open.
+- **E2E tests against the server:** run `cd web && E2E_BASE_URL=http://localhost:47300 E2E_FAUCET_URL=http://127.0.0.1:47305 E2E_CLAIMS_URL=http://127.0.0.1:47303 npx playwright test` while the tunnel is open.
 - **Status and logs:** `ssh <ssh-host> 'cd /opt/everpiece && docker compose ps && docker compose logs --tail 50'`
 - **Stop:** `ssh <ssh-host> 'cd /opt/everpiece && docker compose stop'` stops only Everpiece.
+
+## Real claim-code emails (Resend)
+
+The stack sends real emails when the host's `.env` has both `RESEND_API_KEY` and `EMAIL_FROM`; otherwise email is simulated.
+
+1. Put both settings on the host. The value is read with hidden input and goes over SSH stdin, never into git, chat or a command line:
+
+   ```bash
+   deploy/test-stack/set-secret.sh <ssh-host> RESEND_API_KEY
+   ```
+
+   ```bash
+   deploy/test-stack/set-secret.sh <ssh-host> EMAIL_FROM
+   ```
+
+   `EMAIL_FROM` looks like `Everpiece <codes@mail.everpiece.xyz>`, on a domain verified in Resend.
+2. Restart the stack:
+
+   ```bash
+   ssh <ssh-host> 'cd /opt/everpiece && docker compose up -d --force-recreate stack'
+   ```
+
+   The claims log then shows `"email":"resend"` and `/healthz` shows `emailLive: true`.
+3. `e2e/email.spec.ts` skips itself when email is live, because it can't read a real inbox. Check a real inbox by hand instead.
 
 ## Indexer
 

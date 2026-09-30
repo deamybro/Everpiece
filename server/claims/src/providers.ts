@@ -273,7 +273,65 @@ export class SimulatedEmailProvider implements VerificationProvider {
   }
 }
 
+/**
+ * Resend (docs/VERIFIED.md §4.8): Everpiece generates the code (LocalOtp) and Resend only delivers the email.
+ *   POST {base}/emails   Authorization: Bearer re_…, User-Agent (required, else 403), Idempotency-Key (≤ 256 chars, 24 h)
+ *   JSON { from, to: [..], subject, text } → 200 { id }
+ * The idempotency key is the OTP ref, so a retried request can never send a second, different code.
+ */
+export class ResendEmailProvider implements VerificationProvider {
+  readonly name = "resend";
+  readonly live = true;
+  private readonly cfg: NonNullable<ClaimsConfig["resend"]>;
+  private readonly otp: LocalOtp;
+  private readonly fetchImpl: typeof fetch;
+  constructor(cfg: NonNullable<ClaimsConfig["resend"]>, otpKey: Buffer, fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
+    this.cfg = cfg;
+    this.otp = new LocalOtp(otpKey, now);
+    this.fetchImpl = fetchImpl;
+  }
+
+  async start(email: string): Promise<{ ref: string }> {
+    const { ref, code } = this.otp.issue("RSND");
+    const m = otpEmail(code);
+    let r: Response;
+    try {
+      r = await this.fetchImpl(`${this.cfg.baseUrl.replace(/\/$/, "")}/emails`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.cfg.apiKey}`,
+          "content-type": "application/json",
+          "user-agent": "everpiece-claims/0.1",
+          "idempotency-key": ref,
+        },
+        body: JSON.stringify({ from: this.cfg.from, to: [email], subject: m.subject, text: m.text }),
+        signal: AbortSignal.timeout(TIMEOUT),
+      });
+    } catch {
+      this.otp.forget(ref);
+      throw new ProviderError("resend network error");
+    }
+    if (!r.ok) {
+      this.otp.forget(ref);
+      // Error bodies aren't specified in the docs; only a string `name` (e.g. validation_error) is surfaced, never content.
+      const j = (await r.json().catch(() => ({}))) as { name?: unknown };
+      throw new ProviderError(`resend HTTP ${r.status}${typeof j.name === "string" ? ` ${j.name.slice(0, 64)}` : ""}`);
+    }
+    const j = (await r.json().catch(() => ({}))) as { id?: unknown };
+    if (typeof j.id !== "string" || !j.id) {
+      this.otp.forget(ref);
+      throw new ProviderError("resend: no id in response");
+    }
+    return { ref };
+  }
+
+  async check(_email: string, code: string, ref: string): Promise<CheckResult> {
+    return this.otp.check(ref, code);
+  }
+}
+
 export function emailProviderFromConfig(cfg: ClaimsConfig, simulatedSink?: (email: string, code: string) => void): VerificationProvider | undefined {
+  if (cfg.emailProvider === "resend") return new ResendEmailProvider(cfg.resend!, otpKeyFrom(cfg.phoneEncKey));
   if (cfg.emailProvider === "simulated") return new SimulatedEmailProvider(simulatedSink ?? (() => {}));
   return undefined;
 }

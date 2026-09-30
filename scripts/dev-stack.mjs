@@ -134,7 +134,10 @@ run("claims", process.execPath, ["server/claims/src/main.ts"], {
   env: {
     ...common, APPROVER_PRIVATE_KEY: keys.approver, PHONE_ENC_KEY: generatePrivateKey(), CLAIMS_DB_PATH: ":memory:", PORT: String(P.claims),
     SMS_PROVIDER: "simulated", ALLOW_SIMULATED_SMS: "1", SIMULATED_SMS_STDOUT: "1",
-    EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1", SIMULATED_EMAIL_STDOUT: "1",
+    // Real email when a Resend key + From address are provided (deploy/test-stack: the host's .env); simulated otherwise.
+    ...(process.env.RESEND_API_KEY && process.env.EMAIL_FROM
+      ? { EMAIL_PROVIDER: "resend", RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_FROM: process.env.EMAIL_FROM }
+      : { EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1", SIMULATED_EMAIL_STDOUT: "1" }),
   },
 });
 

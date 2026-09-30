@@ -381,6 +381,33 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - TODO(VERIFY): whether HyperIndex can follow the `finalized` tag directly.
   - TODO(VERIFY): HyperSync's own lag on Monad against the head, on the real chain.
 
+### 4.8 Resend email API (claim-code email channel)
+- **Fact:** How to send one transactional email with Resend, and its limits
+- **Value:**
+  - `POST https://api.resend.com/emails` with `Authorization: Bearer re_…`.
+  - Required fields: `from` ("Name <email@example.com>"), `to` (string or array, max 50) and `subject`. `text` and `html` are optional. Success returns `{ "id": "<uuid>" }`.
+  - "All API requests must include a User-Agent header." Otherwise the request is rejected with 403.
+  - `Idempotency-Key` header: at most 256 characters, unique per request, expires after 24 h.
+  - Errors used by the adapter:
+    - 401 `missing_api_key`;
+    - 403 `validation_error` (own-address-only without a verified domain; domain not verified);
+    - 429 `rate_limit_exceeded`, `daily_quota_exceeded`, `monthly_quota_exceeded`;
+    - 5xx.
+    The error JSON shape is **not documented**; the adapter only reads an optional string `name`.
+  - Default rate limit: 10 requests per second per team.
+  - A verified domain is mandatory. Resend recommends a subdomain (e.g. `updates.example.com`) to isolate reputation.
+    - The dashboard generates the DNS records: DKIM TXT at `resend._domainkey[.sub]`, plus SPF and MX for the return-path subdomain (default `send.`).
+  - Free plan: 3,000 emails per month, "limited to 100 emails per day", 3 domains. Pro: $20/month for 50,000.
+- **Official source:** https://resend.com/docs/api-reference/emails/send-email ; https://resend.com/docs/api-reference/introduction ; https://resend.com/docs/api-reference/errors ; https://resend.com/docs/dashboard/domains/introduction ; https://resend.com/docs/add-a-domain ; https://resend.com/pricing
+- **Explorer / verified-source reference:** n/a
+- **Date checked:** 2026-09-30
+- **Checked by:** Everpiece team
+- **Notes:**
+  - Adapter: `server/claims/src/providers.ts` `ResendEmailProvider`. Everpiece generates and checks the code (LocalOtp); the idempotency key is the OTP ref.
+  - The API key format was seen only as `re_…` in the docs, so config checks just the prefix.
+  - TODO(VERIFY): a live send from the owner's verified domain, and the error body shape from a real failure.
+  - TODO(VERIFY): inbox placement at Gmail and Yahoo (with DMARC set).
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**

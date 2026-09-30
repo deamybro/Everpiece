@@ -2,7 +2,7 @@ import { getAddress, isAddress, isHex, type Address, type Hex } from "viem";
 import { MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
 
 export type SmsProviderName = "twilio" | "twilio-sms" | "termii" | "simulated";
-export type EmailProviderName = "none" | "simulated";
+export type EmailProviderName = "none" | "resend" | "simulated";
 
 export type ClaimsConfig = {
   rpcUrl: string;
@@ -23,6 +23,8 @@ export type ClaimsConfig = {
   emailProvider?: EmailProviderName;
   /** Codes per email address per day (defaults to perPhonePerDay). */
   perEmailPerDay?: number;
+  /** Resend (VERIFIED §4.8); Everpiece generates/checks the code (LocalOtp). `from` must be on a Resend-verified domain. */
+  resend?: { apiKey: string; from: string; baseUrl: string };
   /** Approval lifetime: short (master §14). */
   approvalTtlSec: number;
   /** Max clock skew allowed on client-supplied request deadlines. */
@@ -74,7 +76,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ClaimsConfig {
   }
 
   const emailProvider = (env.EMAIL_PROVIDER ?? "none") as EmailProviderName;
-  if (!["none", "simulated"].includes(emailProvider)) throw new Error("config: EMAIL_PROVIDER must be none | simulated");
+  if (!["none", "resend", "simulated"].includes(emailProvider)) throw new Error("config: EMAIL_PROVIDER must be none | resend | simulated");
   if (emailProvider === "simulated" && !(env.ALLOW_SIMULATED_EMAIL === "1" && isLocalRpc(rpcUrl))) {
     throw new Error("config: EMAIL_PROVIDER=simulated requires ALLOW_SIMULATED_EMAIL=1 and a localhost MONAD_RPC");
   }
@@ -126,6 +128,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ClaimsConfig {
       from,
       baseUrl: env.TWILIO_MESSAGES_BASE_URL ?? "https://api.twilio.com/2010-04-01",
     };
+  }
+  if (emailProvider === "resend") {
+    const apiKey = req(env, "RESEND_API_KEY");
+    if (!/^re_\S{8,}$/.test(apiKey)) throw new Error("config: RESEND_API_KEY must look like re_…");
+    const from = req(env, "EMAIL_FROM");
+    // "Name <addr@domain>" or "addr@domain"; the domain must be verified in Resend.
+    if (!/^([^<>\r\n]{1,64} <[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)$/.test(from)) {
+      throw new Error('config: EMAIL_FROM must be "Name <addr@domain>" or "addr@domain"');
+    }
+    cfg.resend = { apiKey, from, baseUrl: env.RESEND_BASE_URL ?? "https://api.resend.com" };
   }
   if (smsProvider === "termii") {
     cfg.termii = { baseUrl: req(env, "TERMII_BASE_URL"), apiKey: req(env, "TERMII_API_KEY"), senderId: req(env, "TERMII_SENDER_ID") };

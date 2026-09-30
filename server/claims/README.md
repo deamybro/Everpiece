@@ -54,9 +54,8 @@ Delivery to Nigerian numbers is **unproven until a live test** (INTEGRATION_LEDG
 | `EMAIL_PROVIDER` | Status | Needs |
 |---|---|---|
 | `none` (default) | Email invites are refused with `EmailUnavailable`, so link payments are SMS-only | — |
+| `resend` | API verified from docs (VERIFIED §4.8); adapter tested against mocked HTTP; **not yet live-tested**. Everpiece generates the code; Resend only delivers it | `RESEND_API_KEY` (`re_…`), `EMAIL_FROM` on a Resend-verified domain, e.g. `Everpiece <codes@mail.everpiece.xyz>` |
 | `simulated` | **SIMULATED**; refused unless `ALLOW_SIMULATED_EMAIL=1` **and** `MONAD_RPC` is localhost. Health shows `emailLive: false` | — |
-
-No live email provider yet. Choosing one is the owner's call, and its API must be verified (docs/VERIFIED.md) before an adapter is written.
 
 ## Run
 

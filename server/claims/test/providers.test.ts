@@ -184,7 +184,7 @@ test("email channel: simulated email is gated like SMS; codes via sink only; mas
   assert.equal(emailProviderFromConfig(off), undefined); // email is opt-in: link payments stay SMS-only
   assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "simulated" }), /ALLOW_SIMULATED_EMAIL/);
   assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1" }), /localhost/);
-  assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "sendgrid" }), /none \| simulated/);
+  assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "sendgrid" }), /none \| resend \| simulated/);
   const local = loadConfig({ ...base, EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1", MONAD_RPC: "http://127.0.0.1:8545" });
   assert.equal(emailProviderFromConfig(local)!.live, false);
 
@@ -221,4 +221,60 @@ test("store: invites created before the email channel read back as SMS invites",
   assert.equal(s.getInvite("0x01")!.channel, "sms");
   s.close();
   rmSync(dir, { recursive: true, force: true });
+});
+
+test("Resend (LocalOtp): exact URL, Bearer auth, User-Agent, idempotency, JSON body; code single-use, never in URL; errors", async () => {
+  const { ResendEmailProvider, otpEmail } = await import("../src/index.ts");
+  let t = 1_000;
+  const { f, calls } = mockFetch([
+    { status: 200, json: { id: "49a3999c-0ce1-4ea6-ab68-afcd6dc2e794" } },
+    { status: 403, json: { name: "validation_error", message: "domain not verified" } },
+    { status: 429, json: { name: "daily_quota_exceeded" } },
+    { status: 200, json: {} },
+  ]);
+  const cfg = { apiKey: "re_testkey_123456", from: "Everpiece <codes@mail.everpiece.xyz>", baseUrl: "https://api.resend.com" };
+  const p = new ResendEmailProvider(cfg, Buffer.alloc(32, 9), f, () => t);
+  const { ref } = await p.start("mama.ngozi@example.com");
+  assert.equal(calls[0].url, "https://api.resend.com/emails");
+  assert.equal(calls[0].init.method, "POST");
+  const h = calls[0].init.headers as Record<string, string>;
+  assert.equal(h.authorization, "Bearer re_testkey_123456");
+  assert.equal(h["content-type"], "application/json");
+  assert.ok(h["user-agent"]); // required by Resend, else 403
+  assert.equal(h["idempotency-key"], ref); // a retry can't send a second, different code
+  assert.ok(ref.length >= 1 && ref.length <= 256);
+  const body = JSON.parse(String(calls[0].init.body));
+  assert.deepEqual(Object.keys(body).sort(), ["from", "subject", "text", "to"]);
+  assert.equal(body.from, cfg.from);
+  assert.deepEqual(body.to, ["mama.ngozi@example.com"]);
+  const code = /code is ([0-9]{6})\./.exec(body.text)![1];
+  assert.deepEqual({ subject: body.subject, text: body.text }, otpEmail(code));
+  assert.ok(!calls[0].url.includes(code));
+
+  assert.equal(await p.check("", code === "000000" ? "111111" : "000000", ref), "wrong");
+  assert.equal(await p.check("", code, ref), "approved");
+  assert.equal(await p.check("", code, ref), "dead"); // single use
+
+  await assert.rejects(p.start("x@example.com"), /resend HTTP 403 validation_error/);
+  await assert.rejects(p.start("x@example.com"), /resend HTTP 429 daily_quota_exceeded/);
+  await assert.rejects(p.start("x@example.com"), /no id/);
+  // a failed send leaves no usable code behind
+  const refs = calls.slice(1).map((c) => (c.init.headers as Record<string, string>)["idempotency-key"]);
+  for (const r of refs) assert.equal(await p.check("", "123456", r), "dead");
+
+});
+
+test("config: resend needs an re_ key and a From address; never gated to localhost (it is live)", () => {
+  const base = {
+    MONAD_RPC: "https://rpc.monad.xyz", ESCROW_ADDRESS: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+    APPROVER_PRIVATE_KEY: "0x" + "11".repeat(32), PHONE_ENC_KEY: "0x" + "22".repeat(32), TWILIO_API_USER: "a", TWILIO_API_SECRET: "b", TWILIO_VERIFY_SERVICE_SID: "c",
+    EMAIL_PROVIDER: "resend",
+  };
+  assert.throws(() => loadConfig(base), /RESEND_API_KEY/);
+  assert.throws(() => loadConfig({ ...base, RESEND_API_KEY: "sk_live_123456789" }), /re_/);
+  assert.throws(() => loadConfig({ ...base, RESEND_API_KEY: "re_123456789" }), /EMAIL_FROM/);
+  assert.throws(() => loadConfig({ ...base, RESEND_API_KEY: "re_123456789", EMAIL_FROM: "not an address" }), /EMAIL_FROM/);
+  const c = loadConfig({ ...base, RESEND_API_KEY: "re_123456789", EMAIL_FROM: "Everpiece <codes@mail.everpiece.xyz>" });
+  assert.equal(c.resend!.baseUrl, "https://api.resend.com");
+  assert.equal(c.emailProvider, "resend");
 });

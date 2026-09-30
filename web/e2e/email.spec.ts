@@ -26,7 +26,12 @@ async function latestSimulatedCode(page: Page): Promise<string> {
   return m[1];
 }
 
-test("send by link with an EMAIL code → recipient gets the code by email → claims", async ({ browser }) => {
+const CLAIMS = process.env.E2E_CLAIMS_URL ?? "http://127.0.0.1:8788";
+
+test("send by link with an EMAIL code → recipient gets the code by email → claims", async ({ browser, request }) => {
+  // With a live email provider the code lands in a real inbox this test can't read: check it by hand instead.
+  const health = await (await request.get(`${CLAIMS}/healthz`)).json();
+  test.skip(health.emailLive === true, `live email provider (${health.email}): verify with a real inbox`);
   const stella = await withPasskeys(await browser.newContext());
   const mama = await withPasskeys(await browser.newContext());
   const csp: string[] = [];
