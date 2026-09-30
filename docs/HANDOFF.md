@@ -28,7 +28,28 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
   - Each start creates new keys and a new escrow, so old test accounts see an empty chain.
   - The indexer is not deployed yet. Envio's Postgres and GraphQL server need about 0.5 GB more than the current cap allows. It needs its own capped compose service, with the RAM measured first.
   - HTTPS on a domain waits on the owner choosing the passkey domain.
-- **Next recommended action:** the indexer as a second capped service on the server, pointed at the fork's RPC. Measure its memory first; then web history from its GraphQL.
+- **Indexer added to the test stack (same session, owner: "do it"):** `indexer`, `indexer-db` (postgres:18.3) and `indexer-hasura` (v2.43.0), the versions envio 3.12.1 uses.
+  - **Wiring:**
+    - `indexer/config.yaml` takes its RPC source from `ENVIO_RPC_URL` / `ENVIO_RPC_FOR`: `sync` on the fork, because HyperSync only sees real mainnet.
+    - dev-stack publishes each run's escrow and deploy block to a shared volume. The indexer re-indexes from scratch (`envio start -r`) when that changes.
+    - Public read-only GraphQL on 127.0.0.1:47306. Secrets live in the host's `/opt/everpiece/.env` (0600), generated there.
+  - **Memory:**
+    - Caps: 192 / 320 / 384 MB; stack cap lowered to 1000 MB (measured peak 753).
+    - `oom_score_adj 1000` on every Everpiece container, so a host-wide OOM kills Everpiece first.
+    - The indexer services wait for the stack's healthcheck. The first deploy started them alongside the web build and host free memory dipped to 400 MB. After the fix: no alert.
+  - **Ports:**
+    - The browser URLs used to be baked as 127.0.0.1:3000/8787/…, which clashed with the owner's other local tunnels (one already held 8787).
+    - `STACK_PUBLIC_PORT_BASE=47300` now puts them on 47300–47305, tunnelled 1:1.
+    - `E2E_BASE_URL` / `E2E_FAUCET_URL` point Playwright at the tunnel.
+  - **Verified:** Playwright **2/2** against the server through the tunnel.
+    - The indexer then held exactly those payments: 4 payments, $60 created, $45 claimed, $15 cancelled, 0 active.
+    - 8 PaymentEvents equals the raw `eth_getLogs` count; `activeLiability` 0 equals on-chain `totalActiveLiability` at finalized.
+    - Public GraphQL mutations are refused.
+  - **Steady state:** Everpiece uses about 820 MB in total (stack 426, Hasura 196, indexer 164, db 37). 0 OOM kills, 0 restarts; host has about 1 GB free. All 15 co-tenant PM2 apps are online and the 6 co-tenant containers kept their uptimes.
+  - **Observed, not changed (owner's call):**
+    - The host's sshd is under constant brute force (`MaxStartups throttling`, invalid users); fail2ban is inactive.
+    - Tunnels get reset now and then; the README has a reconnect loop.
+- **Next recommended action:** web history from the indexer's GraphQL (`NEXT_PUBLIC_INDEXER_URL`, device-local list as fallback), then the escrow GO for mainnet.
 
 ---
 

@@ -24,6 +24,12 @@ The ports are the same on both ends (47300–47306), so the tunnel can't clash w
 ssh -N -L 47300:127.0.0.1:47300 -L 47301:127.0.0.1:47301 -L 47302:127.0.0.1:47302 -L 47303:127.0.0.1:47303 -L 47304:127.0.0.1:47304 -L 47305:127.0.0.1:47305 -L 47306:127.0.0.1:47306 <ssh-host>
 ```
 
+The host's sshd is constantly probed from the internet and sometimes resets connections, so a self-reconnecting tunnel is handier:
+
+```bash
+while true; do ssh -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -L 47300:127.0.0.1:47300 -L 47301:127.0.0.1:47301 -L 47302:127.0.0.1:47302 -L 47303:127.0.0.1:47303 -L 47304:127.0.0.1:47304 -L 47305:127.0.0.1:47305 -L 47306:127.0.0.1:47306 <ssh-host>; sleep 3; done
+```
+
 - **The app:** http://localhost:47300. Passkeys work because the browser sees `localhost`.
 - **Simulated texts:** http://127.0.0.1:47305/sms
 - **Indexer GraphQL:** http://127.0.0.1:47306/v1/graphql. It is read-only with the `public` role and needs no key.

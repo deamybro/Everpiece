@@ -4,7 +4,7 @@ Indexes the four canonical EverpieceEscrow events on Monad mainnet (143) into:
 
 - **Payment**: one row per payment (sender, mode, amount, expiry, status, the recipient once claimed, created/settled block and tx).
 - **PaymentEvent**: the timeline (CREATED → CLAIMED | CANCELLED | REFUNDED).
-- **Stats**: real metrics from executed events only. `activeLiability` mirrors the escrow's own.
+- **Stats**: real metrics from executed events only. `activeLiability` mirrors the escrow's `totalActiveLiability` (checked against the chain on the test stack).
 
 This is **history, not financial truth**. The app still confirms money movements with `getPayment` read at `"finalized"` (ESCROW_SPEC §17).
 The handlers throw on impossible history: a settle for an unknown payment, a second settle, or an amount or sender mismatch. A wrong start block fails loudly instead of producing a plausible but wrong history.

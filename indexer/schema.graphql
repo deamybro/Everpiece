@@ -60,7 +60,7 @@ type Stats {
   cancelledVolume: BigInt!
   refunded: Int!
   refundedVolume: BigInt!
-  "Mirrors the escrow's activeLiability: created − claimed − cancelled − refunded."
+  "Mirrors the escrow's totalActiveLiability: created − claimed − cancelled − refunded."
   activeCount: Int!
   activeLiability: BigInt!
 }
