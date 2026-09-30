@@ -4,6 +4,34 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 9 — 2026-09-30 — Test stack on the owner's shared VPS
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed). The code was shipped by `git archive` over SSH; no GitHub was involved.
+- **Decisions (owner):**
+  - Use the VPS already used for Tenet, and don't stop other processes there. It's shared by about 20 projects.
+  - Access is via an SSH tunnel only: no public domain, and the shared Caddy is untouched.
+  - No swap; cap Everpiece instead.
+- **Completed:**
+  - `deploy/test-stack/`: a Dockerfile (Node 24 + Foundry 1.8.3 anvil + CA certificates), `compose.yaml`, `push.sh <ssh-host>` and a README with the tunnel command. The host address is not in the repo.
+    - Compose project `everpiece-test` in `/opt/everpiece`, with ports on the host's 127.0.0.1:47300–47305 only.
+    - Caps: 1200 MB with no swap, 1 CPU, 512 pids, `restart: on-failure:3`, and rotated logs.
+  - `scripts/dev-stack.mjs` gained opt-in `STACK_BIND_HOST`, `STACK_WEB=prod` and `STACK_WEB_BUILDER=webpack`. Local defaults are unchanged.
+- **Found and fixed while deploying:**
+  1. The slim image had no CA certificates, so anvil couldn't fork over HTTPS.
+  2. The Turbopack `next build` needs more than 1.15 GB. The kernel killed it inside our cap (`CONSTRAINT_MEMCG`); no co-tenant was touched.
+     - A capped probe measured the webpack build at 745 MB, so the container now builds with webpack.
+- **Tests run:** Playwright from this PC through the tunnel, against the server's production build: **2/2 pass** (link flow and username flow).
+  - Container memory peaked at 753 MB, with 0 OOM kills and 0 restarts, and idles at about 340 MB.
+  - The host's free memory never went below 719 MB, including the failed attempts.
+  - All 15 co-tenant PM2 apps stayed online, and the 6 co-tenant containers kept their uptimes.
+- **Open / known limits:**
+  - Each start creates new keys and a new escrow, so old test accounts see an empty chain.
+  - The indexer is not deployed yet. Envio's Postgres and GraphQL server need about 0.5 GB more than the current cap allows. It needs its own capped compose service, with the RAM measured first.
+  - HTTPS on a domain waits on the owner choosing the passkey domain.
+- **Next recommended action:** the indexer as a second capped service on the server, pointed at the fork's RPC. Measure its memory first; then web history from its GraphQL.
+
+---
+
 ## Session 8 — 2026-09-30 — Envio indexer (build + test; not yet running on a chain)
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
