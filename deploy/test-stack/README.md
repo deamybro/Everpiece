@@ -37,6 +37,19 @@ while true; do ssh -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -L 4
 - **Status and logs:** `ssh <ssh-host> 'cd /opt/everpiece && docker compose ps && docker compose logs --tail 50'`
 - **Stop:** `ssh <ssh-host> 'cd /opt/everpiece && docker compose stop'` stops only Everpiece.
 
+## Public test site (https://test.everpiece.xyz)
+
+With `STACK_PUBLIC_ORIGIN=https://test.everpiece.xyz` in the host's `.env`, the app has one public HTTPS origin and no tunnel is needed.
+
+- **Routing:** the host's Caddy has one Everpiece-only site block, appended with a timestamped backup, validated first and reloaded gracefully.
+  - `/` → 47300 (web)
+  - `/svc/relayer|claims|directory|faucet/*` → 47302–47305, with the prefix stripped
+- **No public raw RPC.** The browser uses `/svc/faucet/rpc`, which only allows `eth_chainId`, `eth_blockNumber`, `net_version`, `eth_getBlockByNumber(tag, false)` and `eth_call` to the escrow or AUSD. Every `anvil_*`, `evm_*` and send method is refused, and a batch is refused if any call in it is. anvil's port stays on 127.0.0.1.
+- **Rate limits:** the services see the visitor's address via `TRUST_PROXY=1`, so limits are per visitor.
+- **Passkeys** belong to `test.everpiece.xyz` (rpId = hostname). They are separate from the future production domain.
+- **E2E:** run `E2E_BASE_URL=https://test.everpiece.xyz E2E_FAUCET_URL=https://test.everpiece.xyz/svc/faucet E2E_CLAIMS_URL=https://test.everpiece.xyz/svc/claims npx playwright test`.
+- **Anyone with the link can use it.** Test Dollars only, but claim-code emails are real, so abuse is capped only by the per-address and per-IP limits and Resend's 100 a day.
+
 ## Real claim-code emails (Resend)
 
 The stack sends real emails when the host's `.env` has both `RESEND_API_KEY` and `EMAIL_FROM`; otherwise email is simulated.

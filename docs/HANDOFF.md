@@ -4,6 +4,27 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 12 — 2026-09-30 — Public HTTPS test site (test.everpiece.xyz) on the shared VPS
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Owner:** added the A record `test` → 38.49.209.149 in Namecheap.
+- **Completed:**
+  - `STACK_PUBLIC_ORIGIN` mode: one origin, services under `/svc/*`, and `TRUST_PROXY` for per-visitor rate limits.
+  - A filtered read-only `/rpc`, so anvil is never exposed.
+  - An Everpiece-only Caddy block, with backup `Caddyfile.pre-everpiece-20260930T2234Z`. Validated before install (append-only, 23 → 24 sites) and reloaded gracefully. Seven co-tenant sites answered 200 both before and after.
+- **Tests run:**
+  - HTTPS and TLS valid on `/` and all four `/svc/*` health endpoints; `emailLive: true`.
+  - RPC filter: allowed reads succeed. `anvil_setBalance`, `anvil_impersonateAccount`, `eth_sendRawTransaction`, `eth_call` to a foreign contract and a batch with `evm_mine` all get 403.
+  - Playwright against the public site: **2 passed** (link and username flows), **1 skipped** (`email.spec`, because email is live; verified by hand in session 11).
+  - Host: Everpiece about 880 MB in total; 15/15 PM2 apps online; 6 co-tenant containers up; Caddy active.
+- **Open:**
+  - Real-device testing (Android Chrome with Google Password Manager, iPhone Safari, WhatsApp in-app browser → system browser handoff, master §C7).
+  - The public site has no access gate. Email abuse is bounded only by rate limits and Resend's 100 a day. Consider a simple gate if it's shared widely.
+  - Production rpId decision: everpiece.xyz vs a subdomain; passkeys can't move between them.
+- **Next recommended action:** the owner tests on their phone; then web history from the indexer.
+
+---
+
 ## Session 11 — 2026-09-30 — Real email for claim codes (Resend)
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
