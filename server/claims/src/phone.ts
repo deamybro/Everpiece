@@ -2,7 +2,8 @@ import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } f
 import type { Hex } from "viem";
 
 /**
- * Phone numbers are sensitive application data (master §12.3): AES-256-GCM at rest, keyed-HMAC lookup keys
+ * Phone numbers (and, for the email channel, email addresses) are sensitive application data (master §12.3).
+ * The HKDF labels keep their original "phone" names so existing keys and data stay valid. AES-256-GCM at rest, keyed-HMAC lookup keys
  * (a plain hash of a phone number is trivially brute-forced), masked for display, never logged, never on-chain.
  * Two independent subkeys are derived from PHONE_ENC_KEY with HKDF and explicit labels.
  */
@@ -34,6 +35,15 @@ export class PhoneVault {
   lookupKey(e164: string): string {
     return createHmac("sha256", this.macKey).update(e164).digest("base64url");
   }
+}
+
+/** Email invites use the same vault; their lookup key is namespaced so it can never equal a phone's. */
+export const emailLookupInput = (email: string) => `email:${email}`;
+
+/** "mama.ngozi@example.com" → "m•••@example.com". */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  return `${email.slice(0, 1)}•••${email.slice(at)}`;
 }
 
 /** "+2348000000000" → "+234 ••• ••• 0000". */

@@ -18,15 +18,18 @@ import {
   PaymentStatus,
   claimApproval,
   claimStart,
+  emailHash,
+  emailInviteRegistration,
   everpieceEscrowAbi,
   inviteRegistration,
+  normalizeEmail,
   phoneHash,
   recipientCommitment,
 } from "@everpiece/shared";
 import type { ClaimsConfig } from "./config.ts";
-import { PhoneVault, maskPhone } from "./phone.ts";
+import { PhoneVault, emailLookupInput, maskEmail, maskPhone } from "./phone.ts";
 import { ProviderError, type VerificationProvider } from "./providers.ts";
-import { ClaimsStore } from "./store.ts";
+import { ClaimsStore, type Channel } from "./store.ts";
 import { log } from "./log.ts";
 
 export type Result = { httpStatus: number; body: Record<string, unknown> };
@@ -80,15 +83,22 @@ export class ClaimsService {
   readonly cfg: ClaimsConfig;
   readonly store: ClaimsStore;
   readonly provider: VerificationProvider;
+  /** Email channel; undefined when not configured (link payments are then SMS-only). */
+  readonly emailProvider?: VerificationProvider;
   readonly approver: PrivateKeyAccount;
   readonly client: PublicClient;
   private readonly vault: PhoneVault;
   private readonly ipLimiter: Limiter;
   private readonly now: () => number;
 
-  constructor(cfg: ClaimsConfig, provider: VerificationProvider, opts: { store?: ClaimsStore; now?: () => number } = {}) {
+  constructor(
+    cfg: ClaimsConfig,
+    provider: VerificationProvider,
+    opts: { store?: ClaimsStore; now?: () => number; emailProvider?: VerificationProvider } = {},
+  ) {
     this.cfg = cfg;
     this.provider = provider;
+    this.emailProvider = opts.emailProvider;
     this.store = opts.store ?? new ClaimsStore(cfg.dbPath);
     this.now = opts.now ?? Date.now;
     this.vault = new PhoneVault(cfg.phoneEncKey);
@@ -118,7 +128,17 @@ export class ClaimsService {
       throw new Error(`startup: key ${this.approver.address} is not escrow.claimApprover() (${current})`);
     }
     if (!this.provider.live) log("warn", "claims.sms_provider_simulated", { provider: this.provider.name });
-    log("info", "claims.startup", { chainId, escrow: this.cfg.escrow, approver: this.approver.address, sms: this.provider.name });
+    if (this.emailProvider && !this.emailProvider.live) log("warn", "claims.email_provider_simulated", { provider: this.emailProvider.name });
+    log("info", "claims.startup", {
+      chainId, escrow: this.cfg.escrow, approver: this.approver.address, sms: this.provider.name, email: this.emailProvider?.name ?? "none",
+    });
+  }
+
+  private providerFor(channel: Channel): VerificationProvider | undefined {
+    return channel === "email" ? this.emailProvider : this.provider;
+  }
+  private perDayLimit(channel: Channel): number {
+    return channel === "email" ? (this.cfg.perEmailPerDay ?? this.cfg.perPhonePerDay) : this.cfg.perPhonePerDay;
   }
 
   private nowSec(): bigint {
@@ -158,33 +178,50 @@ export class ClaimsService {
   async registerInvite(body: unknown, ip: string): Promise<Result> {
     const limited = this.guard(ip);
     if (limited) return limited;
-    let paymentId: Hex, phone: string, deadline: bigint, senderSig: Hex;
+    // Exactly one contact: `phone` (SMS, E.164) or `email` (normalized). Each has its own signed type.
+    let paymentId: Hex, channel: Channel, contact: string, deadline: bigint, senderSig: Hex;
     try {
-      const o = fields(body, ["paymentId", "phone", "deadline", "senderSig"]);
+      channel = typeof body === "object" && body !== null && "email" in body ? "email" : "sms";
+      const o = fields(body, ["paymentId", channel === "email" ? "email" : "phone", "deadline", "senderSig"]);
       paymentId = hex(o.paymentId, 32, "paymentId");
-      if (typeof o.phone !== "string" || !E164.test(o.phone)) throw new Bad("phone: E.164 required");
-      phone = o.phone;
+      if (channel === "email") {
+        if (typeof o.email !== "string" || normalizeEmail(o.email) !== o.email) throw new Bad("email: normalized (trimmed, lowercase) address required");
+        contact = o.email;
+      } else {
+        if (typeof o.phone !== "string" || !E164.test(o.phone)) throw new Bad("phone: E.164 required");
+        contact = o.phone;
+      }
       deadline = secs(o.deadline, "deadline");
       senderSig = hex(o.senderSig, 65, "senderSig");
     } catch (e) {
       return err(400, "InvalidRequest", { detail: (e as Error).message });
     }
+    if (!this.providerFor(channel)) return err(422, "EmailUnavailable");
     if (!this.deadlineOk(deadline)) return err(400, "BadDeadline");
     const p = await this.payment(paymentId);
     const why = this.claimable(p);
     if (why) return err(422, why);
-    const typed = inviteRegistration(this.cfg.escrow, { paymentId, phoneHash: phoneHash(phone), deadline }, this.cfg.expectedChainId);
+    const typed =
+      channel === "email"
+        ? emailInviteRegistration(this.cfg.escrow, { paymentId, emailHash: emailHash(contact), deadline }, this.cfg.expectedChainId)
+        : inviteRegistration(this.cfg.escrow, { paymentId, phoneHash: phoneHash(contact), deadline }, this.cfg.expectedChainId);
     if (!(await signedBy(p.sender, { ...typed, signature: senderSig }))) return err(401, "InvalidSenderSignature");
 
-    const key = this.vault.lookupKey(phone);
+    const key = this.vault.lookupKey(channel === "email" ? emailLookupInput(contact) : contact);
+    const mask = channel === "email" ? maskEmail(contact) : maskPhone(contact);
+    const shown = (m: string) => ({ channel, maskedContact: m, ...(channel === "sms" ? { maskedPhone: m } : {}) });
     const existing = this.store.getInvite(paymentId);
     if (existing) {
-      // Immutable once set: a mistaken phone is fixed by cancelling the payment, not by rewriting the invite.
-      return existing.phone_key === key ? { httpStatus: 200, body: { paymentId, maskedPhone: existing.phone_mask, idempotent: true } } : err(409, "InviteAlreadyRegistered");
+      // Immutable once set: a mistaken contact is fixed by cancelling the payment, not by rewriting the invite.
+      return existing.phone_key === key && existing.channel === channel
+        ? { httpStatus: 200, body: { paymentId, ...shown(existing.phone_mask), idempotent: true } }
+        : err(409, "InviteAlreadyRegistered");
     }
-    this.store.insertInvite({ payment_id: paymentId, phone_enc: this.vault.encrypt(phone), phone_mask: maskPhone(phone), phone_key: key, sender: p.sender, created_at: this.now() });
-    log("info", "claims.invite_registered", { paymentId });
-    return { httpStatus: 201, body: { paymentId, maskedPhone: maskPhone(phone) } };
+    this.store.insertInvite({
+      payment_id: paymentId, channel, phone_enc: this.vault.encrypt(contact), phone_mask: mask, phone_key: key, sender: p.sender, created_at: this.now(),
+    });
+    log("info", "claims.invite_registered", { paymentId, channel });
+    return { httpStatus: 201, body: { paymentId, ...shown(mask) } };
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -229,29 +266,34 @@ export class ClaimsService {
       const readyAt = recent[recent.length - 1] + wait;
       if (now < readyAt) return err(429, "Cooldown", { retryAfterSeconds: Math.ceil((readyAt - now) / 1000) });
     }
-    if (this.store.sendsForPhoneSince(invite.phone_key, now - 86_400_000) >= this.cfg.perPhonePerDay) {
-      return err(429, "PhoneDailyLimit", { retryAfterSeconds: 3600 });
+    const channel = invite.channel ?? "sms";
+    const provider = this.providerFor(channel);
+    if (!provider) return err(503, "VerificationUnavailable");
+    if (this.store.sendsForPhoneSince(invite.phone_key, now - 86_400_000) >= this.perDayLimit(channel)) {
+      return err(429, channel === "email" ? "EmailDailyLimit" : "PhoneDailyLimit", { retryAfterSeconds: 3600 });
     }
 
-    const phone = this.vault.decrypt(invite.phone_enc);
+    const contact = this.vault.decrypt(invite.phone_enc);
     let ref: string;
     try {
-      ({ ref } = await this.provider.start(phone));
+      ({ ref } = await provider.start(contact));
     } catch (e) {
-      log("error", "claims.provider_start_failed", { paymentId, provider: this.provider.name, err: e instanceof ProviderError ? e.message : "unknown" });
+      log("error", "claims.provider_start_failed", { paymentId, provider: provider.name, err: e instanceof ProviderError ? e.message : "unknown" });
       return err(503, "VerificationUnavailable");
     }
     this.store.recordSend(paymentId, invite.phone_key, now);
     this.store.openSession(paymentId, recipient, ref, now);
     const c = this.cfg.resendCooldownsSec;
-    log("info", "claims.code_sent", { paymentId, provider: this.provider.name });
+    log("info", "claims.code_sent", { paymentId, provider: provider.name, channel });
     return {
       httpStatus: 200,
       body: {
         paymentId,
-        maskedPhone: invite.phone_mask,
+        channel,
+        maskedContact: invite.phone_mask,
+        ...(channel === "sms" ? { maskedPhone: invite.phone_mask } : {}),
         resendAfterSeconds: c[Math.min(recent.length, c.length - 1)],
-        simulated: !this.provider.live,
+        simulated: !provider.live,
       },
     };
   }
@@ -290,11 +332,13 @@ export class ClaimsService {
     const invite = this.store.getInvite(paymentId);
     if (!invite) return err(409, "InviteNotRegistered");
 
+    const provider = this.providerFor(invite.channel ?? "sms");
+    if (!provider) return err(503, "VerificationUnavailable");
     let result;
     try {
-      result = await this.provider.check(this.vault.decrypt(invite.phone_enc), code, s.provider_ref);
+      result = await provider.check(this.vault.decrypt(invite.phone_enc), code, s.provider_ref);
     } catch (e) {
-      log("error", "claims.provider_check_failed", { paymentId, provider: this.provider.name, err: e instanceof ProviderError ? e.message : "unknown" });
+      log("error", "claims.provider_check_failed", { paymentId, provider: provider.name, err: e instanceof ProviderError ? e.message : "unknown" });
       return err(503, "VerificationUnavailable");
     }
     if (result === "dead") {
@@ -322,7 +366,10 @@ export class ClaimsService {
   }
 
   health(): Record<string, unknown> {
-    return { ok: true, approver: this.approver.address, escrow: this.cfg.escrow, sms: this.provider.name, smsLive: this.provider.live };
+    return {
+      ok: true, approver: this.approver.address, escrow: this.cfg.escrow, sms: this.provider.name, smsLive: this.provider.live,
+      email: this.emailProvider?.name ?? "none", emailLive: this.emailProvider?.live ?? false,
+    };
   }
 }
 

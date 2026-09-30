@@ -172,3 +172,53 @@ test("config: twilio-sms needs account SID, API credentials and an E.164 From nu
   const c = loadConfig({ ...base, TWILIO_ACCOUNT_SID: "AC" + "a".repeat(32), TWILIO_FROM_NUMBER: "+17372508034" });
   assert.equal(c.twilioSms!.baseUrl, "https://api.twilio.com/2010-04-01");
 });
+
+test("email channel: simulated email is gated like SMS; codes via sink only; masking, namespaced lookup, wording", async () => {
+  const { SimulatedEmailProvider, emailProviderFromConfig, otpEmail, maskEmail, emailLookupInput } = await import("../src/index.ts");
+  const base = {
+    MONAD_RPC: "https://rpc.monad.xyz", ESCROW_ADDRESS: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+    APPROVER_PRIVATE_KEY: "0x" + "11".repeat(32), PHONE_ENC_KEY: "0x" + "22".repeat(32), TWILIO_API_USER: "a", TWILIO_API_SECRET: "b", TWILIO_VERIFY_SERVICE_SID: "c",
+  };
+  const off = loadConfig(base);
+  assert.equal(off.emailProvider, "none");
+  assert.equal(emailProviderFromConfig(off), undefined); // email is opt-in: link payments stay SMS-only
+  assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "simulated" }), /ALLOW_SIMULATED_EMAIL/);
+  assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1" }), /localhost/);
+  assert.throws(() => loadConfig({ ...base, EMAIL_PROVIDER: "sendgrid" }), /none \| simulated/);
+  const local = loadConfig({ ...base, EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1", MONAD_RPC: "http://127.0.0.1:8545" });
+  assert.equal(emailProviderFromConfig(local)!.live, false);
+
+  let t = 0;
+  const got: string[] = [];
+  const p = new SimulatedEmailProvider((_e, code) => got.push(code), () => t);
+  const { ref } = await p.start("mama@example.com");
+  assert.match(got[0], /^[0-9]{6}$/);
+  assert.equal(await p.check("", got[0], ref), "approved");
+  assert.equal(await p.check("", got[0], ref), "dead"); // single use
+
+  assert.equal(maskEmail("mama.ngozi@example.com"), "m•••@example.com");
+  const v = new PhoneVault(("0x" + "42".repeat(32)) as `0x${string}`);
+  assert.notEqual(v.lookupKey(emailLookupInput("x@y.co")), v.lookupKey("x@y.co"));
+  const mail = otpEmail("123456");
+  assert.ok(mail.subject.includes("123456") && mail.text.includes("123456"));
+  assert.ok(mail.text.includes("Never share it with anyone, including the person who sent you money."));
+  assert.ok(mail.text.includes("Everpiece never emails claim links"));
+});
+
+test("store: invites created before the email channel read back as SMS invites", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { ClaimsStore } = await import("../src/index.ts");
+  const dir = mkdtempSync(join(tmpdir(), "claims-mig-"));
+  const path = join(dir, "old.sqlite");
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE invites (payment_id TEXT PRIMARY KEY, phone_enc TEXT NOT NULL, phone_mask TEXT NOT NULL, phone_key TEXT NOT NULL, sender TEXT NOT NULL, created_at INTEGER NOT NULL);
+    INSERT INTO invites VALUES ('0x01', 'enc', 'mask', 'key', '0xabc', 1);`);
+  old.close();
+  const s = new ClaimsStore(path);
+  assert.equal(s.getInvite("0x01")!.channel, "sms");
+  s.close();
+  rmSync(dir, { recursive: true, force: true });
+});

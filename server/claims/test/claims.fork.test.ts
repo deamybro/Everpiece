@@ -12,10 +12,10 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  AUSD_ADDRESS, PaymentMode, cancelIntent, claimApproval, claimStart, everpieceEscrowAbi, fundingAuthorization,
-  inviteRegistration, linkClaimIntent, paymentIdOf, phoneHash, recipientCommitment, type PaymentIntent,
+  AUSD_ADDRESS, PaymentMode, cancelIntent, claimApproval, claimStart, emailHash, emailInviteRegistration, everpieceEscrowAbi,
+  fundingAuthorization, inviteRegistration, linkClaimIntent, paymentIdOf, phoneHash, recipientCommitment, type PaymentIntent,
 } from "@everpiece/shared";
-import { ClaimsService, ClaimsStore, SimulatedProvider, createClaimsServer, setLogSink, type ClaimsConfig } from "../src/index.ts";
+import { ClaimsService, ClaimsStore, SimulatedEmailProvider, SimulatedProvider, createClaimsServer, setLogSink, type ClaimsConfig } from "../src/index.ts";
 
 const RUN = process.env.RUN_FORK_TESTS === "true";
 const CORE_SLOT = "0x455730fed596673e69db1907be2e521374ba893f1a04cc5f5dd931616cd6b700";
@@ -239,6 +239,60 @@ describe("claims server on a Monad mainnet fork (real AUSD, simulated SMS)", { s
     assert.equal(r.body.error, "PhoneDailyLimit");
   });
 
+  test("email channel: signed email invite → emailed code → approval → on-chain claim; channels never mix", async () => {
+    const EMAIL = "mama.ngozi@example.com";
+    const emails: { email: string; code: string }[] = [];
+    const esvc = new ClaimsService(cfgFor(), new SimulatedProvider((phone, code) => codes.push({ phone, code }), () => clock), {
+      now: () => clock,
+      emailProvider: new SimulatedEmailProvider((email, code) => emails.push({ email, code }), () => clock),
+    });
+    const { paymentId, recipientSalt } = await createPayment();
+    const deadline = nowSec() + 300n;
+    const emailSig = await K.sender.signTypedData(emailInviteRegistration(escrow, { paymentId, emailHash: emailHash(EMAIL), deadline }));
+    const body = { paymentId, email: EMAIL, deadline: deadline.toString(), senderSig: emailSig };
+
+    // a PHONE-typed signature over the same 32 bytes can't register an email invite (separate EIP-712 types)
+    const phoneTyped = await K.sender.signTypedData(inviteRegistration(escrow, { paymentId, phoneHash: emailHash(EMAIL), deadline }));
+    assert.equal((await esvc.registerInvite({ ...body, senderSig: phoneTyped }, "ip")).body.error, "InvalidSenderSignature");
+    assert.equal((await esvc.registerInvite({ ...body, email: "Mama.Ngozi@Example.com" }, "ip")).httpStatus, 400); // must be normalized
+    assert.equal((await esvc.registerInvite({ ...body, senderSig: await K.stranger.signTypedData(emailInviteRegistration(escrow, { paymentId, emailHash: emailHash(EMAIL), deadline })) }, "ip")).body.error, "InvalidSenderSignature");
+    // the default service has no email provider: refused before anything is stored
+    assert.equal((await svc.registerInvite(body, "ip")).body.error, "EmailUnavailable");
+
+    const inv = await esvc.registerInvite(body, "ip");
+    assert.equal(inv.httpStatus, 201, JSON.stringify(inv.body));
+    assert.deepEqual([inv.body.channel, inv.body.maskedContact, inv.body.maskedPhone], ["email", "m•••@example.com", undefined]);
+    assert.equal((await esvc.registerInvite(body, "ip")).body.idempotent, true);
+    // immutable: can't be switched to a phone afterwards
+    const phoneSig = await K.sender.signTypedData(inviteRegistration(escrow, { paymentId, phoneHash: phoneHash(PHONE), deadline }));
+    assert.equal((await esvc.registerInvite({ paymentId, phone: PHONE, deadline: deadline.toString(), senderSig: phoneSig }, "ip")).body.error, "InviteAlreadyRegistered");
+
+    const smsBefore = codes.length;
+    const d2 = nowSec() + 300n;
+    const claimKeySig = await K.claimKey.signTypedData(claimStart(escrow, { paymentId, recipient: K.recipient.address, deadline: d2 }));
+    const s = await esvc.startVerification({ paymentId, recipient: K.recipient.address, claimKey: K.claimKey.address, recipientSalt, deadline: d2.toString(), claimKeySig }, "ip");
+    assert.equal(s.httpStatus, 200, JSON.stringify(s.body));
+    assert.deepEqual([s.body.channel, s.body.maskedContact, s.body.simulated], ["email", "m•••@example.com", true]);
+    assert.equal(emails.at(-1)!.email, EMAIL);
+    assert.equal(codes.length, smsBefore); // emailed, not texted
+
+    const v = await esvc.verifyCode({ paymentId, recipient: K.recipient.address, code: emails.at(-1)!.code }, "ip");
+    assert.equal(v.httpStatus, 200, JSON.stringify(v.body));
+    const actionNonce = rnd("e");
+    const cd = (await pub.getBlock()).timestamp + 600n;
+    const linkSig = await K.claimKey.signTypedData(linkClaimIntent(escrow, { paymentId, recipient: K.recipient.address, actionNonce, deadline: cd }));
+    const before = await balance(K.recipient.address);
+    const hash = await wallet.writeContract({
+      address: escrow, abi: everpieceEscrowAbi, functionName: "claimLinkPayment", chain: null, account: K.submitter,
+      args: [paymentId, K.recipient.address, K.claimKey.address, recipientSalt, actionNonce, cd, linkSig, v.body.approvalNonce as Hex, BigInt(v.body.approvalDeadline as string), v.body.approverSig as Hex],
+    });
+    assert.equal((await pub.waitForTransactionReceipt({ hash })).status, "success");
+    assert.equal((await balance(K.recipient.address)) - before, 20_000_000n);
+
+    // privacy: the address is never stored in plaintext
+    for (const row of esvc.store.db.prepare("SELECT * FROM invites").all() as Record<string, string>[]) assert.ok(!JSON.stringify(row).includes("ngozi"));
+  });
+
   test("startup refuses: wrong chain, key that is not the escrow approver, approver == owner", async () => {
     const sim = new SimulatedProvider(() => {});
     await assert.rejects(new ClaimsService(cfgFor({ expectedChainId: 1 }), sim).start(), /chainId/);
@@ -253,6 +307,7 @@ describe("claims server on a Monad mainnet fork (real AUSD, simulated SMS)", { s
     assert.ok(logs.length > 0);
     for (const l of logs) {
       assert.ok(!l.includes("8000000000"), l);
+      assert.ok(!l.toLowerCase().includes("ngozi"), l); // email addresses are never logged either
       for (const c of codes) assert.ok(!l.includes(`"${c.code}"`), l);
     }
     const sessions = svc.store.db.prepare("SELECT * FROM sessions").all();

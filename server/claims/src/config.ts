@@ -2,6 +2,7 @@ import { getAddress, isAddress, isHex, type Address, type Hex } from "viem";
 import { MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
 
 export type SmsProviderName = "twilio" | "twilio-sms" | "termii" | "simulated";
+export type EmailProviderName = "none" | "simulated";
 
 export type ClaimsConfig = {
   rpcUrl: string;
@@ -18,6 +19,10 @@ export type ClaimsConfig = {
   /** Plain Twilio SMS; Everpiece generates/checks the code (LocalOtp). */
   twilioSms?: { user: string; secret: string; accountSid: string; from: string; baseUrl: string };
   termii?: { baseUrl: string; apiKey: string; senderId: string };
+  /** Email channel for the verification code. "none" (default): link payments are SMS-only. */
+  emailProvider?: EmailProviderName;
+  /** Codes per email address per day (defaults to perPhonePerDay). */
+  perEmailPerDay?: number;
   /** Approval lifetime: short (master §14). */
   approvalTtlSec: number;
   /** Max clock skew allowed on client-supplied request deadlines. */
@@ -68,8 +73,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ClaimsConfig {
     throw new Error("config: SMS_PROVIDER=simulated requires ALLOW_SIMULATED_SMS=1 and a localhost MONAD_RPC");
   }
 
+  const emailProvider = (env.EMAIL_PROVIDER ?? "none") as EmailProviderName;
+  if (!["none", "simulated"].includes(emailProvider)) throw new Error("config: EMAIL_PROVIDER must be none | simulated");
+  if (emailProvider === "simulated" && !(env.ALLOW_SIMULATED_EMAIL === "1" && isLocalRpc(rpcUrl))) {
+    throw new Error("config: EMAIL_PROVIDER=simulated requires ALLOW_SIMULATED_EMAIL=1 and a localhost MONAD_RPC");
+  }
+
   const cfg: ClaimsConfig = {
     rpcUrl,
+    emailProvider,
+    perEmailPerDay: int(env, "EMAIL_PER_ADDRESS_PER_DAY", 10),
     expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
     escrow: getAddress(escrow),
     approverPrivateKey: key32(env, "APPROVER_PRIVATE_KEY"),

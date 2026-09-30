@@ -235,6 +235,49 @@ export class SimulatedProvider implements VerificationProvider {
   }
 }
 
+/**
+ * Email channel. The code email tells the recipient where the claim link must NOT come from: the link and the code
+ * are two factors, and a single inbox holding both would defeat that (THREAT_MODEL C8).
+ */
+export function otpEmail(code: string): { subject: string; text: string } {
+  return {
+    subject: `Your Everpiece code: ${code}`,
+    text:
+      `Your Everpiece code is ${code}. It expires in 10 minutes.\n\n` +
+      `Never share it with anyone, including the person who sent you money. Everpiece never emails claim links: ` +
+      `the link comes from the sender, by WhatsApp, text or in person.`,
+  };
+}
+
+/**
+ * SIMULATED email for local/fork tests ONLY (config refuses it unless ALLOW_SIMULATED_EMAIL=1 and the RPC is
+ * localhost). Same LocalOtp rules as SMS. No live email provider exists yet: choosing one is an owner decision,
+ * and its API must be verified (docs/VERIFIED.md) before an adapter is written.
+ */
+export class SimulatedEmailProvider implements VerificationProvider {
+  readonly name = "SIMULATED-EMAIL";
+  readonly live = false;
+  private readonly otp: LocalOtp;
+  private readonly sink: (email: string, code: string) => void;
+  constructor(sink: (email: string, code: string) => void, now: () => number = Date.now) {
+    this.sink = sink;
+    this.otp = new LocalOtp(randomBytes(32), now);
+  }
+  async start(email: string): Promise<{ ref: string }> {
+    const { ref, code } = this.otp.issue("SIME");
+    this.sink(email, code);
+    return { ref };
+  }
+  async check(_email: string, code: string, ref: string): Promise<CheckResult> {
+    return this.otp.check(ref, code);
+  }
+}
+
+export function emailProviderFromConfig(cfg: ClaimsConfig, simulatedSink?: (email: string, code: string) => void): VerificationProvider | undefined {
+  if (cfg.emailProvider === "simulated") return new SimulatedEmailProvider(simulatedSink ?? (() => {}));
+  return undefined;
+}
+
 /** OTP MAC key: HKDF from PHONE_ENC_KEY with its own label (independent of the phone enc/lookup subkeys). */
 export function otpKeyFrom(phoneEncKey: `0x${string}`): Buffer {
   return Buffer.from(hkdfSync("sha256", Buffer.from(phoneEncKey.slice(2), "hex"), Buffer.alloc(0), "everpiece.claims.otp.mac.v1", 32));

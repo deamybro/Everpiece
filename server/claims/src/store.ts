@@ -1,7 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 
-export type Invite = { payment_id: string; phone_enc: string; phone_mask: string; phone_key: string; sender: string; created_at: number };
+export type Channel = "sms" | "email";
+/** phone_* hold the invite's contact for either channel (a phone number or an email address). */
+export type Invite = { payment_id: string; channel: Channel; phone_enc: string; phone_mask: string; phone_key: string; sender: string; created_at: number };
 export type Session = {
   id: string;
   payment_id: string;
@@ -29,6 +31,9 @@ export class ClaimsStore {
       CREATE TABLE IF NOT EXISTS approvals (payment_id TEXT NOT NULL, recipient TEXT NOT NULL, approval_nonce TEXT PRIMARY KEY,
         deadline INTEGER NOT NULL, created_at INTEGER NOT NULL);
     `);
+    // Email channel (2026-09-30): invites made before it are SMS invites.
+    const cols = (this.db.prepare(`PRAGMA table_info(invites)`).all() as { name: string }[]).map((c) => c.name);
+    if (!cols.includes("channel")) this.db.exec(`ALTER TABLE invites ADD COLUMN channel TEXT NOT NULL DEFAULT 'sms'`);
   }
 
   getInvite(paymentId: string): Invite | undefined {
@@ -36,8 +41,8 @@ export class ClaimsStore {
   }
   insertInvite(i: Invite): void {
     this.db
-      .prepare(`INSERT INTO invites (payment_id, phone_enc, phone_mask, phone_key, sender, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(i.payment_id, i.phone_enc, i.phone_mask, i.phone_key, i.sender, i.created_at);
+      .prepare(`INSERT INTO invites (payment_id, channel, phone_enc, phone_mask, phone_key, sender, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(i.payment_id, i.channel, i.phone_enc, i.phone_mask, i.phone_key, i.sender, i.created_at);
   }
 
   sendsForPaymentSince(paymentId: string, since: number): number[] {
