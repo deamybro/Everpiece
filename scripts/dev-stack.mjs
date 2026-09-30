@@ -42,9 +42,10 @@ function run(name, cmd, args, opts = {}) {
   const onLine = (buf) => {
     for (const line of buf.toString().split(/\r?\n/)) {
       if (!line.trim()) continue;
-      if (line.startsWith("SIMULATED_SMS ")) {
-        smsOutbox.unshift(JSON.parse(line.slice(14)));
-        say(`simulated text to ${smsOutbox[0].to} — see http://127.0.0.1:${PUB.faucet}/sms`);
+      if (line.startsWith("SIMULATED_SMS ") || line.startsWith("SIMULATED_EMAIL ")) {
+        const kind = line.startsWith("SIMULATED_SMS ") ? "text" : "email";
+        smsOutbox.unshift({ kind, ...JSON.parse(line.slice(line.indexOf(" ") + 1)) });
+        say(`simulated ${kind} to ${smsOutbox[0].to} — see http://127.0.0.1:${PUB.faucet}/sms`);
       } else if (!opts.quiet) process.stdout.write(`\x1b[2m[${name}]\x1b[0m ${line}\n`);
     }
   };
@@ -133,6 +134,7 @@ run("claims", process.execPath, ["server/claims/src/main.ts"], {
   env: {
     ...common, APPROVER_PRIVATE_KEY: keys.approver, PHONE_ENC_KEY: generatePrivateKey(), CLAIMS_DB_PATH: ":memory:", PORT: String(P.claims),
     SMS_PROVIDER: "simulated", ALLOW_SIMULATED_SMS: "1", SIMULATED_SMS_STDOUT: "1",
+    EMAIL_PROVIDER: "simulated", ALLOW_SIMULATED_EMAIL: "1", SIMULATED_EMAIL_STDOUT: "1",
   },
 });
 
@@ -146,9 +148,9 @@ createServer(async (req, res) => {
   res.setHeader("access-control-allow-headers", "content-type");
   if (req.method === "OPTIONS") return res.writeHead(204).end();
   if (req.method === "GET" && req.url === "/sms") {
-    const rows = smsOutbox.map((m) => `<li><b>${m.code}</b> → ${m.to} <small>${m.at}</small></li>`).join("") || "<li>No texts yet.</li>";
+    const rows = smsOutbox.map((m) => `<li><b>${m.code}</b> → ${m.to} <small>(${m.kind}) ${m.at}</small></li>`).join("") || "<li>No texts or emails yet.</li>";
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-    return res.end(`<!doctype html><meta name=viewport content="width=device-width"><title>Simulated SMS</title><body style="font-family:system-ui;padding:16px"><h2>Simulated texts (local test network — nothing was sent)</h2><p>Latest first. The real app texts the recipient's phone instead.</p><ul>${rows}</ul><p><a href="/sms">Refresh</a></p>`);
+    return res.end(`<!doctype html><meta name=viewport content="width=device-width"><title>Simulated texts and emails</title><body style="font-family:system-ui;padding:16px"><h2>Simulated texts and emails (local test network — nothing was sent)</h2><p>Latest first. The real app texts or emails the recipient instead.</p><ul>${rows}</ul><p><a href="/sms">Refresh</a></p>`);
   }
   if (req.method === "POST" && req.url === "/faucet") {
     let body = "";

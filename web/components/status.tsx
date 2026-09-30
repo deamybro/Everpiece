@@ -6,7 +6,7 @@ import type { RelayStatus } from "../lib/api";
 export function progressText(s: RelayStatus | "SIGNING" | "", verb: string): string {
   switch (s) {
     case "SIGNING":
-      return "Confirm with your fingerprint…";
+      return "Confirm with your fingerprint or screen lock…";
     case "SUBMITTED":
     case "PROCESSING":
       return `${verb}…`;

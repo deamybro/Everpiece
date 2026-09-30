@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { E164 } from "@everpiece/shared";
+import { E164, normalizeEmail } from "@everpiece/shared";
 import { Welcome } from "../../components/Welcome";
 import { Progress, progressText } from "../../components/status";
 import { dollarsOf, formatDollars, parseDollars } from "../../lib/chain";
@@ -13,7 +13,7 @@ import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera"
 import { UsernameError, findRecipient, type Pinning, type Recipient } from "../../lib/username";
 
 type Step = "amount" | "who" | "review" | "sending" | "done" | "protectedNoInvite";
-type Method = "phone" | "username";
+type Method = "phone" | "email" | "username";
 
 export default function Send() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -21,6 +21,7 @@ export default function Send() {
   const [step, setStep] = useState<Step>("amount");
   const [amountText, setAmountText] = useState("");
   const [phone, setPhone] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [method, setMethod] = useState<Method>("phone");
   const [usernameInput, setUsernameInput] = useState("");
   const [found, setFound] = useState<{ recipient: Recipient; pinning: Pinning } | null>(null);
@@ -47,6 +48,7 @@ export default function Send() {
   const amount = parseDollars(amountText);
   const phoneOk = E164.test(phone.replace(/\s+/g, ""));
   const cleanPhone = phone.replace(/\s+/g, "");
+  const email = normalizeEmail(emailInput);
 
   async function lookUp() {
     setLooking(true);
@@ -81,7 +83,8 @@ export default function Send() {
       return;
     }
     try {
-      const { paymentId, pkg } = await sendByLink(account, amount, cleanPhone, (s) => setProgress(progressText(s, "Protecting your payment")));
+      const to = method === "email" && email ? { channel: "email" as const, email } : { channel: "sms" as const, phone: cleanPhone };
+      const { paymentId, pkg } = await sendByLink(account, amount, to, (s) => setProgress(progressText(s, "Protecting your payment")));
       setLink(claimLink(paymentId, pkg));
       setStep("done");
     } catch (e) {
@@ -98,7 +101,8 @@ export default function Send() {
   }
 
   const shareText = `I sent you ${amount !== null ? formatDollars(amount) : "money"} on Everpiece. Tap to claim it (free): ${link}`;
-  const waHref = `https://wa.me/${cleanPhone.replace(/^\+/, "")}?text=${encodeURIComponent(shareText)}`;
+  // Email payments have no phone number: WhatsApp opens its contact picker instead.
+  const waHref = `https://wa.me/${method === "phone" ? cleanPhone.replace(/^\+/, "") : ""}?text=${encodeURIComponent(shareText)}`;
 
   return (
     <div className="stack">
@@ -124,9 +128,24 @@ export default function Send() {
         <div className="stack">
           <h1>Who is it for?</h1>
           <div className="row" role="group" aria-label="Send to">
-            <button className={method === "phone" ? "" : "secondary"} aria-pressed={method === "phone"} onClick={() => setMethod("phone")}>Phone number</button>
+            <button className={method === "phone" ? "" : "secondary"} aria-pressed={method === "phone"} onClick={() => setMethod("phone")}>Phone</button>
+            <button className={method === "email" ? "" : "secondary"} aria-pressed={method === "email"} onClick={() => setMethod("email")}>Email</button>
             <button className={method === "username" ? "" : "secondary"} aria-pressed={method === "username"} onClick={() => setMethod("username")}>@username</button>
           </div>
+          {method === "email" && (
+            <>
+              <p className="muted">We&apos;ll email them a code so only they can claim it. You&apos;ll share the link with them yourself, but not by email.</p>
+              <div>
+                <label htmlFor="email">Their email address</label>
+                <input
+                  id="email" type="email" inputMode="email" autoComplete="off" autoCapitalize="none" spellCheck={false}
+                  placeholder="name@example.com" value={emailInput} onChange={(e) => setEmailInput(e.target.value)}
+                />
+              </div>
+              {emailInput.trim().length > 3 && !email && <p className="muted small">That doesn&apos;t look like an email address.</p>}
+              <button disabled={!email} onClick={() => setStep("review")}>Continue</button>
+            </>
+          )}
           {method === "phone" && (
             <>
               <p className="muted">We&apos;ll text them a code so only they can claim it. You&apos;ll share the link with them yourself.</p>
@@ -187,7 +206,7 @@ export default function Send() {
               <dt>They receive</dt>
               <dd>{formatDollars(amount)}</dd>
               <dt>Recipient</dt>
-              <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : cleanPhone}</dd>
+              <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : method === "email" ? email : cleanPhone}</dd>
               <dt>Expires</dt>
               <dd>in 30 days</dd>
             </dl>
@@ -199,7 +218,7 @@ export default function Send() {
           </p>
           <Progress text={progress} />
           {error && <div className="status bad">{error}</div>}
-          <button disabled={step === "sending"} onClick={send}>Confirm with fingerprint</button>
+          <button disabled={step === "sending"} onClick={send}>Confirm with fingerprint or screen lock</button>
           {step === "review" && <button className="ghost" onClick={() => setStep("who")}>Back</button>}
         </div>
       )}
@@ -220,7 +239,7 @@ export default function Send() {
           <div className="status ok">Sent to @{found.recipient.username} ✓</div>
           <p className="muted">
             {formatDollars(amount)} is waiting for {found.recipient.displayName}. They&apos;ll see it on their Everpiece Home and claim it
-            with their fingerprint. You can cancel from Home until they do.
+            with their fingerprint or screen lock. You can cancel from Home until they do.
           </p>
           {!delivered && (
             <p className="muted small">We&apos;re still letting them know. Your money is protected and this retries automatically from Home.</p>
@@ -229,13 +248,25 @@ export default function Send() {
         </div>
       )}
 
-      {step === "done" && amount !== null && method === "phone" && (
+      {step === "done" && amount !== null && method !== "username" && (
         <div className="stack">
           <div className="status ok">Payment protected ✓</div>
           <h1>Now send them the link</h1>
-          <p className="muted">
-            Send this link only to them. They&apos;ll also get a code by text to {cleanPhone} — you won&apos;t see it.
-          </p>
+          {method === "email" ? (
+            <>
+              <p className="muted">
+                Send this link only to them. They&apos;ll also get a code by email at {email} — you won&apos;t see it.
+              </p>
+              <div className="status warn">
+                Don&apos;t email this link. Send it by WhatsApp, text or in person. The link and the code must travel separately,
+                so someone who gets into their inbox can&apos;t claim the money.
+              </div>
+            </>
+          ) : (
+            <p className="muted">
+              Send this link only to them. They&apos;ll also get a code by text to {cleanPhone} — you won&apos;t see it.
+            </p>
+          )}
           <a className="button" href={waHref} target="_blank" rel="noopener noreferrer">Send on WhatsApp</a>
           {typeof navigator !== "undefined" && "share" in navigator && (
             <button className="secondary" onClick={() => navigator.share({ title: "Everpiece", text: shareText }).catch(() => {})}>

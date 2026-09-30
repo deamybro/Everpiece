@@ -25,14 +25,14 @@ export function Welcome({ onReady, title }: { onReady: (a: Account) => void; tit
     <div className="stack">
       <div className="brand">Everpiece</div>
       <h1>{title ?? "Send money to the right person."}</h1>
-      <p className="muted">Your account lives in your fingerprint. No passwords, no app to install, free to use.</p>
+      <p className="muted">Your account lives in a passkey on your phone, unlocked with your fingerprint, face or screen lock. No passwords, no app to install, free to use.</p>
       <div className="card stack">
         <div>
           <label htmlFor="name">Your first name</label>
           <input id="name" autoComplete="given-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Stella" />
         </div>
         <button disabled={busy || name.trim().length === 0} onClick={() => run(() => createAccount(name.trim()))}>
-          Create my account with fingerprint
+          Create my account with fingerprint or screen lock
         </button>
         <button className="secondary" disabled={busy} onClick={() => run(signIn)}>
           I already have an account
@@ -40,7 +40,7 @@ export function Welcome({ onReady, title }: { onReady: (a: Account) => void; tit
       </div>
       {error && <div className="status bad">{error}</div>}
       <p className="muted small">
-        If you lose access to your fingerprint/passkey on all your devices, Everpiece can&apos;t restore your account.
+        If you lose access to your passkey on all your devices, Everpiece can&apos;t restore your account.
       </p>
     </div>
   );

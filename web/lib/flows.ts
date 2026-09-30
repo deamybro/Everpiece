@@ -7,6 +7,8 @@ import {
   cancelIntent,
   claimIntent,
   claimStart,
+  emailHash,
+  emailInviteRegistration,
   fundingAuthorization,
   inviteRegistration,
   linkClaimIntent,
@@ -55,14 +57,18 @@ function markDelivered(paymentId: Hex) {
   localStorage.setItem(SENT_KEY, JSON.stringify(loadSent().map((x) => (x.paymentId === paymentId && x.delivery ? { ...x, delivery: { ...x.delivery, delivered: true } } : x))));
 }
 
+/** Where the claim code goes: a phone (E.164) by SMS, or a normalized email address. */
+export type CodeContact = { channel: "sms"; phone: string } | { channel: "email"; email: string };
+
 /**
- * Send by link (LINK mode). ONE fingerprint prompt signs both the AUSD funding authorization and the
- * InviteRegistration (the recipient phone). The link secret is created locally and returned — never stored.
+ * Send by link (LINK mode). ONE passkey prompt signs both the AUSD funding authorization and the invite
+ * (InviteRegistration for a phone, EmailInviteRegistration for an email). The link secret is created locally and
+ * returned — never stored.
  */
 export async function sendByLink(
   account: Account,
   amount: bigint,
-  phoneE164: string,
+  to: CodeContact,
   onStatus: (s: RelayStatus | "SIGNING") => void,
 ): Promise<{ paymentId: Hex; pkg: ClaimPackage }> {
   const pkg = newClaimPackage();
@@ -89,7 +95,9 @@ export async function sendByLink(
   const { ausdSignature, senderSig } = await withSigner(account, async (signer) => ({
     ausdSignature: await signer.signTypedData(fundingAuthorization(config.escrow, intent, config.chainId)),
     senderSig: await signer.signTypedData(
-      inviteRegistration(config.escrow, { paymentId, phoneHash: phoneHash(phoneE164), deadline: inviteDeadline }, config.chainId),
+      to.channel === "email"
+        ? emailInviteRegistration(config.escrow, { paymentId, emailHash: emailHash(to.email), deadline: inviteDeadline }, config.chainId)
+        : inviteRegistration(config.escrow, { paymentId, phoneHash: phoneHash(to.phone), deadline: inviteDeadline }, config.chainId),
     ),
   }));
 
@@ -99,10 +107,11 @@ export async function sendByLink(
   if (done.status !== "CONFIRMED") throw new FlowError(done.error ?? "PaymentNotConfirmed");
 
   // The money is now protected on-chain. From here on, never let the user "try again" into a second payment.
-  rememberSent({ paymentId, amount: amount.toString(), to: phoneE164, createdAt: Date.now(), expiresAt: intent.expiresAt.toString() });
+  const contact = to.channel === "email" ? { email: to.email } : { phone: to.phone };
+  rememberSent({ paymentId, amount: amount.toString(), to: to.channel === "email" ? to.email : to.phone, createdAt: Date.now(), expiresAt: intent.expiresAt.toString() });
   let lastError = "";
   for (let attempt = 0; attempt < 3; attempt++) {
-    const inv = await claims("/v1/invites", { paymentId, phone: phoneE164, deadline: inviteDeadline, senderSig }).catch(() => null);
+    const inv = await claims("/v1/invites", { paymentId, ...contact, deadline: inviteDeadline, senderSig }).catch(() => null);
     if (inv && (inv.status === 201 || inv.status === 200)) return { paymentId, pkg };
     lastError = inv?.body.error ?? "network";
     await new Promise((r) => setTimeout(r, 1500));
@@ -131,8 +140,12 @@ export async function returnExpired(paymentId: Hex, onStatus: (s: RelayStatus) =
   if (done.status !== "CONFIRMED") throw new FlowError(done.error ?? "NotConfirmed");
 }
 
-/** Step 1 of a link claim: the link's claim key asks the claims server to text the code (binds the recipient wallet). */
-export async function requestCode(paymentId: Hex, pkg: ClaimPackage, recipient: Address): Promise<{ maskedPhone: string; simulated: boolean }> {
+/** Step 1 of a link claim: the link's claim key asks the claims server to send the code (binds the recipient wallet). */
+export async function requestCode(
+  paymentId: Hex,
+  pkg: ClaimPackage,
+  recipient: Address,
+): Promise<{ channel: "sms" | "email"; masked: string; simulated: boolean }> {
   const claimKey = privateKeyToAccount(pkg.claimPrivateKey);
   const deadline = (await chainTime()) + 300n;
   const claimKeySig = await claimKey.signTypedData(claimStart(config.escrow, { paymentId, recipient, deadline }, config.chainId));
@@ -140,7 +153,7 @@ export async function requestCode(paymentId: Hex, pkg: ClaimPackage, recipient: 
     paymentId, recipient, claimKey: claimKey.address, recipientSalt: pkg.recipientSalt, deadline, claimKeySig,
   });
   if (r.status !== 200) throw new FlowError(r.body.error);
-  return { maskedPhone: r.body.maskedPhone, simulated: Boolean(r.body.simulated) };
+  return { channel: r.body.channel === "email" ? "email" : "sms", masked: r.body.maskedContact ?? r.body.maskedPhone, simulated: Boolean(r.body.simulated) };
 }
 
 /** Step 2: code → approval → claim-key signature → relayer. Both capabilities are bound to `recipient`. */

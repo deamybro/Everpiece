@@ -95,7 +95,7 @@ export async function withSigner<T>(account: Account, fn: (signer: LocalAccount,
 
 /** Mera error codes → consumer copy (master §22.5: never show raw SDK errors). */
 export function friendlyPasskeyError(e: unknown): string {
-  if (e instanceof Error && e.message === "WrongPasskey") return "That fingerprint belongs to a different Everpiece account.";
+  if (e instanceof Error && e.message === "WrongPasskey") return "That passkey belongs to a different Everpiece account.";
   if (isMeraError(e)) {
     switch (e.code) {
       case "PRF_UNAVAILABLE":
@@ -105,8 +105,8 @@ export function friendlyPasskeyError(e: unknown): string {
       case "CRYPTO_UNAVAILABLE":
         return "Please open Everpiece in a secure browser (Chrome or Safari).";
       default:
-        return "Your fingerprint couldn't be used. Please try again.";
+        return "Your fingerprint or screen lock couldn't be used. Please try again.";
     }
   }
-  return "Your fingerprint couldn't be used. Please try again.";
+  return "Your fingerprint or screen lock couldn't be used. Please try again.";
 }

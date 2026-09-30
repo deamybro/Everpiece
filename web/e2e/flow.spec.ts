@@ -46,7 +46,7 @@ test("send by link → recipient verifies phone → claims; sender cancels anoth
   // --- Stella onboards with a passkey and gets test Dollars
   await stella.goto("/");
   await stella.getByLabel("Your first name").fill("Stella");
-  await stella.getByRole("button", { name: "Create my account with fingerprint" }).click();
+  await stella.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
   await expect(stella.getByText("Hi Stella, your Dollars")).toBeVisible();
   await stella.getByRole("button", { name: "Get 100 test Dollars" }).click();
   await expect(stella.locator(".balance")).toHaveText("$100.00");
@@ -58,7 +58,7 @@ test("send by link → recipient verifies phone → claims; sender cancels anoth
   await stella.getByLabel("Their phone number (with country code)").fill("+2348000000000");
   await stella.getByRole("button", { name: "Continue" }).click();
   await expect(stella.getByText("Everpiece fee")).toBeVisible();
-  await stella.getByRole("button", { name: "Confirm with fingerprint" }).click();
+  await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText("Payment protected ✓")).toBeVisible();
   const wa = await stella.getByRole("link", { name: "Send on WhatsApp" }).getAttribute("href");
   expect(wa).toMatch(/^https:\/\/wa\.me\/2348000000000\?text=/);
@@ -69,8 +69,8 @@ test("send by link → recipient verifies phone → claims; sender cancels anoth
   await expect(mama.getByText("$25.00")).toBeVisible();
   expect(mama.url()).not.toContain("#");
   await mama.getByLabel("Your first name").fill("Mama");
-  await mama.getByRole("button", { name: "Create my account with fingerprint" }).click();
-  await mama.getByRole("button", { name: "Text me the code" }).click();
+  await mama.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
+  await mama.getByRole("button", { name: "Send me the code" }).click();
   await expect(mama.getByText(/We texted a 6-digit code to \+234 ••• ••• 0000/)).toBeVisible();
 
   // wrong code first — refused, payment untouched
@@ -93,7 +93,7 @@ test("send by link → recipient verifies phone → claims; sender cancels anoth
   await stella.getByRole("button", { name: "Continue" }).click();
   await stella.getByLabel("Their phone number (with country code)").fill("+447700900123");
   await stella.getByRole("button", { name: "Continue" }).click();
-  await stella.getByRole("button", { name: "Confirm with fingerprint" }).click();
+  await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText("Payment protected ✓")).toBeVisible();
   await stella.getByRole("link", { name: "Done" }).click();
   await expect(stella.locator(".balance")).toHaveText("$65.00");

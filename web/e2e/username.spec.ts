@@ -19,11 +19,11 @@ async function withPasskeys(context: BrowserContext): Promise<Page> {
 async function onboard(page: Page, first: string, username: string) {
   await page.goto("/");
   await page.getByLabel("Your first name").fill(first);
-  await page.getByRole("button", { name: "Create my account with fingerprint" }).click();
+  await page.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
   await expect(page.getByText(`Hi ${first}, your Dollars`)).toBeVisible();
   await page.getByLabel("Username", { exact: true }).fill(username);
   await expect(page.getByText(`@${username} is available ✓`)).toBeVisible();
-  await page.getByRole("button", { name: `Save @${username} with fingerprint` }).click();
+  await page.getByRole("button", { name: `Save @${username} with fingerprint or screen lock` }).click();
   await expect(page.getByText(`Your username: @${username}`)).toBeVisible();
 }
 
@@ -57,7 +57,7 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   await stella.getByLabel(/This is the person I mean/).check();
   await cont.click();
   await expect(stella.getByText(`@${M} (Mama)`)).toBeVisible();
-  await stella.getByRole("button", { name: "Confirm with fingerprint" }).click();
+  await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible();
   await stella.getByRole("link", { name: "Done" }).click();
   await expect(stella.locator(".balance")).toHaveText("$80.00");
@@ -65,7 +65,7 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   // --- Mama claims from Home
   await expect(mama.getByText("Money for you")).toBeVisible();
   await expect(mama.getByText(`from @${S}`)).toBeVisible();
-  await mama.getByRole("button", { name: "Claim with fingerprint" }).click();
+  await mama.getByRole("button", { name: "Claim with fingerprint or screen lock" }).click();
   await expect(mama.getByText(`You received $20.00 from @${S} ✓`)).toBeVisible();
   await expect(mama.locator(".balance")).toHaveText("$20.00");
   await expect(mama.getByText("Money for you")).toBeHidden();
@@ -75,7 +75,7 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   await toUsername(stella, "5", M);
   await expect(stella.getByText("You've paid them before ✓")).toBeVisible();
   await stella.getByRole("button", { name: "Continue" }).click();
-  await stella.getByRole("button", { name: "Confirm with fingerprint" }).click();
+  await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible();
   await stella.getByRole("link", { name: "Done" }).click();
   await expect(stella.locator(".balance")).toHaveText("$75.00");
@@ -102,7 +102,7 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   const copycat = await withPasskeys(await browser.newContext());
   await copycat.goto("/");
   await copycat.getByLabel("Your first name").fill("Copy");
-  await copycat.getByRole("button", { name: "Create my account with fingerprint" }).click();
+  await copycat.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
   await expect(copycat.getByText("Hi Copy, your Dollars")).toBeVisible();
   await copycat.getByLabel("Username", { exact: true }).fill(M);
   await expect(copycat.getByText("That username is taken. Try another one.")).toBeVisible();

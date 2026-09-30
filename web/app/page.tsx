@@ -152,7 +152,7 @@ export default function Home() {
                   </div>
                   <span className="pill">Waiting for you</span>
                 </div>
-                <button disabled={busyId !== null} onClick={() => onClaim(i)}>Claim with fingerprint</button>
+                <button disabled={busyId !== null} onClick={() => onClaim(i)}>Claim with fingerprint or screen lock</button>
               </li>
             ))}
           </ul>

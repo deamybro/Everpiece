@@ -34,7 +34,9 @@ export async function waitForRequest(requestId: string, onStatus: (s: RelayStatu
 /** Relayer/claims error codes → consumer copy (master §37: no raw errors to users). */
 export function friendlyError(code: string | undefined): string {
   const map: Record<string, string> = {
-    InvalidFundingSignature: "Your fingerprint signature didn't match. Please try again.",
+    InvalidFundingSignature: "Your signature didn't match. Please try again.",
+    EmailUnavailable: "Email codes aren't available yet. Send to a phone number or @username instead.",
+    EmailDailyLimit: "Too many codes today for this email. Try again later.",
     BelowMinimumPayment: "The minimum payment is $1.00.",
     AmountAboveCap: "That's above the current limit per payment.",
     LiabilityCapExceeded: "Everpiece is at its safety limit right now. Please try a smaller amount later.",

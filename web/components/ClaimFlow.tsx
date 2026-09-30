@@ -22,6 +22,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
   const [masked, setMasked] = useState("");
+  const [channel, setChannel] = useState<"sms" | "email">("sms");
   const [simulated, setSimulated] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -55,7 +56,8 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
     setError("");
     try {
       const r = await requestCode(paymentId, pkg.current, account.address);
-      setMasked(r.maskedPhone);
+      setMasked(r.masked);
+      setChannel(r.channel);
       setSimulated(r.simulated);
       setPhase("code");
     } catch (e) {
@@ -131,18 +133,23 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
 
           {phase === "request" && (
             <>
-              <p className="muted">To make sure it&apos;s really you, we&apos;ll text a code to the phone number the sender entered.</p>
-              <button disabled={busy} onClick={sendCode}>Text me the code</button>
+              <p className="muted">To make sure it&apos;s really you, we&apos;ll send a code to the phone number or email the sender entered.</p>
+              <button disabled={busy} onClick={sendCode}>Send me the code</button>
             </>
           )}
 
           {(phase === "code" || phase === "claiming") && (
             <>
-              <p className="muted">We texted a 6-digit code to {masked}. Never share it with anyone, including the sender.</p>
+              <p className="muted">
+                {channel === "email"
+                  ? <>We emailed a 6-digit code to {masked}. Check your spam folder too. </>
+                  : <>We texted a 6-digit code to {masked}. </>}
+                Never share it with anyone, including the sender.
+              </p>
               {simulated && isDevStack && (
                 <div className="dev">
-                  Local test network: no real text is sent.{" "}
-                  <a href={`${config.devFaucetUrl}/sms`} target="_blank" rel="noopener noreferrer">See the simulated text</a>
+                  Local test network: no real {channel === "email" ? "email" : "text"} is sent.{" "}
+                  <a href={`${config.devFaucetUrl}/sms`} target="_blank" rel="noopener noreferrer">See the simulated {channel === "email" ? "email" : "text"}</a>
                 </div>
               )}
               <input className="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} aria-label="Code" />
