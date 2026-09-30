@@ -4,6 +4,39 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 10 — 2026-09-30 — Email claim code (SMS alternative) + passkey wording
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Decisions (owner):**
+  - Mera stays passkey-only; no email login for the wallet (it would need custody or a third-party key service).
+  - Approved: **email as an alternative to SMS for the link-claim code**, since SMS is blocked for Nigeria.
+  - Approved: the wording "fingerprint or screen lock".
+- **Completed:**
+  - **shared:** `EmailInviteRegistration` (its own EIP-712 type), `normalizeEmail` (lowercase ASCII) and `emailHash`. Vectors generated with cast (`evidence/claims-email-v0`).
+  - **claims:**
+    - Invites carry a `channel`; `/v1/invites` takes `phone` or `email`, each checked against its own signed type.
+    - Codes go to the invite's channel with the same LocalOtp rules, cooldowns and a per-address daily cap.
+    - `EMAIL_PROVIDER=none|simulated`; simulated is gated like SMS. Old databases migrate, with channel = sms.
+    - The phone path is unchanged: the same responses, plus `channel` and `maskedContact`.
+  - **web:**
+    - Send offers Phone | Email | @username. The email share step warns "Don't email this link"; WhatsApp opens without a number.
+    - The claim page says "Send me the code", then "texted" or "emailed".
+    - Copy everywhere says "fingerprint or screen lock" (passkeys also unlock with face or PIN).
+  - **Docs:** THREAT_MODEL **C10** (same-inbox risk; not enforceable; SIMULATED only), claims README, `.env.example`, INTEGRATION_LEDGER.
+- **Tests run:**
+  - shared **11/11**; claims **20/20** with the fork, including an email invite paid out by `claimLinkPayment` in real AUSD.
+    - A phone-typed signature can't register an email invite; channels can't be switched; no plaintext address is stored or logged.
+  - Web typecheck clean.
+  - Playwright **3/3** against the VPS test stack through the tunnel: `email.spec.ts` (new), `flow.spec.ts` and `username.spec.ts`.
+  - Couldn't run the local stack: the owner's own tunnel to another server holds local port 8787, so it was left alone.
+- **Open:**
+  - No live email provider.
+  - Owner to choose one, plus a sending domain with SPF, DKIM and DMARC.
+  - Its API must be verified in VERIFIED.md before an adapter is written.
+- **Next recommended action:** owner picks an email provider (or live SMS); then web history from the indexer.
+
+---
+
 ## Session 9 — 2026-09-30 — Test stack on the owner's shared VPS
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed). The code was shipped by `git archive` over SSH; no GitHub was involved.

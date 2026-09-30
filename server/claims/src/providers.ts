@@ -237,7 +237,7 @@ export class SimulatedProvider implements VerificationProvider {
 
 /**
  * Email channel. The code email tells the recipient where the claim link must NOT come from: the link and the code
- * are two factors, and a single inbox holding both would defeat that (THREAT_MODEL C8).
+ * are two factors, and a single inbox holding both would defeat that (THREAT_MODEL C10).
  */
 export function otpEmail(code: string): { subject: string; text: string } {
   return {

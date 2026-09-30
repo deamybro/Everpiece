@@ -46,6 +46,18 @@ client   → relayer POST /v1/payments/claim-link with the claim-key signature +
 
 Delivery to Nigerian numbers is **unproven until a live test** (INTEGRATION_LEDGER).
 
+### Email channel (optional)
+
+- **What changes:** the sender can register an email address instead of a phone (`EmailInviteRegistration`). The code then goes by email, with the same one-time-code rules, cooldowns and a per-address daily cap (`EMAIL_PER_ADDRESS_PER_DAY`, default 10).
+- **Same-inbox risk:** the link must not travel by email too (THREAT_MODEL C10).
+
+| `EMAIL_PROVIDER` | Status | Needs |
+|---|---|---|
+| `none` (default) | Email invites are refused with `EmailUnavailable`, so link payments are SMS-only | — |
+| `simulated` | **SIMULATED**; refused unless `ALLOW_SIMULATED_EMAIL=1` **and** `MONAD_RPC` is localhost. Health shows `emailLive: false` | — |
+
+No live email provider yet. Choosing one is the owner's call, and its API must be verified (docs/VERIFIED.md) before an adapter is written.
+
 ## Run
 
 ```bash

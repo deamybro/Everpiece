@@ -98,6 +98,16 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
   - `voiceRootSecret` is independently random.
   - The voice key is HKDF(voiceRootSecret, `"everpiece.link.voice.v1"`).
   - No key is used for more than one purpose. Voice-decryption capability never authorizes a claim.
+- C10 **Email as factor B (owner-approved 2026-09-30, as an alternative to SMS).** The code can go to an email address instead of a phone (`EmailInviteRegistration`, a separate EIP-712 type, so a phone invite signature can't be replayed as an email one).
+  - **Same-inbox risk.** If the sender emails the claim link to the same address, one inbox holds both factors, and whoever controls it (or anyone who breaks into it) can claim. This is C3 with a larger attack surface: email accounts are phished and reused more than SIMs are swapped.
+  - **Mitigations:**
+    - The share step says not to email the link and offers WhatsApp without a number, the share sheet, and copy. The app itself never offers email sharing.
+    - The code email says "Everpiece never emails claim links".
+    - Caps, sender cancel and expiry (C3).
+  - **Not enforceable:** Everpiece can't see how the sender shares the link, and the share sheet can still pick email.
+  - **Weaker than SMS for Nigeria?** Unknown in practice. It does avoid SMS pumping, sender-ID registration and DND filtering.
+  - **Delivery:** email is **SIMULATED only**; no live provider is chosen. A live one needs SPF, DKIM and DMARC on the sending domain, or codes land in spam.
+  - **Privacy:** addresses are encrypted at rest, masked (`m•••@domain`) in responses, never logged and never on-chain, the same as phones.
 
 ## D. Recipient verification / SMS / OTP (master §12–13)
 
