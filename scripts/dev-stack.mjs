@@ -188,7 +188,9 @@ async function publicRpc(req, res) {
   return res.end(r ? await r.text() : "");
 }
 
-createServer(async (req, res) => {
+// One handler for the faucet port. Every failure — including a client that disconnects mid-request ("aborted",
+// ECONNRESET) — is answered or dropped here: an unhandled rejection would take the whole stack (and its chain) down.
+async function faucetHandler(req, res) {
   res.setHeader("access-control-allow-origin", WEB_ORIGIN);
   res.setHeader("access-control-allow-headers", "content-type");
   if (req.method === "OPTIONS") return res.writeHead(204).end();
@@ -200,7 +202,10 @@ createServer(async (req, res) => {
   if (req.method === "POST" && req.url === "/rpc") return publicRpc(req, res);
   if (req.method === "POST" && req.url === "/faucet") {
     let body = "";
-    for await (const c of req) body += c;
+    for await (const c of req) {
+      body += c;
+      if (body.length > 4096) return res.writeHead(413).end();
+    }
     try {
       const { address } = JSON.parse(body);
       if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new Error("bad address");
@@ -215,7 +220,16 @@ createServer(async (req, res) => {
     }
   }
   res.writeHead(404).end();
-}).listen(P.faucet, BIND);
+}
+const faucetServer = createServer((req, res) => {
+  faucetHandler(req, res).catch((e) => {
+    if (!res.headersSent && !res.destroyed) res.writeHead(500).end();
+    else res.destroy();
+    if (!(e instanceof Error && e.message === "aborted")) say(`faucet request failed: ${String(e).slice(0, 120)}`);
+  });
+});
+faucetServer.on("clientError", (_e, socket) => socket.destroy());
+faucetServer.listen(P.faucet, BIND);
 
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);
