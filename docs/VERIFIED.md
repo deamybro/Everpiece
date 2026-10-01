@@ -491,6 +491,11 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Notes:**
   - Everpiece OTP texts (custom body, or Verify) need an upgraded Twilio account.
   - The trial console "Send an SMS" with a predefined template can still be used to test **delivery** to a Nigerian number for free.
+  - **Trial units (Twilio docs, read 2026-10-01; https://www.twilio.com/docs/usage/trials):**
+    - Product units rather than dollars: "100 SMS messages, 3,000 emails, and 75 voice minutes", and "Verify functions during trial with 40 verifications".
+    - At most **5 verified recipients**; "SMS messages and voice calls are restricted to your sign-up country"; the trial ends 30 days after sign-up.
+    - Trial SMS must use Twilio-provided templates (order confirmations, appointment reminders); no documented OTP template.
+    - This contradicts the console message seen on 2026-09-29 ("Upgrade to create and manage your own Verify service"). TODO(VERIFY): whether a trial account can create or use a Verify Service.
   - **Owner-reported (2026-10-01):** a Twilio trial test SMS **was received** on the owner's Nigerian Airtel number (+234 902…), sent from a Twilio number. In practice delivery to Airtel NG worked on that route, despite the guideline about numeric senders.
     - TODO(VERIFY): which sender and route it used (console message log); whether a custom-body OTP from `twilio-sms` delivers the same way after upgrading; MTN, Glo and 9mobile.
 
