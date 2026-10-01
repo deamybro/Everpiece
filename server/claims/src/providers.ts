@@ -48,7 +48,11 @@ export class TwilioVerifyProvider implements VerificationProvider {
 
   async start(e164: string): Promise<{ ref: string }> {
     const r = await this.post("Verifications", { To: e164, Channel: "sms" });
-    if (!r.ok) throw new ProviderError(`twilio start HTTP ${r.status}`);
+    if (!r.ok) {
+      // Twilio's numeric error code (e.g. 60200-series) says why; it carries no phone number or secret.
+      const j = (await r.json().catch(() => ({}))) as { code?: unknown };
+      throw new ProviderError(`twilio start HTTP ${r.status}${typeof j.code === "number" ? ` code ${j.code}` : ""}`);
+    }
     const j = (await r.json()) as { sid?: string; status?: string };
     if (!j.sid || j.status !== "pending") throw new ProviderError(`twilio start status ${j.status}`);
     return { ref: j.sid };
