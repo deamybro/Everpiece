@@ -21,6 +21,11 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
   - Real-device testing (Android Chrome with Google Password Manager, iPhone Safari, WhatsApp in-app browser → system browser handoff, master §C7).
   - The public site has no access gate. Email abuse is bounded only by rate limits and Resend's 100 a day. Consider a simple gate if it's shared widely.
   - Production rpId decision: everpiece.xyz vs a subdomain; passkeys can't move between them.
+- **Incident 2026-10-01 13:56 UTC — public site returned 502:**
+  - **Cause:** the dev-stack orchestrator crashed on an unhandled `Error: aborted` (ECONNRESET), when a client disconnected mid-request to the faucet port. My bug. The container restarted on a **fresh chain**, wiping the owner's overnight phone test (`@maris` and an email payment, around 23:19 UTC).
+  - **Fix (6ea72d1):** per-request error handling, a body cap and `clientError` handling. Reproduced locally (the old pattern crashes, the new one survives), then live: an aborted faucet request against the public site left the stack running (0 restarts).
+  - The `Server Reference ID did not match` errors in the web log are bots probing Next server actions; harmless.
+- **Known limit:** any stack restart or deploy creates a new chain, escrow and keys, and in-memory databases are lost, so test accounts reset. Option: persist anvil state and keys across restarts.
 - **Next recommended action:** the owner tests on their phone; then web history from the indexer.
 
 ---
