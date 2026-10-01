@@ -491,6 +491,8 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Notes:**
   - Everpiece OTP texts (custom body, or Verify) need an upgraded Twilio account.
   - The trial console "Send an SMS" with a predefined template can still be used to test **delivery** to a Nigerian number for free.
+  - **Owner-reported (2026-10-01):** a Twilio trial test SMS **was received** on the owner's Nigerian Airtel number (+234 902…), sent from a Twilio number. In practice delivery to Airtel NG worked on that route, despite the guideline about numeric senders.
+    - TODO(VERIFY): which sender and route it used (console message log); whether a custom-body OTP from `twilio-sms` delivers the same way after upgrading; MTN, Glo and 9mobile.
 
 ## 5. Pending verification
 
