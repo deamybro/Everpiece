@@ -25,6 +25,12 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
   - **Cause:** the dev-stack orchestrator crashed on an unhandled `Error: aborted` (ECONNRESET), when a client disconnected mid-request to the faucet port. My bug. The container restarted on a **fresh chain**, wiping the owner's overnight phone test (`@maris` and an email payment, around 23:19 UTC).
   - **Fix (6ea72d1):** per-request error handling, a body cap and `clientError` handling. Reproduced locally (the old pattern crashes, the new one survives), then live: an aborted faucet request against the public site left the stack running (0 restarts).
   - The `Server Reference ID did not match` errors in the web log are bots probing Next server actions; harmless.
+- **Real SMS (2026-10-01, owner: no budget, so use the Twilio trial):**
+  - Twilio's "Try out Verify" delivered to the owner's Airtel number and approved the check.
+  - The owner created a Standard API key. Service SID and key went to the host via Notepad, then hidden SSH stdin; lengths confirmed on the host; file wiped.
+  - The stack uses `twilio-verify` when all three are set: claims reports `"sms":"twilio-verify","smsLive":true`, and email is still Resend.
+  - Trial limits: 40 verifications, at most 5 verified recipients, Nigeria only. Unverified numbers will fail with `VerificationUnavailable`.
+  - The service's friendly name is "Try It Out Verify Service" and appears in the SMS. Renaming it to "Everpiece" changes the owner's Twilio account settings, so it waits for the owner's OK.
 - **Known limit:** any stack restart or deploy creates a new chain, escrow and keys, and in-memory databases are lost, so test accounts reset. Option: persist anvil state and keys across restarts.
 - **Next recommended action:** the owner tests on their phone; then web history from the indexer.
 

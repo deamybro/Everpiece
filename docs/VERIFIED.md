@@ -453,6 +453,11 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
     - **Nigeria:** alphanumeric sender ID needs pre-registration: international ~3 weeks, domestic 2–3 weeks (major networks only). "Numeric International sender ID is not supported to the MTN, Airtel and 9 Mobile networks". The DND registry "can block notifications and OTPs" through aggressive telco filtering. No two-way SMS. Sources: https://www.twilio.com/en-us/guidelines/ng/sms, and Twilio Help "Alphanumeric Sender ID for Verify" (Nigeria is pre-registration-required for Verify).
     - **UK:** dynamic alphanumeric sender IDs are allowed; generic IDs ("OTP", "2FA", "Verify", "SMS", …) are blocked; protected IDs need registration. Source: https://www.twilio.com/en-us/guidelines/gb/sms
   - Pricing, rate limits and actual NG/UK delivery: TODO(VERIFY) via a live account and test sends.
+  - **Live on a TRIAL account (2026-10-01):**
+    - The console "Try out Verify" sent a code that **arrived on the owner's Airtel NG number**, and the check returned approved.
+    - The trial has a default Verify Service ("Try It Out Verify Service", `code_length` 6). A Standard API key can fetch it: `GET /v2/Services/{sid}` → 200.
+    - The test stack now runs `SMS_PROVIDER=twilio` against that service.
+    - Trial limits: 40 verifications, only to the trial's verified recipients (at most 5), sign-up country only.
 
 ### 4.5 Termii Token API (Nigeria-focused SMS OTP provider candidate)
 - **Fact:** API used by `server/claims` TermiiProvider
