@@ -29,11 +29,15 @@ services:
     environment:
       STACK_INFO_FILE: /shared/stack.json
       STACK_PUBLIC_PORT_BASE: "47300" # browser URLs use 47300-47305, tunnelled 1:1 (README)
-      # Real claim-code emails via Resend when both are set in the host's .env (set-secret.sh); simulated otherwise.
       # Public HTTPS test site behind the host's Caddy (README "Public test site"); unset = tunnel-only.
       STACK_PUBLIC_ORIGIN: ${STACK_PUBLIC_ORIGIN:-}
+      # Real claim-code emails via Resend when both are set in the host's .env (set-secret.sh); simulated otherwise.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      # Real SMS codes via Twilio Verify when all three are set; simulated otherwise.
+      TWILIO_API_USER: ${TWILIO_API_USER:-}
+      TWILIO_API_SECRET: ${TWILIO_API_SECRET:-}
+      TWILIO_VERIFY_SERVICE_SID: ${TWILIO_VERIFY_SERVICE_SID:-}
     volumes:
       - stack-info:/shared
     # Healthy once the web is built and serving (dev-stack writes the info file last). The indexer services wait for
