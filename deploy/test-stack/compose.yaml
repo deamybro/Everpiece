@@ -34,6 +34,8 @@ services:
       # Real claim-code emails via Resend when both are set in the host's .env (set-secret.sh); simulated otherwise.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      # New usernames per IP per day on the directory (default 5; raised for repeated E2E runs).
+      REGISTRATIONS_PER_IP_PER_DAY: ${REGISTRATIONS_PER_IP_PER_DAY:-}
       # Real SMS codes via Twilio Verify when all three are set; simulated otherwise.
       TWILIO_API_USER: ${TWILIO_API_USER:-}
       TWILIO_API_SECRET: ${TWILIO_API_SECRET:-}

@@ -159,7 +159,8 @@ run("claims", process.execPath, ["server/claims/src/main.ts"], {
 });
 
 run("directory", process.execPath, ["server/directory/src/main.ts"], {
-  env: { ...common, DIRECTORY_DB_PATH: ":memory:", PORT: String(P.directory) },
+  // REGISTRATIONS_PER_IP_PER_DAY passes through (test stack: raised on the host so repeated E2E runs from one IP fit).
+  env: { ...common, DIRECTORY_DB_PATH: ":memory:", PORT: String(P.directory), ...(process.env.REGISTRATIONS_PER_IP_PER_DAY ? { REGISTRATIONS_PER_IP_PER_DAY: process.env.REGISTRATIONS_PER_IP_PER_DAY } : {}) },
 });
 
 // 6. dev faucet + simulated SMS outbox (LOCAL ONLY)

@@ -117,5 +117,5 @@ test("history comes from the indexer: sent + received, refresh, new device, sign
   await expect(row(stella, "$4.00").getByText("Cancelled")).toBeVisible();
   await stella2.reload();
   await expect(row(stella2, "$4.00").getByText("Cancelled")).toBeVisible();
-  await expect(stella.locator(".balance")).toHaveText("$90.00");
+  await expect(stella.locator(".balance")).toHaveText("$94.00"); // 100 − 6 (claimed) − 4 + 4 (cancelled, returned)
 });

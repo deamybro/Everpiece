@@ -35,7 +35,12 @@ async function latestSimulatedCode(page: Page): Promise<string> {
   return m[1];
 }
 
-test("send by link → recipient verifies phone → claims; sender cancels another payment", async ({ browser }) => {
+const CLAIMS = process.env.E2E_CLAIMS_URL ?? "http://127.0.0.1:8788";
+
+test("send by link → recipient verifies phone → claims; sender cancels another payment", async ({ browser, request }) => {
+  // Reads the code from the SIMULATED text outbox; with a live SMS provider the code goes to a real phone instead.
+  const health = await (await request.get(`${CLAIMS}/healthz`)).json();
+  test.skip(health.smsLive === true, `live SMS provider (${health.sms}): verify with a real phone`);
   const stellaCtx = await browser.newContext();
   const mamaCtx = await browser.newContext();
   const stella = await withPasskeys(stellaCtx);
