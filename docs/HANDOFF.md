@@ -4,6 +4,35 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 14 — 2026-10-02 — Everpiece on Monad testnet
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Owner decisions:**
+  - Testnet first.
+  - **TestDollar** (an AUSD stand-in, so the escrow stays unchanged) rather than changing the escrow for USDC.
+  - Private payments as a **separate Private mode** via Unlink: @username to @username, final once sent; protected payments stay cancellable.
+- **Facts (VERIFIED §4.9–4.10):**
+  - AUSD is absent on testnet, and the escrow is AUSD-specific.
+  - The testnet RPC limits `eth_getLogs` to 100 blocks.
+  - Unlink: testnet available, mainnet by request. It hides sender, recipient and amount; documents no cancel or expiry; needs a dashboard API key and appId.
+- **Completed:**
+  - `contracts/src/testnet/TestDollar.sol`: the exact IAUSD surface, an honest name, minter-only minting capped at $100, no freeze/burn/pause. 9 tests, including the unchanged escrow's full lifecycles on it. Full suite 158 passed.
+  - `shared`: `DollarToken` for the funding domain (AUSD by default, so vectors are unchanged). Relayer `DOLLAR_EIP712_NAME`; web `NEXT_PUBLIC_DOLLAR_*`.
+  - **Deployed to testnet** with `scripts/deploy-testnet.mjs` (refuses other chains; finalized receipts; read-back checks):
+    - TestDollar `0xd073fD9a4361a18aa41f599d8A6ea96033376667`;
+    - escrow `0x94A25e4cE211D94709915100bd6E8CbC4477BFD5`.
+    - Keys were generated on the VPS (addresses only shown); the owner funded the deployer and relayer with 5 MON each.
+  - `scripts/testnet-stack.mjs`: https://test.everpiece.xyz now runs on **Monad testnet**, with persistent keys and `/data` databases (no more resets), a TestDollar faucet (minter key, cooldowns), and real Twilio SMS plus Resend email (simulated refused). Compose `STACK_SCRIPT` switches between fork and testnet.
+  - Indexer: chain from `ENVIO_CHAIN_ID`, RPC window capped at 90 blocks. It initially indexed nothing because of the 100-block limit; fixed.
+- **Tests run on testnet (real transactions):** Playwright history **1/1** (45 s) and username **1/1**; flow and email skip (live providers).
+  - Indexer `activeLiability` = on-chain `totalActiveLiability` = 4,000,000 at finalized.
+- **Open:**
+  - The Unlink dashboard fails to load ("Couldn't load this page" at `/orgs/everpiece/projects`, on PC and phone). Private mode is blocked on getting an API key and appId.
+  - The relayer, approver and minter keys sit in the host `.env` (fine for testnet; KMS before mainnet).
+  - Verify the contracts on the explorer (Sourcify) so their source is public.
+
+---
+
 ## Session 13 — 2026-10-02 — Payment history from the indexer
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).

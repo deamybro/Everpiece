@@ -422,6 +422,12 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - The official testnet token list (monad-crypto/token-list `tokenlist-testnet.json`) has 4 tokens; the only dollar token is **USDC** `0x534b2f3A21130d7a60830c2Df862319e593943A3` (6 decimals).
   - **EverpieceEscrow is AUSD-specific.** It calls `AUSD.isReceiveWithAuthorizationUpgraded()` before funding and fails closed. A token without that function (e.g. USDC) makes every `createPayment` revert.
   - TODO(VERIFY): whether testnet USDC implements EIP-3009 `receiveWithAuthorization` (Circle FiatToken).
+  - **The public testnet RPC limits `eth_getLogs` to 100 blocks** ("eth_getLogs is limited to a 100 range", seen live 2026-10-02). The indexer caps its window at 90 blocks.
+  - **Everpiece testnet deployment (2026-10-02)**, both finalized; read back at finalized: token, owner, approver, minter, decimals, flag:
+    - TestDollar `0xd073fD9a4361a18aa41f599d8A6ea96033376667` (block 67538098, tx `0x2ca90a43…3f2c`);
+    - EverpieceEscrow `0x94A25e4cE211D94709915100bd6E8CbC4477BFD5` (block 67538102, tx `0xc60211e9…f63b`).
+    - Owner `0x61Acc84c…701a`, approver `0x8e87D298…593c`, relayer `0x181b4Ff1…a467`, deployer/minter `0xc90551F8…8eAe`.
+    - Explorer: https://testnet.monadscan.com/address/0x94A25e4cE211D94709915100bd6E8CbC4477BFD5
 - **Official source:** https://docs.monad.xyz/developer-essentials/testnets ; https://github.com/monad-crypto/token-list ; live `eth_chainId` / `eth_getCode`
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
