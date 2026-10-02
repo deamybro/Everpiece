@@ -450,10 +450,26 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - Transfer status: `confirmed | processed | failed`; "prefer processed" before spending.
   - Test tokens come from `requestTestTokens()` / `requestPrivateTokens()`, "hosted mock token" addresses shown in the Unlink dashboard.
   - **Not documented:** escrow, cancel, expiry or conditional release of a private transfer; per-chain pool addresses; supported-token list; audit status. Treat private transfers as final until proven otherwise.
-- **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy ; https://docs.unlink.xyz/ (supported-chains, how-unlink-works, accounts-and-keys, transfer, faucet)
+- **Official source:** https://docs.unlink.xyz/ (supported-chains, how-unlink-works, accounts-and-keys, transfer, faucet); https://blog.monad.xyz/blog/privacy-comes-to-monad-with-unlink
+- **Correction (2026-10-02):** the raw https://docs.monad.xyz/tooling-and-infra/privacy.md lists **only TACEO Merces** (§4.11), not Unlink. An earlier summarised fetch was wrong about that. Unlink's Monad support rests on Unlink's own docs and Monad's blog.
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
 - **Notes:** TODO(VERIFY): the dashboard/appId requirement, whether arbitrary ERC-20s (an Everpiece test dollar) can be deposited, Mera EOA `personal_sign` compatibility, and audit status. Master §28.2 gate items 6–13 must be proven on testnet before launch.
+
+### 4.11 TACEO Merces (private ERC-20 balances) on Monad
+- **Fact:** The privacy provider on Monad's official privacy page
+- **Value:**
+  - Wraps existing ERC-20s into private balances. Balances and identifiers are secret-shared across independent MPC nodes (the TACEO Network), and every state change is verified on-chain by a collaborative ZK proof (coSNARK).
+  - SDK `@taceo/merces-client` (with CLI `taceo-merces-client --chain monad`).
+  - **Mainnet:** "Supported (limited access)": **USDC only** (`0x754704Bc059F8C67012fEd69BC8A327a5aafb603`); Merces `0x9Dd5DE40592AdfcDD60F0f3fF3B014553998f7c1`; ID Registry `0xF55DFe8242ec117F44Acd932adb5C233b582A04a`.
+    - A **compliance attestation is required** for registration, deposit and withdraw.
+    - ANON group: Fee=0, **Max 1 USDC per tx**, 35 txs per epoch, **max 100 members**.
+  - **Testnet:** "Supported (demo)": a cross-chain OFT demo via LayerZero with **its own test token** `0xb1ed36367611392c04d14f80812d86749dc02d9c`; Merces `0x654d4c73473e060a1de5888fab34bcb41af073cf`; ID Registry `0x3cae9f1934b9079212531673cafc070a2e44bdc8`; access "Via OFT SDK".
+  - **Not stated:** support for arbitrary ERC-20s (e.g. TestDollar), transfer finality, cancel or escrow, browser key management.
+  - Trust model: privacy relies on the MPC nodes not colluding.
+- **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy.md ; https://docs.taceo.io/docs/start-here/deployments-and-status/ ; https://docs.taceo.io/docs/finance-solutions/overview/
+- **Date checked:** 2026-10-02
+- **Checked by:** Everpiece team
 
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
