@@ -139,6 +139,10 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
             <div className="muted small">Free to claim</div>
           </div>
           <MessageCard message={message} />
+          <p className="muted">
+            Everpiece is holding this money safely for you. To receive it, create a free account (it takes a minute), then confirm
+            it&apos;s you with a code we send to your phone or email.
+          </p>
           <Welcome onReady={(a) => { setAccount(a); setPhase("request"); }} title="Create your account to receive it." />
         </div>
       )}

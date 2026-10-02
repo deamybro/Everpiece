@@ -61,7 +61,7 @@ input.code { font-size: 1.8rem; letter-spacing: 0.35em; text-align: center; font
 .list { list-style: none; padding: 0; margin: 0; }
 .list li { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .list li:last-child { border-bottom: 0; }
-.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: #ece8fd; color: var(--brand); }
+.pill { display: inline-block; white-space: nowrap; padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: #ece8fd; color: var(--brand); }
 .pill.ok { background: #e6f4ee; color: var(--ok); }
 .pill.muted { background: #efeef3; color: var(--muted); }
 

@@ -233,7 +233,6 @@ export default function Home() {
               <div>
                 <strong>{r.direction === "received" ? "+" : ""}{formatDollars(r.amount)}</strong>{" "}
                 <span className="muted">{r.direction === "received" ? "from" : "to"} {r.counterparty}</span>
-                <p className="muted small explain">{explain(r)}</p>
                 <div className="muted small">
                   {when(r.at)}
                   {r.tx && <> · <a href={`${config.explorerUrl}/tx/${r.tx}`} target="_blank" rel="noopener noreferrer">See it on Monad</a></>}
@@ -241,6 +240,7 @@ export default function Home() {
               </div>
               <StatusPill item={r} />
             </div>
+            <p className="muted small explain">{explain(r)}</p>
             {r.direction === "sent" && r.state === "protected" && r.delivery && !r.delivery.delivered && (
               <p className="muted small">Your money is protected. We&apos;re still letting {r.counterparty} know; this retries automatically.</p>
             )}

@@ -5,6 +5,7 @@ import { createAccount, friendlyPasskeyError, signIn, type Account } from "../li
 import { HowItWorks } from "./HowItWorks";
 
 /** Onboarding: a passkey ("Fingerprint") is the account. No seed phrase, no MON, no wallet app. */
+/** With a 	itle it is embedded in another page (the claim page): no brand, no sender-oriented hints. */
 export function Welcome({ onReady, title }: { onReady: (a: Account) => void; title?: string }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,7 @@ export function Welcome({ onReady, title }: { onReady: (a: Account) => void; tit
 
   return (
     <div className="stack">
-      <div className="brand">Everpiece</div>
+      {!title && <div className="brand">Everpiece</div>}
       <h1>{title ?? "Send money to the right person."}</h1>
       <p className="muted">
         Your account opens with your phone&apos;s fingerprint, face or screen lock. No password to remember, no app to install.
@@ -34,7 +35,7 @@ export function Welcome({ onReady, title }: { onReady: (a: Account) => void; tit
         <div>
           <label htmlFor="name">Your first name</label>
           <input id="name" autoComplete="given-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Stella" aria-describedby="name-hint" />
-          <div id="name-hint" className="muted small">So people know who the money is from.</div>
+          {!title && <div id="name-hint" className="muted small">So people know who the money is from.</div>}
         </div>
         <button disabled={busy || name.trim().length === 0} onClick={() => run(() => createAccount(name.trim()))}>
           Create my account with fingerprint or screen lock
