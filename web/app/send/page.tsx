@@ -7,6 +7,7 @@ import { Welcome } from "../../components/Welcome";
 import { Progress, progressText } from "../../components/status";
 import { MessageComposer, type Draft } from "../../components/MessageComposer";
 import { messagesAvailable, seconds } from "../../lib/message";
+import { StepHint, day } from "../../components/HowItWorks";
 import { dollarsOf, formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
 import { claimLink } from "../../lib/link";
@@ -123,6 +124,7 @@ export default function Send() {
 
       {step === "amount" && (
         <div className="stack">
+          <StepHint step={1} of={3} />
           <h1>How much?</h1>
           <input className="big" inputMode="decimal" placeholder="$0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount in Dollars" />
           {balance !== null && <p className="muted center">You have {formatDollars(balance)}</p>}
@@ -136,6 +138,7 @@ export default function Send() {
 
       {step === "who" && (
         <div className="stack">
+          <StepHint step={2} of={3} />
           <h1>Who is it for?</h1>
           <div className="row" role="group" aria-label="Send to">
             <button className={method === "phone" ? "" : "secondary"} aria-pressed={method === "phone"} onClick={() => setMethod("phone")}>Phone</button>
@@ -144,7 +147,10 @@ export default function Send() {
           </div>
           {method === "email" && (
             <>
-              <p className="muted">We&apos;ll email them a code so only they can claim it. You&apos;ll share the link with them yourself, but not by email.</p>
+              <p className="muted">
+                You&apos;ll get a link to send them (by WhatsApp or text, <strong>not</strong> by email). We&apos;ll email them a code. They
+                need both to claim it, so it can&apos;t end up with the wrong person.
+              </p>
               <div>
                 <label htmlFor="email">Their email address</label>
                 <input
@@ -158,7 +164,10 @@ export default function Send() {
           )}
           {method === "phone" && (
             <>
-              <p className="muted">We&apos;ll text them a code so only they can claim it. You&apos;ll share the link with them yourself.</p>
+              <p className="muted">
+                You&apos;ll get a link to send them (by WhatsApp or text). We&apos;ll text them a code. They need both to claim it, so it
+                can&apos;t end up with the wrong person, even if the link is forwarded.
+              </p>
               <div>
                 <label htmlFor="phone">Their phone number (with country code)</label>
                 <input id="phone" type="tel" autoComplete="off" placeholder="+234 800 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -169,7 +178,7 @@ export default function Send() {
           )}
           {method === "username" && (
             <>
-              <p className="muted">For people who already have Everpiece. Only their account can claim it — no link or code needed.</p>
+              <p className="muted">For people who already use Everpiece. It goes straight to their account: no link, no code. Only they can claim it.</p>
               <div>
                 <label htmlFor="to-username">Their Everpiece username</label>
                 <input
@@ -204,7 +213,8 @@ export default function Send() {
 
       {(step === "review" || step === "sending") && amount !== null && (
         <div className="stack">
-          <h1>Review</h1>
+          <StepHint step={3} of={3} />
+          <h1>Check and send</h1>
           <div className="card review">
             <dl>
               <dt>You send</dt>
@@ -218,7 +228,7 @@ export default function Send() {
               <dt>Recipient</dt>
               <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : method === "email" ? email : cleanPhone}</dd>
               <dt>Expires</dt>
-              <dd>in 30 days</dd>
+              <dd>in 30 days ({day(Math.floor(Date.now() / 1000) + 30 * 86_400)})</dd>
               {withMessage && (
                 <>
                   <dt>Message</dt>
@@ -236,11 +246,21 @@ export default function Send() {
           {method === "username" && found && messagesAvailable() && !found.recipient.messageKey && (
             <p className="muted small">@{found.recipient.username} hasn&apos;t turned on voice messages yet, so this payment can&apos;t carry one.</p>
           )}
-          <p className="muted small">
-            {method === "username" && found ? `Only @${found.recipient.username}'s account can claim it. ` : ""}
-            Your money stays protected until they claim it. You can cancel any time before they do. If they never claim it,
-            the money comes back to you after 30 days. Free to claim.
-          </p>
+          <div className="card stack" aria-label="What happens next">
+            <strong>What happens next</strong>
+            <ol className="steps">
+              <li>The money leaves your balance and is held safely. It isn&apos;t theirs yet.</li>
+              {method === "username" && found ? (
+                <li>@{found.recipient.username} sees it on their Everpiece Home and claims it with their fingerprint or screen lock. Only their account can.</li>
+              ) : (
+                <>
+                  <li>You send them the link we give you on the next screen.</li>
+                  <li>They open it and enter the code we {method === "email" ? "email" : "text"} them. Then it&apos;s theirs. Free to claim.</li>
+                </>
+              )}
+              <li>Until they claim it, you can cancel from Home and get every cent back. If it isn&apos;t claimed in 30 days, it comes back by itself.</li>
+            </ol>
+          </div>
           <Progress text={progress} />
           {error && <div className="status bad">{error}</div>}
           <button disabled={step === "sending"} onClick={send}>Confirm with fingerprint or screen lock</button>
@@ -277,20 +297,19 @@ export default function Send() {
         <div className="stack">
           <div className="status ok">Payment protected ✓</div>
           <h1>Now send them the link</h1>
-          {method === "email" ? (
-            <>
-              <p className="muted">
-                Send this link only to them. They&apos;ll also get a code by email at {email} — you won&apos;t see it.
-              </p>
-              <div className="status warn">
-                Don&apos;t email this link. Send it by WhatsApp, text or in person. The link and the code must travel separately,
-                so someone who gets into their inbox can&apos;t claim the money.
-              </div>
-            </>
-          ) : (
-            <p className="muted">
-              Send this link only to them. They&apos;ll also get a code by text to {cleanPhone} — you won&apos;t see it.
-            </p>
+          <ol className="steps" aria-label="How they get it">
+            <li><strong>Send them this link</strong> with one of the buttons below. Only to them.</li>
+            <li>
+              When they open it, we {method === "email" ? <>email a code to {email}</> : <>text a code to {cleanPhone}</>}. You won&apos;t
+              see the code.
+            </li>
+            <li>They enter the code and the money is theirs. Until then, you can still cancel from Home.</li>
+          </ol>
+          {method === "email" && (
+            <div className="status warn">
+              Don&apos;t email this link. Send it by WhatsApp, text or in person. The link and the code must travel separately,
+              so someone who gets into their inbox can&apos;t claim the money.
+            </div>
           )}
           <a className="button" href={waHref} target="_blank" rel="noopener noreferrer">Send on WhatsApp</a>
           {typeof navigator !== "undefined" && "share" in navigator && (

@@ -7,6 +7,7 @@ import { NO_METADATA, PaymentMode, PaymentStatus } from "@everpiece/shared";
 import { Welcome } from "../components/Welcome";
 import { UsernameSetup } from "../components/UsernameSetup";
 import { MessageCard } from "../components/MessageCard";
+import { HowItWorks, day } from "../components/HowItWorks";
 import { Progress, progressText } from "../components/status";
 import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
@@ -194,6 +195,7 @@ export default function Home() {
       {incoming.length > 0 && (
         <>
           <h2>Money for you</h2>
+          <p className="muted small">Sent to your @username. Claim it to move it into your balance. It&apos;s free.</p>
           <ul className="list">
             {incoming.map((i) => (
               <li key={i.paymentId} className="stack">
@@ -218,7 +220,12 @@ export default function Home() {
       {historySource === "device" && config.indexerUrl && (
         <p className="muted small">Payment history is temporarily unavailable. Showing payments sent from this device.</p>
       )}
-      {historySource !== null && history.length === 0 && <p className="muted">Payments you send and receive will show here.</p>}
+      {historySource !== null && history.length === 0 && (
+        <>
+          <p className="muted">Payments you send and receive will show here.</p>
+          <HowItWorks />
+        </>
+      )}
       <ul className="list" aria-label="Activity">
         {history.map((r) => (
           <li key={`${r.direction}-${r.paymentId}`} className="stack" data-payment-id={r.paymentId}>
@@ -226,6 +233,7 @@ export default function Home() {
               <div>
                 <strong>{r.direction === "received" ? "+" : ""}{formatDollars(r.amount)}</strong>{" "}
                 <span className="muted">{r.direction === "received" ? "from" : "to"} {r.counterparty}</span>
+                <p className="muted small explain">{explain(r)}</p>
                 <div className="muted small">
                   {when(r.at)}
                   {r.tx && <> · <a href={`${config.explorerUrl}/tx/${r.tx}`} target="_blank" rel="noopener noreferrer">See it on Monad</a></>}
@@ -248,6 +256,23 @@ export default function Home() {
       <p className="muted small center"><Link href="/proof">Everpiece in numbers</Link></p>
     </div>
   );
+}
+
+/** One plain sentence: where the money is now and what happens next. (Avoids the status words used in the pills.) */
+function explain(r: HistoryItem): string {
+  if (r.direction === "received") return "It's in your balance.";
+  switch (r.state) {
+    case "claimed":
+      return `It's in their account now.`;
+    case "cancelled":
+      return "You stopped this payment. The money is back in your balance.";
+    case "refunded":
+      return "Nobody took it in time, so it came back to your balance.";
+    case "expired":
+      return "Nobody took it in time. Tap below to get it back now.";
+    default:
+      return `Protected until they take it. You can cancel until then. If it isn't taken by ${day(r.expiresAt)}, it comes back to you.`;
+  }
 }
 
 const when = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });

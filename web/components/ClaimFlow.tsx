@@ -14,6 +14,8 @@ import { claimWithCode, FlowError, requestCode } from "../lib/flows";
 import { loadAccount, type Account } from "../lib/mera";
 import { bindMessage, loadMessage, type IncomingMessage } from "../lib/message";
 import { MessageCard } from "./MessageCard";
+import { StepHint } from "./HowItWorks";
+import { usernameOf } from "../lib/username";
 import { messageLocator, messageSalt } from "@everpiece/shared";
 
 type Phase = "loading" | "incomplete" | "unavailable" | "account" | "request" | "code" | "claiming" | "done";
@@ -32,6 +34,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
   const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<IncomingMessage>({ status: "none" });
+  const [from, setFrom] = useState<string | null>(null);
 
   useEffect(() => {
     // Fragment hygiene (master §2.5): parse, validate version, copy to memory, then remove it from the URL/history.
@@ -44,6 +47,8 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
     (async () => {
       const [p, now] = await Promise.all([paymentOf(paymentId), chainTime()]);
       setPayment(p);
+      // Who it's from, if the sender has a (self-signed) @username. The sender's account is public on-chain anyway.
+      usernameOf(p.sender).then((n) => setFrom(n ? `@${n}` : null)).catch(() => {});
       // The sender's message, checked against this payment's on-chain commitment. Loads on its own: it never blocks money.
       const root = pkg.current!.voiceRootSecret;
       if (p.metadataCommitment !== NO_METADATA) {
@@ -129,7 +134,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
       {phase === "account" && (
         <div className="stack">
           <div className="card center">
-            <div className="muted">Someone sent you</div>
+            <div className="muted">{from ? `${from} sent you` : "Someone sent you"}</div>
             <div className="amount">{amount}</div>
             <div className="muted small">Free to claim</div>
           </div>
@@ -141,7 +146,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
       {(phase === "request" || phase === "code" || phase === "claiming") && (
         <div className="stack">
           <div className="card center">
-            <div className="muted">You&apos;ve been sent</div>
+            <div className="muted">{from ? `${from} sent you` : <>You&apos;ve been sent</>}</div>
             <div className="amount">{amount}</div>
             <div className="muted small">Free to claim</div>
           </div>
@@ -149,13 +154,18 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
 
           {phase === "request" && (
             <>
-              <p className="muted">To make sure it&apos;s really you, we&apos;ll send a code to the phone number or email the sender entered.</p>
+              <StepHint step={1} of={2} />
+              <p className="muted">
+                To make sure the money reaches the right person, we&apos;ll send a code to the phone number or email the sender entered.
+                Then you enter it here, and the money moves into your account.
+              </p>
               <button disabled={busy} onClick={sendCode}>Send me the code</button>
             </>
           )}
 
           {(phase === "code" || phase === "claiming") && (
             <>
+              <StepHint step={2} of={2} />
               <p className="muted">
                 {channel === "email"
                   ? <>We emailed a 6-digit code to {masked}. Check your spam folder too. </>
