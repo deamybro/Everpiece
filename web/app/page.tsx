@@ -13,6 +13,7 @@ import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
 import { cancelPayment, claimUsernamePayment, deliver, retryMessageBinds, returnExpired, FlowError } from "../lib/flows";
 import { loadHistory, type HistoryItem, type HistoryState } from "../lib/history";
+import { receiptPath } from "../lib/receipt";
 import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
 import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
 import { friendlyError, type RelayStatus } from "../lib/api";
@@ -246,6 +247,7 @@ export default function Home() {
                 <div className="muted small">
                   {when(r.at)}
                   {r.tx && <> · <a href={`${config.explorerUrl}/tx/${r.tx}`} target="_blank" rel="noopener noreferrer">See it on Monad</a></>}
+                  {" · "}<Link href={receiptPath(r.paymentId)}>Receipt</Link>
                 </div>
               </div>
               <StatusPill item={r} />

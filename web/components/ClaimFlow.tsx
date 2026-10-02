@@ -16,6 +16,7 @@ import { bindMessage, loadMessage, type IncomingMessage } from "../lib/message";
 import { MessageCard } from "./MessageCard";
 import { StepHint } from "./HowItWorks";
 import { usernameOf } from "../lib/username";
+import { receiptPath } from "../lib/receipt";
 import { messageLocator, messageSalt } from "@everpiece/shared";
 
 type Phase = "loading" | "incomplete" | "unavailable" | "account" | "request" | "code" | "claiming" | "done";
@@ -203,6 +204,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
             <div className="row"><span>Own a Piece</span><span className="pill muted">Coming soon</span></div>
           </div>
           <Link className="button" href="/">Go to my Everpiece</Link>
+          <Link className="button ghost" href={receiptPath(paymentId)}>View receipt</Link>
         </div>
       )}
     </div>

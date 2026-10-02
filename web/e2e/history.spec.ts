@@ -135,4 +135,30 @@ test("history comes from the indexer: sent + received, refresh, new device, sign
   await expect(numbers).toContainText("Median time to claim");
   await expect(stella.getByRole("list", { name: "Latest transactions" }).getByRole("link", { name: "See it on Monad" }).first())
     .toHaveAttribute("href", /\/tx\/0x[0-9a-f]{64}$/);
+
+  // 7. receipts: rebuilt from the chain + indexer, each step with its transaction; nothing private before a claim
+  await stella.goto("/");
+  await row(stella, "$6.00").getByRole("link", { name: "Receipt" }).click();
+  await expect(stella.getByLabel("Receipt status")).toContainText(`Claimed by @${M}`);
+  const details = stella.getByLabel("Receipt details");
+  await expect(details).toContainText(`@${S}`);
+  await expect(details).toContainText(`@${M}`);
+  await expect(details).toContainText("$0.00 (paid by Everpiece)");
+  const timeline = stella.getByRole("list", { name: "Timeline" });
+  await expect(timeline.getByRole("listitem")).toHaveCount(2);
+  await expect(timeline).toContainText("Sent and protected");
+  await expect(timeline).toContainText("Claimed by the recipient");
+  for (const a of await timeline.getByRole("link", { name: "Proof on Monad" }).all()) await expect(a).toHaveAttribute("href", /\/tx\/0x[0-9a-f]{64}$/);
+  await expect(stella.getByRole("button", { name: "Save as PDF / Print" })).toBeVisible();
+
+  await stella.goto("/");
+  await row(stella, "$4.00").getByRole("link", { name: "Receipt" }).click();
+  await expect(stella.getByLabel("Receipt status")).toContainText("Cancelled");
+  await expect(stella.getByRole("list", { name: "Timeline" })).toContainText("Cancelled, money returned to the sender");
+
+  // the recipient's receipt for the same $6 payment, in her own browser
+  await mama.goto("/");
+  await row(mama, "+$6.00").getByRole("link", { name: "Receipt" }).click();
+  await expect(mama.getByLabel("Receipt status")).toContainText(`Claimed by @${M}`);
+  await expect(mama.getByLabel("Receipt details")).toContainText(`@${S}`);
 });

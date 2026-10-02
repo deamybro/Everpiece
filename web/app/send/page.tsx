@@ -8,6 +8,8 @@ import { Progress, progressText } from "../../components/status";
 import { MessageComposer, type Draft } from "../../components/MessageComposer";
 import { messagesAvailable, seconds } from "../../lib/message";
 import { StepHint, day } from "../../components/HowItWorks";
+import { receiptPath } from "../../lib/receipt";
+import type { Hex } from "viem";
 import { dollarsOf, formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
 import { claimLink } from "../../lib/link";
@@ -38,6 +40,7 @@ export default function Send() {
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
   const [draft, setDraft] = useState<Draft>({ note: "", voice: null });
+  const [sentId, setSentId] = useState<Hex | null>(null);
 
   useEffect(() => {
     const a = loadAccount();
@@ -84,6 +87,7 @@ export default function Send() {
       try {
         const r = await sendToUsername(account, amount, found.recipient, (s) => setProgress(progressText(s, "Sending")), message);
         setDelivered(r.delivered);
+        setSentId(r.paymentId);
         setStep("done");
       } catch (e) {
         setError(e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e));
@@ -97,6 +101,7 @@ export default function Send() {
       const to = method === "email" && email ? { channel: "email" as const, email } : { channel: "sms" as const, phone: cleanPhone };
       const { paymentId, pkg } = await sendByLink(account, amount, to, (s) => setProgress(progressText(s, "Protecting your payment")), message);
       setLink(claimLink(paymentId, pkg));
+      setSentId(paymentId);
       setStep("done");
     } catch (e) {
       if (e instanceof FlowError && e.code.startsWith("InviteFailedAfterPayment")) {
@@ -290,6 +295,7 @@ export default function Send() {
             <p className="muted small">We&apos;re still letting them know. Your money is protected and this retries automatically from Home.</p>
           )}
           <Link className="button" href="/">Done</Link>
+          {sentId && <Link className="button ghost" href={receiptPath(sentId)}>View receipt</Link>}
         </div>
       )}
 
@@ -324,6 +330,7 @@ export default function Send() {
             {copied ? "Link copied ✓" : "Copy link"}
           </button>
           <p className="muted small">This link is shown only once. If you lose it, cancel the payment from Home and send again.</p>
+          {sentId && <Link className="button secondary" href={receiptPath(sentId)}>View receipt</Link>}
           <Link className="button ghost" href="/">Done</Link>
         </div>
       )}
