@@ -4,6 +4,26 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 19 — 2026-10-02 — Payment receipts
+
+- **Owner:** "payment receipts is important". Also confirmed a real-phone voice note works (Android; 20.8 KB note stored and bound at 17:03 UTC).
+- **Built (`0e6e852`):** `/r/<paymentId>` receipt.
+  - Contents: amount; Everpiece fee $0; network fee $0 (paid by Everpiece); from/to; how it was sent; expiry.
+    - The recipient stays private until a claim. The sender's typed label shows only on the sender's own device.
+  - Timeline: each step links its transaction on the explorer. Built from the indexer plus `getPayment` (the chain wins; it refreshes while the indexer catches up).
+  - Save as PDF / Print (print CSS) and Share.
+  - Linked from every Activity row and the send/claim done screens.
+- **Tests run on testnet:** history 1/1, now including receipts (claimed and cancelled, both sides); message 2/2.
+  - `username.spec` was blocked by the directory's anti-squatting caps (60/min, then 30 new usernames per IP per day) after today's many runs from one IP. Not a product failure; the same @username flow passed inside `message.spec`.
+- **Open (owner decisions):**
+  - take over `contracts/test/adversarial/` (AGENTS.md reserves it for Codex);
+  - mainnet GO and funding;
+  - the exact deadline from the dashboard;
+  - Private mode after 6 Oct;
+  - the submission package.
+
+---
+
 ## Session 18 — 2026-10-02 — Message binding + clearer UI
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
