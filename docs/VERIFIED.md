@@ -450,7 +450,7 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - Transfer status: `confirmed | processed | failed`; "prefer processed" before spending.
   - Test tokens come from `requestTestTokens()` / `requestPrivateTokens()`, "hosted mock token" addresses shown in the Unlink dashboard.
   - **Not documented:** escrow, cancel, expiry or conditional release of a private transfer; per-chain pool addresses; supported-token list; audit status. Treat private transfers as final until proven otherwise.
-- **Official source:** https://docs.unlink.xyz/ (supported-chains, how-unlink-works, accounts-and-keys, transfer, faucet); https://blog.monad.xyz/blog/privacy-comes-to-monad-with-unlink
+- **Official source:** https://docs.unlink.xyz/ (supported-chains, how-unlink-works, accounts-and-keys, transfer, faucet); https://monad.xyz/blog/privacy-comes-to-monad-with-unlink (Monad blog, published 2026-06-25: "Unlink … is now live on Monad"; the contract "verifies each operation without learning the sender, the recipient, or the amount of a private transfer")
 - **Correction (2026-10-02):** the raw https://docs.monad.xyz/tooling-and-infra/privacy.md lists **only TACEO Merces** (§4.11), not Unlink. An earlier summarised fetch was wrong about that. Unlink's Monad support rests on Unlink's own docs and Monad's blog.
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
@@ -477,6 +477,19 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
     - The only Monad preset (`--chain monad`) is **mainnet** (USDC, compliance URL, query nodes `query.node{0,1,2}.usdc.monad.merces.taceo.network`). **Testnet query-node URLs are not published** in the SDK or README.
   - TODO(VERIFY): testnet node URLs, how to obtain the testnet token, and whether the Merces contract accepts relayed submissions — ask TACEO.
 - **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy.md ; https://docs.taceo.io/docs/start-here/deployments-and-status/ ; https://docs.taceo.io/docs/finance-solutions/overview/
+- **Date checked:** 2026-10-02
+- **Checked by:** Everpiece team
+- **Also (TACEO launch post, 2026-09-24, https://core.taceo.io/articles/merces-mainnet/):** live on **Monad and World Chain mainnet**. Testnets listed are Arc, Base, Ethereum, Plasma and Stable; **Monad testnet is not listed** there. Tapa is TACEO's internal payments app on Monad mainnet. No relayer or gas sponsorship is mentioned. Builders contact TACEO for integration.
+
+### 4.12 Monad privacy landscape (re-checked 2026-10-02)
+- **Fact:** Which private-payment routes Monad itself points to
+- **Value:**
+  - **Monad docs privacy page:** still lists **only TACEO Merces** (§4.11; re-fetched raw .md 2026-10-02).
+  - **Monad blog:** one privacy post, **Unlink** (§4.10, 2026-06-25).
+  - **Upcoming, unconfirmed:** Monad's official X teased "Privacy is coming" / "An open network doesn't require open books", with a reveal on **2026-10-06** at the Monad Foundation's "Open" summit in Singapore. Press reports say the technology comes from **Category Labs** (formerly Monad Labs). **No technical spec, scope or timeline has been published.** TODO(VERIFY) on 2026-10-06 from Monad's official channels; do not design against it before then.
+  - **Not found on Monad** in official sources: Railgun, Hinkal, Privacy Pools, Aztec, Zama/FHE. Aztec is its own L2; Zama needs an FHE coprocessor.
+  - **Self-built option:** ERC-5564 stealth addresses + ERC-6538 registry are a final Ethereum standard. They hide **who is the recipient** (a one-time address), not the amount or the sender. They need no third party and work on any EVM chain, including Monad testnet.
+- **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy.md ; https://monad.xyz/blog/privacy-comes-to-monad-with-unlink ; https://ercs.ethereum.org/ERCS/erc-5564 ; press: https://www.kucoin.com/news/flash/monad-announces-privacy-update-for-october-6-mon-token-surges-18
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
 
