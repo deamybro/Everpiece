@@ -28,6 +28,13 @@ async function latestSimulatedCode(page: Page): Promise<string> {
 
 const CLAIMS = process.env.E2E_CLAIMS_URL ?? "http://127.0.0.1:8788";
 
+
+// Close every browser this test opened: open pages keep polling Home (directory/indexer) and would eat the next
+// test's per-IP rate limits, since all test traffic comes from one IP.
+test.afterEach(async ({ browser }) => {
+  for (const c of browser.contexts()) await c.close();
+});
+
 test("send by link with an EMAIL code → recipient gets the code by email → claims", async ({ browser, request }) => {
   // With a live email provider the code lands in a real inbox this test can't read: check it by hand instead.
   const health = await (await request.get(`${CLAIMS}/healthz`)).json();

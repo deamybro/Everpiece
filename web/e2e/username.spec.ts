@@ -36,6 +36,13 @@ async function toUsername(page: Page, amount: string, username: string) {
   await page.getByRole("button", { name: "Find" }).click();
 }
 
+
+// Close every browser this test opened: open pages keep polling Home (directory/indexer) and would eat the next
+// test's per-IP rate limits, since all test traffic comes from one IP.
+test.afterEach(async ({ browser }) => {
+  for (const c of browser.contexts()) await c.close();
+});
+
 test("send to @username → recipient claims from Home; pinned recipient; changed recipient blocked", async ({ browser }) => {
   const stella = await withPasskeys(await browser.newContext());
   const mama = await withPasskeys(await browser.newContext());

@@ -41,6 +41,13 @@ async function secondBrowser(browser: Browser, from: Page): Promise<Page> {
   return page;
 }
 
+
+// Close every browser this test opened: open pages keep polling Home (directory/indexer) and would eat the next
+// test's per-IP rate limits, since all test traffic comes from one IP.
+test.afterEach(async ({ browser }) => {
+  for (const c of browser.contexts()) await c.close();
+});
+
 test("history comes from the indexer: sent + received, refresh, new device, sign-out/in, second browser, cancel", async ({ browser }) => {
   const stella = await withPasskeys(await browser.newContext());
   const mama = await withPasskeys(await browser.newContext());
