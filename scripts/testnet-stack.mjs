@@ -14,7 +14,8 @@ import { MONAD_TESTNET_CHAIN_ID, TEST_DOLLAR_EIP712_NAME } from "@everpiece/shar
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const env = (n, d) => {
-  const v = process.env[n] ?? d;
+  // compose passes unset settings as empty strings: treat "" as unset so defaults apply
+  const v = process.env[n] || d;
   if (!v) throw new Error(`testnet-stack: ${n} is required`);
   return v;
 };
