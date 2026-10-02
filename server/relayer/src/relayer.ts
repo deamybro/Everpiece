@@ -1,4 +1,4 @@
-import { BaseError, ContractFunctionRevertedError, keccak256, parseEventLogs, type Hex } from "viem";
+import { BaseError, ContractFunctionRevertedError, HttpRequestError, TimeoutError, keccak256, parseEventLogs, type Hex } from "viem";
 import { everpieceEscrowAbi, PaymentStatus } from "@everpiece/shared";
 import { METHODS, type Method, type RelayerConfig } from "./config.ts";
 import { connect, readPayment, relayAbi, startupChecks, type Chain } from "./chain.ts";
@@ -231,22 +231,37 @@ export class Relayer {
     // Persist before sending so a crash can rebroadcast the exact same transaction.
     this.store.update(id, { status: "PROCESSING", tx_hash: hash, nonce, raw_tx: raw, submitted_at: this.now() });
     this.nextNonce = nonce + 1;
-    try {
-      await this.chain.client.sendRawTransaction({ serializedTransaction: raw });
-      log("info", "relayer.broadcast", { id, method: row.method, hash, nonce });
-    } catch (e) {
-      const msg = String(e);
-      if (/already known|already imported|known transaction/i.test(msg)) return;
-      if (!retried && /nonce too low|nonce.*(used|low)|replacement/i.test(msg)) {
-        await this.syncNonce();
-        this.store.update(id, { status: "SUBMITTED", tx_hash: null, nonce: null, raw_tx: null });
-        return this.broadcast(id, day, true);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.chain.client.sendRawTransaction({ serializedTransaction: raw });
+        log("info", "relayer.broadcast", { id, method: row.method, hash, nonce });
+        return;
+      } catch (e) {
+        const msg = String(e);
+        if (/already known|already imported|known transaction/i.test(msg)) return;
+        if (!retried && /nonce too low|nonce.*(used|low)|replacement/i.test(msg)) {
+          await this.syncNonce();
+          this.store.update(id, { status: "SUBMITTED", tx_hash: null, nonce: null, raw_tx: null });
+          return this.broadcast(id, day, true);
+        }
+        if (isTransientRpcError(e)) {
+          // Rate limit, 5xx, timeout or dropped connection: the node may or may not have the transaction, so it is
+          // NOT a rejection. Retry briefly; then keep the exact signed transaction PROCESSING (nonce stays consumed):
+          // the monitor rebroadcasts it and reconciles from the receipt, and alerts if it's stuck.
+          if (attempt < BROADCAST_RETRIES) {
+            await new Promise((r) => setTimeout(r, 500 * 3 ** attempt));
+            continue;
+          }
+          log("warn", "relayer.broadcast_deferred", { id, hash, nonce, err: msg.slice(0, 200) });
+          return;
+        }
+        // Definitive rejection by the node: the nonce slot was not consumed.
+        this.nextNonce = nonce;
+        this.store.releaseGas(day, BigInt(row.gas_limit));
+        this.store.update(id, { status: "FAILED", error: "BroadcastRejected", tx_hash: null, raw_tx: null, nonce: null });
+        log("error", "relayer.broadcast_rejected", { id, err: msg.slice(0, 300) });
+        return;
       }
-      // Definitive rejection: the nonce slot was not consumed.
-      this.nextNonce = nonce;
-      this.store.releaseGas(day, BigInt(row.gas_limit));
-      this.store.update(id, { status: "FAILED", error: "BroadcastRejected", tx_hash: null, raw_tx: null, nonce: null });
-      log("error", "relayer.broadcast_rejected", { id, err: msg.slice(0, 300) });
     }
   }
 
@@ -334,6 +349,21 @@ export class Relayer {
       processing: this.store.byStatus("PROCESSING").length,
     };
   }
+}
+
+const BROADCAST_RETRIES = 3; // waits 0.5 s, 1.5 s, 4.5 s
+
+/**
+ * Transport trouble, not a verdict on the transaction: HTTP 429 / 408 / 5xx, timeouts, dropped connections.
+ * (Monad's public testnet RPC rate-limits eth_sendRawTransaction with 429.) A JSON-RPC error answer from the node
+ * (invalid tx, insufficient funds, …) is a real rejection and is NOT transient.
+ */
+export function isTransientRpcError(e: unknown): boolean {
+  const transient = (x: unknown) =>
+    x instanceof TimeoutError ||
+    (x instanceof HttpRequestError && (x.status === undefined || x.status === 408 || x.status === 429 || x.status >= 500));
+  if (e instanceof BaseError) return Boolean(e.walk(transient));
+  return /fetch failed|ECONNRESET|ECONNREFUSED|socket hang up|ETIMEDOUT/i.test(String(e));
 }
 
 /** Decoded custom-error name of a simulated revert, or null when the failure was not a revert (RPC/transport). */
