@@ -19,6 +19,8 @@ export const config = {
   indexerUrl: process.env.NEXT_PUBLIC_INDEXER_URL ?? "",
   /** Local dev stack only: mints TEST Dollars on a local fork. Never set in production. */
   devFaucetUrl: process.env.NEXT_PUBLIC_DEV_FAUCET_URL ?? "",
+  /** Shown on the test-money banner, e.g. "Monad testnet"; default "Local test network" (the fork). */
+  networkLabel: process.env.NEXT_PUBLIC_NETWORK_LABEL || "Local test network",
 };
 
 export const isDevStack = config.devFaucetUrl !== "";

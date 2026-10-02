@@ -22,6 +22,9 @@ services:
       dockerfile: deploy/test-stack/Dockerfile
     image: everpiece-test-stack:local
     container_name: everpiece-test-stack
+    # STACK_SCRIPT=testnet-stack.mjs runs on Monad testnet (deployed TestDollar + escrow, persistent /data);
+    # unset = the private mainnet fork (dev-stack.mjs), which resets on every start.
+    command: ["node", "scripts/${STACK_SCRIPT:-dev-stack.mjs}"]
     mem_limit: 1000m # measured peak 753 MB (web build at start)
     memswap_limit: 1000m
     cpus: 1.0
@@ -40,8 +43,18 @@ services:
       TWILIO_API_USER: ${TWILIO_API_USER:-}
       TWILIO_API_SECRET: ${TWILIO_API_SECRET:-}
       TWILIO_VERIFY_SERVICE_SID: ${TWILIO_VERIFY_SERVICE_SID:-}
+      # Monad testnet (testnet-stack.mjs only): keys and addresses from the host .env, never from git.
+      TESTNET_RPC: ${TESTNET_RPC:-}
+      TESTNET_RELAYER_KEY: ${TESTNET_RELAYER_KEY:-}
+      TESTNET_APPROVER_KEY: ${TESTNET_APPROVER_KEY:-}
+      TESTNET_DEPLOYER_KEY: ${TESTNET_DEPLOYER_KEY:-}
+      TESTNET_PHONE_ENC_KEY: ${TESTNET_PHONE_ENC_KEY:-}
+      TESTNET_DOLLAR_ADDRESS: ${TESTNET_DOLLAR_ADDRESS:-}
+      TESTNET_ESCROW_ADDRESS: ${TESTNET_ESCROW_ADDRESS:-}
+      TESTNET_ESCROW_BLOCK: ${TESTNET_ESCROW_BLOCK:-}
     volumes:
       - stack-info:/shared
+      - stack-data:/data # persistent relayer/claims/directory databases (testnet)
     # Healthy once the web is built and serving (dev-stack writes the info file last). The indexer services wait for
     # it, so their ~0.4 GB never stacks on the web build's ~0.75 GB peak.
     healthcheck:
@@ -121,7 +134,8 @@ services:
         condition: service_started
     environment:
       STACK_INFO_FILE: /shared/stack.json
-      ENVIO_RPC_URL: http://stack:8545
+      ENVIO_RPC_URL: ${ENVIO_RPC_URL:-http://stack:8545} # testnet: a Monad testnet RPC
+      ENVIO_CHAIN_ID: ${ENVIO_CHAIN_ID:-143} # testnet: 10143
       ENVIO_PG_HOST: indexer-db
       ENVIO_PG_PORT: "5432"
       ENVIO_PG_USER: postgres
@@ -136,4 +150,5 @@ services:
 
 volumes:
   stack-info:
+  stack-data:
   indexer-db:

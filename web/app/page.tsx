@@ -132,7 +132,7 @@ export default function Home() {
 
       {isDevStack && (
         <div className="dev stack">
-          <strong>Local test network</strong>
+          <strong>{config.networkLabel}</strong>
           <span>Test Dollars only — not real money.</span>
           <button className="secondary" onClick={devFund}>Get 100 test Dollars</button>
         </div>

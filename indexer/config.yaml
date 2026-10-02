@@ -23,7 +23,7 @@ contracts:
       - event: PaymentCancelled(bytes32 indexed paymentId, address indexed sender, uint256 amount)
       - event: PaymentRefunded(bytes32 indexed paymentId, address indexed sender, uint256 amount, address caller)
 chains:
-  - id: 143
+  - id: ${ENVIO_CHAIN_ID}
     start_block: ${ENVIO_ESCROW_START_BLOCK}
     block_lag: ${ENVIO_BLOCK_LAG}
     # Production: a Monad RPC with for: fallback (HyperSync stays primary). Test stack: the fork's anvil with for: sync
