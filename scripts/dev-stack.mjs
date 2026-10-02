@@ -34,6 +34,9 @@ const PUB = BASE === null ? P : { web: BASE, anvil: BASE + 1, relayer: BASE + 2,
 const ORIGIN = process.env.STACK_PUBLIC_ORIGIN ? process.env.STACK_PUBLIC_ORIGIN.replace(/\/$/, "") : null;
 const pubUrl = (svc, port) => (ORIGIN ? `${ORIGIN}/svc/${svc}` : `http://127.0.0.1:${port}`);
 const WEB_ORIGIN = ORIGIN ?? `http://localhost:${PUB.web}`;
+// History's source of truth (deploy/test-stack indexer). Only GraphQL is exposed, read-only; empty = the web app's
+// device-only fallback (e.g. `npm run dev:stack` without an indexer).
+const INDEXER_URL = process.env.STACK_INDEXER_URL ?? (ORIGIN ? `${ORIGIN}/svc/indexer/v1/graphql` : BASE !== null ? `http://127.0.0.1:${BASE + 6}/v1/graphql` : "");
 const RPC = `http://127.0.0.1:${P.anvil}`;
 const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a";
 const CORE_SLOT = "0x455730fed596673e69db1907be2e521374ba893f1a04cc5f5dd931616cd6b700"; // VERIFIED §2.12
@@ -118,6 +121,7 @@ writeFileSync(
     `NEXT_PUBLIC_CLAIMS_URL=${pubUrl("claims", PUB.claims)}`,
     `NEXT_PUBLIC_DIRECTORY_URL=${pubUrl("directory", PUB.directory)}`,
     `NEXT_PUBLIC_DEV_FAUCET_URL=${pubUrl("faucet", PUB.faucet)}`,
+    `NEXT_PUBLIC_INDEXER_URL=${INDEXER_URL}`,
     "",
   ].join("\n"),
 );

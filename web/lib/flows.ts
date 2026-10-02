@@ -33,8 +33,11 @@ export class FlowError extends Error {
 }
 
 const SENT_KEY = "everpiece.sent.v1";
+/** This browser's cache of payments it sent (labels + pending delivery). History's source of truth is the indexer (lib/history.ts). */
 export type SentPayment = {
   paymentId: Hex;
+  /** Sending account; entries without it predate the field and are checked on-chain before display. */
+  sender?: Address;
   amount: string;
   to: string;
   createdAt: number;
@@ -108,7 +111,7 @@ export async function sendByLink(
 
   // The money is now protected on-chain. From here on, never let the user "try again" into a second payment.
   const contact = to.channel === "email" ? { email: to.email } : { phone: to.phone };
-  rememberSent({ paymentId, amount: amount.toString(), to: to.channel === "email" ? to.email : to.phone, createdAt: Date.now(), expiresAt: intent.expiresAt.toString() });
+  rememberSent({ paymentId, sender: account.address, amount: amount.toString(), to: to.channel === "email" ? to.email : to.phone, createdAt: Date.now(), expiresAt: intent.expiresAt.toString() });
   let lastError = "";
   for (let attempt = 0; attempt < 3; attempt++) {
     const inv = await claims("/v1/invites", { paymentId, ...contact, deadline: inviteDeadline, senderSig }).catch(() => null);
@@ -228,7 +231,7 @@ export async function sendToUsername(
   // if delivery fails, Home keeps retrying from the saved record — never offer a second send.
   pin(to);
   const sent: SentPayment = {
-    paymentId, amount: amount.toString(), to: `@${to.username}`, createdAt: Date.now(), expiresAt: intent.expiresAt.toString(),
+    paymentId, sender: account.address, amount: amount.toString(), to: `@${to.username}`, createdAt: Date.now(), expiresAt: intent.expiresAt.toString(),
     delivery: { recipient: to.account, recipientSalt, delivered: false },
   };
   rememberSent(sent);

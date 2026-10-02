@@ -9,12 +9,12 @@ import { UsernameSetup } from "../components/UsernameSetup";
 import { Progress, progressText } from "../components/status";
 import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
-import { cancelPayment, claimUsernamePayment, deliver, loadSent, returnExpired, FlowError, type SentPayment } from "../lib/flows";
+import { cancelPayment, claimUsernamePayment, deliver, returnExpired, FlowError } from "../lib/flows";
+import { loadHistory, type HistoryItem } from "../lib/history";
 import { forgetAccount, friendlyPasskeyError, loadAccount, type Account } from "../lib/mera";
 import { friendlyError, type RelayStatus } from "../lib/api";
 import { readInbox, syncUsername, usernameOf } from "../lib/username";
 
-type Row = SentPayment & { status: number; expired: boolean };
 type Incoming = { paymentId: Hex; recipientSalt: Hex; amount: bigint; from: string; expiresAt: bigint };
 
 const short = (a: Address) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -24,7 +24,8 @@ export default function Home() {
   const [account, setAccount] = useState<Account | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [balance, setBalance] = useState<bigint | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historySource, setHistorySource] = useState<"indexer" | "device" | null>(null);
   const [incoming, setIncoming] = useState<Incoming[]>([]);
   const [busyId, setBusyId] = useState<Hex | null>(null);
   const [progress, setProgress] = useState("");
@@ -40,16 +41,18 @@ export default function Home() {
   const refresh = useCallback(async (a: Account) => {
     setBalance(await dollarsOf(a.address).catch(() => null));
     const now = await chainTime().catch(() => BigInt(Math.floor(Date.now() / 1000)));
-    const sent = loadSent();
-    const withStatus = await Promise.all(
-      sent.map(async (s) => {
-        const p = await paymentOf(s.paymentId).catch(() => null);
-        return { ...s, status: p ? Number(p.status) : 0, expired: p ? now >= p.expiresAt : false };
-      }),
-    );
-    setRows(withStatus);
-    // Username payments whose inbox entry didn't reach the directory yet: keep retrying (idempotent).
-    for (const r of withStatus) if (r.status === PaymentStatus.ACTIVE && r.delivery && !r.delivery.delivered) deliver(r).catch(() => {});
+    // History from the indexer (source of truth); this browser's sent list only adds labels / not-yet-indexed sends.
+    const h = await loadHistory(a).catch(() => null);
+    if (h) {
+      setHistory(h.items);
+      setHistorySource(h.source);
+      // Username payments whose inbox entry didn't reach the directory yet: keep retrying (idempotent).
+      for (const i of h.items) {
+        if (i.direction === "sent" && i.state === "protected" && i.delivery && !i.delivery.delivered) {
+          deliver({ paymentId: i.paymentId, amount: i.amount.toString(), to: i.counterparty, createdAt: i.at * 1000, expiresAt: i.expiresAt.toString(), delivery: i.delivery }).catch(() => {});
+        }
+      }
+    }
 
     const inbox = await readInbox(a);
     const waiting = await Promise.all(
@@ -71,14 +74,14 @@ export default function Home() {
     return () => clearInterval(t);
   }, [account, refresh]);
 
-  async function onCancel(r: Row) {
+  async function onCancel(r: HistoryItem) {
     if (!account) return;
     setBusyId(r.paymentId);
     setMessage(null);
     try {
-      if (r.expired) await returnExpired(r.paymentId, (s: RelayStatus) => setProgress(progressText(s, "Returning your money")));
+      if (r.state === "expired") await returnExpired(r.paymentId, (s: RelayStatus) => setProgress(progressText(s, "Returning your money")));
       else await cancelPayment(account, r.paymentId, (s) => setProgress(progressText(s, "Returning your money")));
-      setMessage({ kind: "ok", text: `Money returned: ${formatDollars(BigInt(r.amount))}.` });
+      setMessage({ kind: "ok", text: `Money returned: ${formatDollars(r.amount)}.` });
     } catch (e) {
       setMessage({ kind: "bad", text: e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e) });
     } finally {
@@ -159,23 +162,28 @@ export default function Home() {
         </>
       )}
 
-      <h2>Sent</h2>
-      {rows.length === 0 && <p className="muted">Payments you send will show here.</p>}
-      <ul className="list">
-        {rows.map((r) => (
-          <li key={r.paymentId} className="stack">
+      <h2>Activity</h2>
+      {historySource === "device" && config.indexerUrl && (
+        <p className="muted small">Payment history is temporarily unavailable. Showing payments sent from this device.</p>
+      )}
+      {historySource !== null && history.length === 0 && <p className="muted">Payments you send and receive will show here.</p>}
+      <ul className="list" aria-label="Activity">
+        {history.map((r) => (
+          <li key={`${r.direction}-${r.paymentId}`} className="stack" data-payment-id={r.paymentId}>
             <div className="row">
               <div>
-                <strong>{formatDollars(BigInt(r.amount))}</strong> <span className="muted">to {r.to}</span>
+                <strong>{r.direction === "received" ? "+" : ""}{formatDollars(r.amount)}</strong>{" "}
+                <span className="muted">{r.direction === "received" ? "from" : "to"} {r.counterparty}</span>
+                <div className="muted small">{when(r.at)}</div>
               </div>
-              <StatusPill status={r.status} expired={r.expired} />
+              <StatusPill item={r} />
             </div>
-            {r.status === PaymentStatus.ACTIVE && r.delivery && !r.delivery.delivered && (
-              <p className="muted small">Your money is protected. We&apos;re still letting {r.to} know; this retries automatically.</p>
+            {r.direction === "sent" && r.state === "protected" && r.delivery && !r.delivery.delivered && (
+              <p className="muted small">Your money is protected. We&apos;re still letting {r.counterparty} know; this retries automatically.</p>
             )}
-            {r.status === PaymentStatus.ACTIVE && (
+            {r.direction === "sent" && (r.state === "protected" || r.state === "expired") && (
               <button className="danger" disabled={busyId !== null} onClick={() => onCancel(r)}>
-                {r.expired ? "Return my money" : "Cancel and get my money back"}
+                {r.state === "expired" ? "Return my money" : "Cancel and get my money back"}
               </button>
             )}
           </li>
@@ -185,9 +193,13 @@ export default function Home() {
   );
 }
 
-function StatusPill({ status, expired }: { status: number; expired: boolean }) {
-  if (status === PaymentStatus.CLAIMED) return <span className="pill ok">Claimed</span>;
-  if (status === PaymentStatus.CANCELLED || status === PaymentStatus.REFUNDED) return <span className="pill muted">Money returned</span>;
-  if (status === PaymentStatus.ACTIVE) return <span className="pill">{expired ? "Expired" : "Waiting to be claimed"}</span>;
-  return <span className="pill muted">Checking…</span>;
+const when = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+function StatusPill({ item }: { item: HistoryItem }) {
+  if (item.direction === "received") return <span className="pill ok">Received</span>;
+  if (item.state === "claimed") return <span className="pill ok">Claimed</span>;
+  if (item.state === "cancelled") return <span className="pill muted">Cancelled</span>;
+  if (item.state === "refunded") return <span className="pill muted">Refunded</span>;
+  if (item.state === "expired") return <span className="pill">Expired</span>;
+  return <span className="pill">Waiting to be claimed</span>;
 }
