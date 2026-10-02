@@ -4,6 +4,32 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 13 — 2026-10-02 — Payment history from the indexer
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Owner request:** history must come from the VPS indexer for the signed-in account, not browser storage. Local data may only be a cache or fallback. It must survive refresh, sign-out/sign-in and a second browser or device, and the contract and send/claim/cancel flows must not change.
+- **Owner direction:** build on **testnet first**, and **private payments are compulsory**. Not started here; it needs facts and decisions (see the next section).
+- **Completed:**
+  - `web/lib/history.ts`: sent (`sender = me`) and received (`recipient = me`, i.e. claimed by me) from Envio/Hasura GraphQL.
+    - States: protected; expired (derived, `ACTIVE && now ≥ expiresAt`); claimed; cancelled; refunded.
+    - Labels come from this browser's cache, else the claimer's or sender's **verified** @username, else the payment kind. An unclaimed recipient stays private: it is only a commitment on-chain.
+  - **The local cache is not authoritative:**
+    - it only adds labels, plus just-sent payments not yet indexed;
+    - each entry is checked on-chain to belong to the signed-in account. **Bug fixed:** the cache wasn't scoped per account, so after sign-out/sign-in another account's sends could show;
+    - when the history service is unreachable, the UI shows a labelled device-only fallback.
+  - Home's "Sent" becomes **Activity** (sent and received). Cancel and return-expired call the unchanged flows. The cache now records `sender`.
+  - `NEXT_PUBLIC_INDEXER_URL` (plus CSP); dev-stack publishes it.
+  - Caddy (Everpiece block only, with backup and validation): exposes **only** `/svc/indexer/v1/graphql`. Hasura metadata, query and console paths are 404.
+- **Tests run:** Playwright on https://test.everpiece.xyz: **history 1/1**, username 1/1.
+  - The history test covers sent and received, refresh, a wiped cache, sign-out/sign-in with the same passkey, a second browser for each account, and a cancel reflected on both. Final balance $94.
+  - `flow` and `email` skip themselves because SMS and email are live (they read simulated outboxes).
+  - Test fixes: every context is closed after each test (open pages had exhausted the next test's per-IP directory limit); the test stack's `REGISTRATIONS_PER_IP_PER_DAY` is configurable, and the host sets 30.
+- **Open:**
+  - Testnet and private payments (owner direction).
+  - The public GraphQL lets anyone read any address's history. That data is public on-chain anyway, but it's one more reason private payments matter.
+
+---
+
 ## Session 12 — 2026-09-30 — Public HTTPS test site (test.everpiece.xyz) on the shared VPS
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
