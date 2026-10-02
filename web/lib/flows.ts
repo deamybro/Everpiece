@@ -26,7 +26,7 @@ import { claims, directory, relayer, waitForRequest, type RelayStatus } from "./
 import { newClaimPackage, randomBytes32, type ClaimPackage } from "./link";
 import { withSigner, type Account } from "./mera";
 import { pin, type Recipient } from "./username";
-import { attachMessage } from "./message";
+import { attachMessage, bindMessage, bindingFor } from "./message";
 
 export class FlowError extends Error {
   readonly code: string;
@@ -48,6 +48,8 @@ export type SentPayment = {
   expiresAt: string;
   /** Username payments only: kept until the directory has the recipient's inbox entry (the salt is not a theft secret, ESCROW_SPEC §3.1). */
   delivery?: { recipient: Address; recipientSalt: Hex; delivered: boolean; messageWrap?: Hex };
+  /** An attached message the store hasn't confirmed belongs to this payment yet (retried from Home; locator + salt can't decrypt). */
+  messageBind?: { locator: Hex; metadataSalt: Hex; bound: boolean };
 };
 
 export function loadSent(): SentPayment[] {
@@ -60,6 +62,17 @@ export function loadSent(): SentPayment[] {
 function rememberSent(p: SentPayment) {
   localStorage.setItem(SENT_KEY, JSON.stringify([p, ...loadSent().filter((x) => x.paymentId !== p.paymentId)].slice(0, 50)));
 }
+function markBound(paymentId: Hex) {
+  localStorage.setItem(SENT_KEY, JSON.stringify(loadSent().map((x) => (x.paymentId === paymentId && x.messageBind ? { ...x, messageBind: { ...x.messageBind, bound: true } } : x))));
+}
+
+/** Messages whose binding didn't go through yet (e.g. offline right after sending). Called from Home; idempotent. */
+export async function retryMessageBinds(): Promise<void> {
+  for (const p of loadSent()) {
+    if (p.messageBind && !p.messageBind.bound && (await bindMessage(p.messageBind.locator, p.messageBind.metadataSalt, p.paymentId))) markBound(p.paymentId);
+  }
+}
+
 function markDelivered(paymentId: Hex) {
   localStorage.setItem(SENT_KEY, JSON.stringify(loadSent().map((x) => (x.paymentId === paymentId && x.delivery ? { ...x, delivery: { ...x.delivery, delivered: true } } : x))));
 }
@@ -127,7 +140,10 @@ export async function sendByLink(
 
   // The money is now protected on-chain. From here on, never let the user "try again" into a second payment.
   const contact = to.channel === "email" ? { email: to.email } : { phone: to.phone };
-  rememberSent({ paymentId, sender: account.address, amount: amount.toString(), to: to.channel === "email" ? to.email : to.phone, createdAt: Date.now(), expiresAt: intent.expiresAt.toString() });
+  const binding = message ? { ...bindingFor(pkg.voiceRootSecret), bound: false } : undefined;
+  rememberSent({ paymentId, sender: account.address, amount: amount.toString(), to: to.channel === "email" ? to.email : to.phone, createdAt: Date.now(), expiresAt: intent.expiresAt.toString(), messageBind: binding });
+  // In the background: it never holds up the recipient's code, and Home retries it if it doesn't go through.
+  if (binding) void bindMessage(binding.locator, binding.metadataSalt, paymentId).then((ok) => ok && markBound(paymentId));
   let lastError = "";
   for (let attempt = 0; attempt < 3; attempt++) {
     const inv = await claims("/v1/invites", { paymentId, ...contact, deadline: inviteDeadline, senderSig }).catch(() => null);
@@ -266,8 +282,10 @@ export async function sendToUsername(
   const sent: SentPayment = {
     paymentId, sender: account.address, amount: amount.toString(), to: `@${to.username}`, createdAt: Date.now(), expiresAt: intent.expiresAt.toString(),
     delivery: { recipient: to.account, recipientSalt, delivered: false, ...(messageWrap ? { messageWrap } : {}) },
+    messageBind: message ? { ...bindingFor(messageSecret), bound: false } : undefined,
   };
   rememberSent(sent);
+  if (sent.messageBind) void bindMessage(sent.messageBind.locator, sent.messageBind.metadataSalt, paymentId).then((ok) => ok && markBound(paymentId));
   for (let attempt = 0; attempt < 3; attempt++) {
     if (await deliver(sent)) return { paymentId, delivered: true };
     await new Promise((res) => setTimeout(res, 1500));

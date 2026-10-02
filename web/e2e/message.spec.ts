@@ -52,11 +52,14 @@ test("voice + note: encrypted on the sender's device, opened and verified by the
 
   // the store must receive ciphertext only: capture the upload and check it isn't the plaintext note
   const upload = stella.waitForRequest((r) => r.method() === "PUT" && /\/v1\/messages\/0x[0-9a-f]{64}$/.test(r.url()));
+  const bound = stella.waitForResponse((r) => r.request().method() === "POST" && /\/v1\/messages\/0x[0-9a-f]{64}\/bind$/.test(r.url()), { timeout: 90_000 });
   await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   const body = (await upload).postDataBuffer()!;
   expect(body[0]).toBe(1); // envelope v1
   expect(body.includes(Buffer.from("For October"))).toBe(false);
   await expect(stella.getByText("Payment protected ✓")).toBeVisible({ timeout: 60_000 });
+  // the store checked the on-chain commitment and now keeps the message for the payment's lifetime
+  expect((await bound).status()).toBe(200);
   const wa = await stella.getByRole("link", { name: "Send on WhatsApp" }).getAttribute("href");
   const shared = decodeURIComponent(wa!.split("?text=")[1]);
   expect(shared).toContain("and a message");
@@ -136,11 +139,13 @@ test("@username: the message is sealed to the recipient's own key; she hears it 
   await expect(stella.getByText(/Recording… 0:0[2-9]/)).toBeVisible({ timeout: 10_000 });
   await stella.getByRole("button", { name: "Stop recording" }).click();
   const deliver = stella.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/v1/inbox/deliver"));
+  const ubound = stella.waitForResponse((r) => r.request().method() === "POST" && /\/bind$/.test(r.url()), { timeout: 90_000 });
   await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   const delivered = JSON.parse((await deliver).postData()!);
   expect(delivered.messageWrap).toMatch(/^0x[0-9a-f]{160}$/); // 80-byte HPKE wrap, opaque to the directory
   expect(JSON.stringify(delivered)).not.toContain("Happy birthday");
   await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible({ timeout: 60_000 });
+  expect((await ubound).status()).toBe(200);
 
   await mama.reload();
   const card = mama.getByLabel("Message from the sender");

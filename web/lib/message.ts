@@ -1,5 +1,5 @@
 import type { Hex } from "viem";
-import { NO_METADATA, messageLocator, openMessage, sealMessage, unwrapMessageSecret, type Message, type SealedMessage } from "@everpiece/shared";
+import { NO_METADATA, messageLocator, messageSalt, openMessage, sealMessage, unwrapMessageSecret, type Message, type SealedMessage } from "@everpiece/shared";
 import { config } from "./config";
 
 /**
@@ -72,7 +72,11 @@ export function loadUsernameMessage(messageSeed: Hex, paymentId: Hex, messageWra
     usernameMessages.set(
       key,
       unwrapMessageSecret(messageSeed, paymentId, messageWrap).then(
-        (secret) => loadMessage(secret, messageLocator(secret), commitment),
+        async (secret) => {
+          const m = await loadMessage(secret, messageLocator(secret), commitment);
+          if (m.status === "ok") void bindMessage(messageLocator(secret), messageSalt(secret), paymentId); // the recipient binds too
+          return m;
+        },
         (): IncomingMessage => ({ status: "invalid" }),
       ).then((m) => {
         if (m.status === "unavailable") usernameMessages.delete(key); // try again on the next refresh
@@ -82,3 +86,25 @@ export function loadUsernameMessage(messageSeed: Hex, paymentId: Hex, messageWra
   }
   return usernameMessages.get(key)!;
 }
+
+/**
+ * Tell the store which payment a message belongs to; the store checks the on-chain commitment itself and then keeps
+ * the message until after the payment expires (unbound uploads are deleted after a day). The salt is HKDF'd from the
+ * message secret and can't decrypt anything. Sender and recipient both call this; it never throws.
+ */
+export async function bindMessage(locator: Hex, metadataSalt: Hex, paymentId: Hex): Promise<boolean> {
+  if (!config.voiceUrl) return false;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = await fetch(`${config.voiceUrl}/v1/messages/${locator}/bind`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ paymentId, metadataSalt }),
+    }).catch(() => null);
+    if (r?.status === 200) return true;
+    // retry: not finalized yet (422), chain/RPC trouble (503), rate limit (429), network; anything else won't change
+    if (r && ![422, 429, 503].includes(r.status)) return false;
+    await new Promise((res) => setTimeout(res, 2000));
+  }
+  return false;
+}
+export const bindingFor = (messageSecret: Hex) => ({ locator: messageLocator(messageSecret), metadataSalt: messageSalt(messageSecret) });

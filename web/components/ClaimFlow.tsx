@@ -12,9 +12,9 @@ import { friendlyError } from "../lib/api";
 import { decodePackage, type ClaimPackage } from "../lib/link";
 import { claimWithCode, FlowError, requestCode } from "../lib/flows";
 import { loadAccount, type Account } from "../lib/mera";
-import { loadMessage, type IncomingMessage } from "../lib/message";
+import { bindMessage, loadMessage, type IncomingMessage } from "../lib/message";
 import { MessageCard } from "./MessageCard";
-import { messageLocator } from "@everpiece/shared";
+import { messageLocator, messageSalt } from "@everpiece/shared";
 
 type Phase = "loading" | "incomplete" | "unavailable" | "account" | "request" | "code" | "claiming" | "done";
 
@@ -48,7 +48,11 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
       const root = pkg.current!.voiceRootSecret;
       if (p.metadataCommitment !== NO_METADATA) {
         setMessage({ status: "loading" });
-        loadMessage(root, messageLocator(root), p.metadataCommitment).then(setMessage);
+        loadMessage(root, messageLocator(root), p.metadataCommitment).then((m) => {
+          setMessage(m);
+          // The recipient confirms it to the store too, so the message stays until the payment can't be claimed.
+          if (m.status === "ok") void bindMessage(messageLocator(root), messageSalt(root), paymentId);
+        });
       }
       if (Number(p.status) !== PaymentStatus.ACTIVE || now >= p.expiresAt) {
         setPhase("unavailable");

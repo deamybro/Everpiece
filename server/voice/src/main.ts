@@ -5,6 +5,7 @@ import { log } from "./log.ts";
 
 const cfg = loadConfig();
 const svc = new VoiceService(cfg);
+await svc.start();
 svc.sweep();
 const sweeper = setInterval(() => svc.sweep(), 3_600_000);
 const server = createVoiceServer(svc);

@@ -10,7 +10,7 @@ import { MessageCard } from "../components/MessageCard";
 import { Progress, progressText } from "../components/status";
 import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
-import { cancelPayment, claimUsernamePayment, deliver, returnExpired, FlowError } from "../lib/flows";
+import { cancelPayment, claimUsernamePayment, deliver, retryMessageBinds, returnExpired, FlowError } from "../lib/flows";
 import { loadHistory, type HistoryItem } from "../lib/history";
 import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
 import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
@@ -40,6 +40,7 @@ export default function Home() {
     setAccount(a);
     setLoaded(true);
     if (a && !a.username) syncUsername(a).then(setAccount).catch(() => {});
+    if (a) retryMessageBinds().catch(() => {}); // once per visit: messages sent while offline
   }, []);
 
   const refresh = useCallback(async (a: Account) => {
