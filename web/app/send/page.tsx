@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { E164, normalizeEmail } from "@everpiece/shared";
 import { Welcome } from "../../components/Welcome";
 import { Progress, progressText } from "../../components/status";
+import { MessageComposer, type Draft } from "../../components/MessageComposer";
+import { messagesAvailable, seconds } from "../../lib/message";
 import { dollarsOf, formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
 import { claimLink } from "../../lib/link";
@@ -34,6 +36,7 @@ export default function Send() {
   const [error, setError] = useState("");
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
+  const [draft, setDraft] = useState<Draft>({ note: "", voice: null });
 
   useEffect(() => {
     const a = loadAccount();
@@ -49,6 +52,8 @@ export default function Send() {
   const phoneOk = E164.test(phone.replace(/\s+/g, ""));
   const cleanPhone = phone.replace(/\s+/g, "");
   const email = normalizeEmail(emailInput);
+  const note = draft.note.trim();
+  const withMessage = method !== "username" && messagesAvailable() && (note !== "" || draft.voice !== null);
 
   async function lookUp() {
     setLooking(true);
@@ -84,7 +89,10 @@ export default function Send() {
     }
     try {
       const to = method === "email" && email ? { channel: "email" as const, email } : { channel: "sms" as const, phone: cleanPhone };
-      const { paymentId, pkg } = await sendByLink(account, amount, to, (s) => setProgress(progressText(s, "Protecting your payment")));
+      const message = withMessage
+        ? { note, audio: draft.voice ? { bytes: draft.voice.bytes, type: draft.voice.type, durationMs: draft.voice.durationMs } : undefined }
+        : undefined;
+      const { paymentId, pkg } = await sendByLink(account, amount, to, (s) => setProgress(progressText(s, "Protecting your payment")), message);
       setLink(claimLink(paymentId, pkg));
       setStep("done");
     } catch (e) {
@@ -100,7 +108,7 @@ export default function Send() {
     }
   }
 
-  const shareText = `I sent you ${amount !== null ? formatDollars(amount) : "money"} on Everpiece. Tap to claim it (free): ${link}`;
+  const shareText = `I sent you ${amount !== null ? formatDollars(amount) : "money"}${withMessage ? " and a message" : ""} on Everpiece. Tap to claim it (free): ${link}`;
   // Email payments have no phone number: WhatsApp opens its contact picker instead.
   const waHref = `https://wa.me/${method === "phone" ? cleanPhone.replace(/^\+/, "") : ""}?text=${encodeURIComponent(shareText)}`;
 
@@ -209,8 +217,15 @@ export default function Send() {
               <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : method === "email" ? email : cleanPhone}</dd>
               <dt>Expires</dt>
               <dd>in 30 days</dd>
+              {withMessage && (
+                <>
+                  <dt>Message</dt>
+                  <dd>{[draft.voice && `Voice note ${seconds(draft.voice.durationMs)}`, note && "Written note"].filter(Boolean).join(" + ")}</dd>
+                </>
+              )}
             </dl>
           </div>
+          {method !== "username" && messagesAvailable() && <MessageComposer value={draft} onChange={setDraft} disabled={step === "sending"} />}
           <p className="muted small">
             {method === "username" && found ? `Only @${found.recipient.username}'s account can claim it. ` : ""}
             Your money stays protected until they claim it. You can cancel any time before they do. If they never claim it,

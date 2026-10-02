@@ -16,7 +16,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FORK_URL = process.env.MONAD_RPC ?? "https://rpc.monad.xyz";
-const P = { anvil: 8545, relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, web: 3000 };
+const P = { anvil: 8545, relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, web: 3000 };
 const BIND = process.env.STACK_BIND_HOST ?? "127.0.0.1";
 const WEB_PROD = process.env.STACK_WEB === "prod";
 // Container use: where to publish this run's escrow for the indexer (deploy/test-stack). Removed at start, so a stale
@@ -27,7 +27,8 @@ if (INFO_FILE) rmSync(INFO_FILE, { force: true });
 // directory, faucet), so an SSH tunnel can use the same numbers on both ends without clashing with other local
 // tunnels. Services still listen on P inside.
 const BASE = process.env.STACK_PUBLIC_PORT_BASE ? Number(process.env.STACK_PUBLIC_PORT_BASE) : null;
-const PUB = BASE === null ? P : { web: BASE, anvil: BASE + 1, relayer: BASE + 2, claims: BASE + 3, directory: BASE + 4, faucet: BASE + 5 };
+// base+6 is the indexer's GraphQL (compose); the message store is base+7.
+const PUB = BASE === null ? P : { web: BASE, anvil: BASE + 1, relayer: BASE + 2, claims: BASE + 3, directory: BASE + 4, faucet: BASE + 5, voice: BASE + 7 };
 // Public test site (deploy/test-stack behind Caddy): STACK_PUBLIC_ORIGIN puts everything on one HTTPS origin, services
 // under /svc/<name> (Caddy strips the prefix). The raw fork RPC is never public: the browser uses the faucet's filtered
 // /rpc (read-only methods, escrow + AUSD only), because anvil's own methods could set balances or impersonate accounts.
@@ -122,6 +123,7 @@ writeFileSync(
     `NEXT_PUBLIC_DIRECTORY_URL=${pubUrl("directory", PUB.directory)}`,
     `NEXT_PUBLIC_DEV_FAUCET_URL=${pubUrl("faucet", PUB.faucet)}`,
     `NEXT_PUBLIC_INDEXER_URL=${INDEXER_URL}`,
+    `NEXT_PUBLIC_VOICE_URL=${pubUrl("voice", PUB.voice)}`,
     "",
   ].join("\n"),
 );
@@ -162,6 +164,9 @@ run("directory", process.execPath, ["server/directory/src/main.ts"], {
   // REGISTRATIONS_PER_IP_PER_DAY passes through (test stack: raised on the host so repeated E2E runs from one IP fit).
   env: { ...common, DIRECTORY_DB_PATH: ":memory:", PORT: String(P.directory), ...(process.env.REGISTRATIONS_PER_IP_PER_DAY ? { REGISTRATIONS_PER_IP_PER_DAY: process.env.REGISTRATIONS_PER_IP_PER_DAY } : {}) },
 });
+
+// encrypted message store (ciphertext only; in memory, like the rest of the fork)
+run("voice", process.execPath, ["server/voice/src/main.ts"], { env: { ...common, VOICE_DB_PATH: ":memory:", PORT: String(P.voice) } });
 
 // 6. dev faucet + simulated SMS outbox (LOCAL ONLY)
 // Filtered, read-only JSON-RPC for the public test site: only what the web app reads, only for the escrow and AUSD.
@@ -245,6 +250,7 @@ faucetServer.listen(P.faucet, BIND);
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);
 await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
+await waitFor(`http://127.0.0.1:${P.voice}/healthz`);
 
 // 7. web
 const webArgs = [nextBin, WEB_PROD ? "start" : "dev", "--port", String(P.web), ...(process.env.STACK_BIND_HOST ? ["--hostname", BIND] : [])];

@@ -27,7 +27,7 @@ const ESCROW_BLOCK = Number(env("TESTNET_ESCROW_BLOCK"));
 const DATA = env("STACK_DATA_DIR", "/data");
 const BIND = env("STACK_BIND_HOST", "0.0.0.0");
 const INFO_FILE = process.env.STACK_INFO_FILE;
-const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, web: 3000 };
+const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, web: 3000 };
 const svc = (name) => `${ORIGIN}/svc/${name}`;
 const children = [];
 
@@ -88,6 +88,7 @@ writeFileSync(
     `NEXT_PUBLIC_DIRECTORY_URL=${svc("directory")}`,
     `NEXT_PUBLIC_DEV_FAUCET_URL=${svc("faucet")}`,
     `NEXT_PUBLIC_INDEXER_URL=${svc("indexer")}/v1/graphql`,
+    `NEXT_PUBLIC_VOICE_URL=${svc("voice")}`,
     "NEXT_PUBLIC_NETWORK_LABEL=Monad testnet",
     "NEXT_PUBLIC_EXPLORER_URL=https://testnet.monadscan.com", // VERIFIED §4.9
     "",
@@ -116,6 +117,8 @@ run("directory", ["server/directory/src/main.ts"], {
   ...common, DIRECTORY_DB_PATH: join(DATA, "directory.sqlite"), PORT: String(P.directory),
   ...(process.env.REGISTRATIONS_PER_IP_PER_DAY ? { REGISTRATIONS_PER_IP_PER_DAY: process.env.REGISTRATIONS_PER_IP_PER_DAY } : {}),
 });
+
+run("voice", ["server/voice/src/main.ts"], { ...common, VOICE_DB_PATH: join(DATA, "voice.sqlite"), PORT: String(P.voice) });
 
 // 3. faucet: mints TestDollar with the deployer (= TestDollar.minter). One mint at a time (nonce order);
 //    per-address cooldown and per-IP daily cap, so the minter's MON lasts.
@@ -192,6 +195,7 @@ faucetServer.listen(P.faucet, BIND);
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);
 await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
+await waitFor(`http://127.0.0.1:${P.voice}/healthz`);
 
 // 4. web, then tell the indexer what to index (stable content: it only re-indexes when the escrow changes)
 run("web", [nextBin, "start", "--port", String(P.web), "--hostname", BIND], {}, join(root, "web"));

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Hex } from "viem";
-import { PaymentStatus } from "@everpiece/shared";
+import { NO_METADATA, PaymentStatus } from "@everpiece/shared";
 import { Welcome } from "./Welcome";
 import { Progress, progressText } from "./status";
 import { config, isDevStack } from "../lib/config";
@@ -12,6 +12,8 @@ import { friendlyError } from "../lib/api";
 import { decodePackage, type ClaimPackage } from "../lib/link";
 import { claimWithCode, FlowError, requestCode } from "../lib/flows";
 import { loadAccount, type Account } from "../lib/mera";
+import { loadMessage, seconds, type IncomingMessage } from "../lib/message";
+import { messageLocator } from "@everpiece/shared";
 
 type Phase = "loading" | "incomplete" | "unavailable" | "account" | "request" | "code" | "claiming" | "done";
 
@@ -28,6 +30,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<IncomingMessage>({ status: "none" });
 
   useEffect(() => {
     // Fragment hygiene (master §2.5): parse, validate version, copy to memory, then remove it from the URL/history.
@@ -40,6 +43,12 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
     (async () => {
       const [p, now] = await Promise.all([paymentOf(paymentId), chainTime()]);
       setPayment(p);
+      // The sender's message, checked against this payment's on-chain commitment. Loads on its own: it never blocks money.
+      const root = pkg.current!.voiceRootSecret;
+      if (p.metadataCommitment !== NO_METADATA) {
+        setMessage({ status: "loading" });
+        loadMessage(root, messageLocator(root), p.metadataCommitment).then(setMessage);
+      }
       if (Number(p.status) !== PaymentStatus.ACTIVE || now >= p.expiresAt) {
         setPhase("unavailable");
         return;
@@ -119,6 +128,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
             <div className="amount">{amount}</div>
             <div className="muted small">Free to claim</div>
           </div>
+          <MessageCard message={message} />
           <Welcome onReady={(a) => { setAccount(a); setPhase("request"); }} title="Create your account to receive it." />
         </div>
       )}
@@ -130,6 +140,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
             <div className="amount">{amount}</div>
             <div className="muted small">Free to claim</div>
           </div>
+          <MessageCard message={message} />
 
           {phase === "request" && (
             <>
@@ -165,6 +176,7 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
       {phase === "done" && (
         <div className="stack">
           <div className="status ok">You received {amount} ✓</div>
+          <MessageCard message={message} />
           <h1>It&apos;s yours. What would you like to do?</h1>
           <div className="card stack">
             <div className="row"><strong>Keep Dollars</strong><span className="pill ok">Done</span></div>
@@ -173,6 +185,34 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
           </div>
           <Link className="button" href="/">Go to my Everpiece</Link>
         </div>
+      )}
+    </div>
+  );
+}
+
+function MessageCard({ message }: { message: IncomingMessage }) {
+  if (message.status === "none") return null;
+  return (
+    <div className="card stack" aria-label="Message from the sender">
+      <strong>A message from the sender</strong>
+      {message.status === "loading" && <div className="muted small">Opening the message…</div>}
+      {message.status === "unavailable" && (
+        <div className="muted small">The message can&apos;t be loaded right now. You can still claim your money.</div>
+      )}
+      {message.status === "invalid" && (
+        <div className="status warn">This message couldn&apos;t be verified, so it isn&apos;t shown. Your money is not affected.</div>
+      )}
+      {message.status === "ok" && (
+        <>
+          {message.note && <p className="note">{message.note}</p>}
+          {message.audioUrl && (
+            <>
+              <audio controls src={message.audioUrl} aria-label="Voice message" />
+              <div className="muted small">Voice note, {seconds(message.durationMs ?? 0)}</div>
+            </>
+          )}
+          <div className="muted small">Encrypted on the sender&apos;s phone. Only this link can open it.</div>
+        </>
       )}
     </div>
   );

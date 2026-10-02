@@ -2,6 +2,7 @@ import type { Address, Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
   MAX_EXPIRY_SECONDS,
+  MessageError,
   NO_METADATA,
   PaymentMode,
   cancelIntent,
@@ -15,6 +16,7 @@ import {
   paymentIdOf,
   phoneHash,
   recipientCommitment,
+  type Message,
   type PaymentIntent,
 } from "@everpiece/shared";
 import { config } from "./config";
@@ -23,6 +25,7 @@ import { claims, directory, relayer, waitForRequest, type RelayStatus } from "./
 import { newClaimPackage, randomBytes32, type ClaimPackage } from "./link";
 import { withSigner, type Account } from "./mera";
 import { pin, type Recipient } from "./username";
+import { attachMessage } from "./message";
 
 export class FlowError extends Error {
   readonly code: string;
@@ -66,22 +69,34 @@ export type CodeContact = { channel: "sms"; phone: string } | { channel: "email"
 /**
  * Send by link (LINK mode). ONE passkey prompt signs both the AUSD funding authorization and the invite
  * (InviteRegistration for a phone, EmailInviteRegistration for an email). The link secret is created locally and
- * returned — never stored.
+ * returned — never stored. An optional message is encrypted and uploaded FIRST, so the intent's metadataCommitment
+ * binds exactly those bytes; if that fails, nothing has been signed and no money has moved.
  */
 export async function sendByLink(
   account: Account,
   amount: bigint,
   to: CodeContact,
-  onStatus: (s: RelayStatus | "SIGNING") => void,
+  onStatus: (s: RelayStatus | "SIGNING" | "ATTACHING") => void,
+  message?: Message,
 ): Promise<{ paymentId: Hex; pkg: ClaimPackage }> {
   const pkg = newClaimPackage();
+  let metadata = NO_METADATA;
+  if (message) {
+    onStatus("ATTACHING");
+    metadata = await attachMessage(pkg.voiceRootSecret, message).then(
+      (s) => s.commitment,
+      (e) => {
+        throw new FlowError(e instanceof MessageError ? e.code : "MessageUploadFailed");
+      },
+    );
+  }
   const claimKey = privateKeyToAccount(pkg.claimPrivateKey).address;
   const [t, approver] = await Promise.all([chainTime(), claimApprover()]);
   const intent: PaymentIntent = {
     sender: account.address,
     mode: PaymentMode.LINK,
     recipientCommitment: recipientCommitment(PaymentMode.LINK, claimKey, pkg.recipientSalt),
-    metadataCommitment: NO_METADATA,
+    metadataCommitment: metadata,
     approver,
     amount,
     // expiry is checked at execution time (≤ now + 30 d); signing slightly earlier keeps it inside the window.

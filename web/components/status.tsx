@@ -3,8 +3,10 @@
 import type { RelayStatus } from "../lib/api";
 
 /** Inclusion is not success: in-flight states never read as done (ESCROW_SPEC §17, D9). */
-export function progressText(s: RelayStatus | "SIGNING" | "", verb: string): string {
+export function progressText(s: RelayStatus | "SIGNING" | "ATTACHING" | "", verb: string): string {
   switch (s) {
+    case "ATTACHING":
+      return "Encrypting and attaching your message…";
     case "SIGNING":
       return "Confirm with your fingerprint or screen lock…";
     case "SUBMITTED":

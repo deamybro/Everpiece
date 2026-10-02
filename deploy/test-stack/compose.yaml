@@ -68,6 +68,7 @@ services:
       - "127.0.0.1:47303:8788" # claims
       - "127.0.0.1:47304:8789" # directory
       - "127.0.0.1:47305:8790" # faucet + simulated SMS
+      - "127.0.0.1:47307:8791" # encrypted message store (47306 is the indexer's GraphQL)
 
   indexer-db:
     <<: *shared

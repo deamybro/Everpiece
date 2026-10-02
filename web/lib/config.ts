@@ -15,6 +15,8 @@ export const config = {
   relayerUrl: process.env.NEXT_PUBLIC_RELAYER_URL ?? "",
   claimsUrl: process.env.NEXT_PUBLIC_CLAIMS_URL ?? "",
   directoryUrl: process.env.NEXT_PUBLIC_DIRECTORY_URL ?? "",
+  /** Encrypted message store (server/voice). Empty = messages can't be attached; payments still work. */
+  voiceUrl: process.env.NEXT_PUBLIC_VOICE_URL ?? "",
   /** Envio/Hasura GraphQL (read-only public role): payment history's source of truth. Empty = device-only fallback. */
   indexerUrl: process.env.NEXT_PUBLIC_INDEXER_URL ?? "",
   /** Block explorer for on-chain proof links (VERIFIED §1.3 / §4.9: Monadscan; testnet sets testnet.monadscan.com). */

@@ -12,7 +12,8 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           // Claim links carry secrets in the #fragment; never leak the URL onward (THREAT_MODEL C6).
           { key: "Referrer-Policy", value: "no-referrer" },
-          { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(), usb=()" },
+          // Voice messages record on our own origin only.
+          { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)" },
         ],
       },
       // Claim pages and anything secret-adjacent are never cached (master §2.6).

@@ -6,6 +6,7 @@
     "server/relayer",
     "server/claims",
     "server/directory",
+    "server/voice",
     "web"
   ],
   "engines": {

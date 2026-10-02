@@ -24,6 +24,7 @@ export function proxy(request: NextRequest) {
     origin(process.env.NEXT_PUBLIC_CLAIMS_URL),
     origin(process.env.NEXT_PUBLIC_DIRECTORY_URL),
     origin(process.env.NEXT_PUBLIC_INDEXER_URL),
+    origin(process.env.NEXT_PUBLIC_VOICE_URL),
     origin(process.env.NEXT_PUBLIC_DEV_FAUCET_URL),
   ]
     .filter(Boolean)
@@ -33,6 +34,7 @@ export function proxy(request: NextRequest) {
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""};
     style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
     img-src 'self' blob: data:;
+    media-src 'self' blob:;
     font-src 'self';
     connect-src ${connect};
     worker-src 'self';
