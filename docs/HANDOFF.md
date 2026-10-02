@@ -4,6 +4,37 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 17 — 2026-10-02 — @username messages, self-review, relayer 429 fix
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Owner direction:** finish what's open and do the review yourself, without waiting for Codex.
+- **Built:**
+  - `packages/shared/src/messageKey.ts`:
+    - EVERPIECE_MESSAGE_KEY_V1, its own HKDF domain from the PRF, turned into X25519 by RFC 9180 DeriveKeyPair;
+    - HPKE wrap of a fresh message secret, aad = paymentId;
+    - account-signed `MessageKeyRegistration`.
+    - Tests 24/24 (shared), including RFC 9180 A.1.1 copied from the RFC text and low-order key rejection.
+  - Directory:
+    - message keys (signed, one per account, immutable), returned with lookups;
+    - an optional 80-byte `messageWrap` on inbox deliveries;
+    - in-place migration (the VPS DB was backed up first: `/data/directory.sqlite*.bak-20261002154439`).
+    - Tests 10/10.
+  - Web:
+    - New usernames publish the key in the same prompt; older accounts get "Turn on voice messages".
+    - Home opens and verifies a message with no prompt (4 s cap, so money never waits). If this device lacks the seed, one prompt unlocks it.
+    - Senders get the composer only for recipients with a verified key.
+- **Fixed (found by the testnet E2E):** the relayer treated HTTP 429 from Monad's public RPC as a broadcast rejection; a valid cancel showed FAILED. It now retries and defers to the monitor (`20592b9`). Relayer 26/26 including fork.
+- **Self-review:** THREAT_MODEL §K.1, nine items:
+  - fixed: the relayer broadcast;
+  - accepted with reasons: derived link key, capability reads, unaudited HPKE (mitigated), device-stored seed, metadata;
+  - before mainnet: bind uploads to finalized payments.
+- **Tests run on https://test.everpiece.xyz (`20592b9`):** message **2/2** (link and @username), history 1/1, username 1/1.
+- **Open:**
+  - **Real phones:** recording on Android Chrome (webm) and iPhone Safari (mp4) is untested; only Chromium's fake mic is.
+  - Before mainnet: bind uploads to finalized payments (K.1 #6).
+
+---
+
 ## Session 16 — 2026-10-02 — Encrypted voice + note messages (link payments)
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).

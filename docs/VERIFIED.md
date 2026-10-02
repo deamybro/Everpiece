@@ -493,6 +493,21 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
 
+### 4.13 HPKE for @username messages (RFC 9180, hpke-js)
+- **Fact:** The standard and the library used to seal a message secret to a recipient's X25519 key
+- **Value:**
+  - RFC 9180 HPKE, base mode. Test vector **A.1.1** (DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM): copied verbatim from the RFC text into `packages/shared/test/messageKey.test.ts`; the pinned library reproduces pkRm/skRm from ikmR, enc from ikmE, and ciphertext 0.
+  - §7.1.4: X25519 implementations must reject an all-zero DH output. The library rejects all-zero, 1 and an order-8 point (EncapError); regression test.
+  - Library: `@hpke/core` **1.9.0** + `@hpke/dhkem-x25519` **1.8.0** (+ `@hpke/common` 1.10.1), pinned exactly.
+    - Its X25519 file states it is "based on noble-curves". The README says the module "is implemented by using @noble/curves".
+    - AES-GCM comes from Web Crypto.
+    - The project says it passes the RFC test vectors and "has not been formally audited".
+  - noble-curves: Trail of Bits audit, January 2023 (`audit/2023-01-trailofbits-audit-curves.pdf` in the repo).
+- **Official source:** https://www.rfc-editor.org/rfc/rfc9180.txt ; https://jsr.io/@hpke/hpke-js/doc ; https://paulmillr.com/noble/ ; installed package sources (`node_modules/@hpke/*`)
+- **Date checked:** 2026-10-02
+- **Checked by:** Everpiece team
+- **Notes:** No formally audited JavaScript HPKE was found. Risk accepted and mitigated (THREAT_MODEL K.1 #4).
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**

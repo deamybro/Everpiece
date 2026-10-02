@@ -73,7 +73,7 @@ key        = HKDF-SHA256(voiceRootSecret, salt ∅, info "everpiece.link.voice.v
 locator    = HKDF-SHA256(voiceRootSecret, salt ∅, info "everpiece.link.voice.v1.locator", 32)        store address
 metadataSalt = HKDF-SHA256(voiceRootSecret, salt ∅, info "everpiece.link.voice.v1.metadata-salt", 32)
 ```
-The sender uploads before signing, so the intent commits to it. The recipient refuses any envelope whose commitment differs from the on-chain value, then GCM authenticates every byte. Username-mode messages need a recipient encryption key (THREAT_MODEL §K) and are not in v1.
+The sender uploads before signing, so the intent commits to it. The recipient refuses any envelope whose commitment differs from the on-chain value, then GCM authenticates every byte. **Username mode** uses the same envelope under a fresh random message secret, HPKE-wrapped to the recipient's account-signed message key with aad = paymentId (THREAT_MODEL §K, `packages/shared/src/messageKey.ts`).
 
 ---
 

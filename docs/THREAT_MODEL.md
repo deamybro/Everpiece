@@ -217,15 +217,23 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
   - AES-256-GCM via Web Crypto (never hand-rolled);
   - the server stores ciphertext, IV, hashes, MIME, duration and a wrapped key only.
 - **Link mode (built, v1, ESCROW_SPEC §3.2):** the AES-256-GCM key is HKDF(voiceRootSecret, `"everpiece.link.voice.v1.key"`).
-  - Deviation from "fresh content key + wrap": voiceRootSecret is itself 256 fresh random bits per payment and is used for nothing else, so a derived key gives the same one-key-per-message property without a wrap layer. The IV is random, and a key encrypts one message only. **Codex: review.**
+  - Deviation from "fresh content key + wrap": voiceRootSecret is itself 256 fresh random bits per payment and is used for nothing else, so a derived key gives the same one-key-per-message property without a wrap layer. The IV is random, and a key encrypts one message only. Reviewed: K.1 item 2.
   - The store locator and the commitment salt come from the same secret under different labels: knowing the locator (the store does) reveals nothing about the key.
   - The store keeps ciphertext plus the header (version, audio type, duration). It never receives plaintext, the key or the link.
   - **Binding:** the sender uploads before signing, and the intent's `metadataCommitment` binds the exact envelope. The recipient refuses a mismatch, so neither the store nor anyone else can attach a message to someone's payment (E2E: a swapped envelope shows "couldn't be verified").
   - Upload capture in E2E: the uploaded bytes start 0x01 and don't contain the note's plaintext.
-- **Username mode:** the content key is wrapped to the recipient's **encryption public key**.
-  - That identity is a **separate cryptographic domain** and must never reuse the EVM private key (D6, master §23).
-  - Candidate schemes (not frozen; TODO, messages milestone): an established audited scheme such as HPKE (RFC 9180) with X25519, with the X25519 key derived through a domain-separated KDF, or a second PRF salt used as a namespace.
-  - Evaluate browser/Android support, deterministic recovery and audited implementations first. Do not invent crypto.
+- **Username mode (built, `packages/shared/src/messageKey.ts`):** the message is sealed exactly as for a link (envelope v1), under a **fresh random** 32-byte message secret. That secret is then wrapped to the recipient's **message key** with HPKE.
+  - **Message key (EVERPIECE_MESSAGE_KEY_V1):** HKDF-SHA256(PRF output, info `"everpiece.message-key.v1"`), turned into an X25519 key pair by RFC 9180 DeriveKeyPair.
+    - It is a separate domain from the EVM key and from the inbox key (the directory sees the inbox key). Deterministic from the passkey, so it is recovered on any device.
+  - **Publication:** an EIP-712 `MessageKeyRegistration(account, messageKey, deadline)`, signed by the account. One per account, immutable.
+    - Senders verify the signature themselves, so the directory can't substitute its own key. It can only lie about who @name is, which TOFU pinning covers.
+  - **Wrap:** HPKE base mode, DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / AES-256-GCM, info `"everpiece.username.voice.v1"`, **aad = paymentId**. An 80-byte opaque wrap travels with the inbox entry.
+    - A wrap can't be moved to another payment. A forged wrap or envelope fails the on-chain commitment check.
+  - **Library:** `@hpke/core` 1.9.0 + `@hpke/dhkem-x25519` 1.8.0, pinned exactly. It is **not formally audited** (no audited JS HPKE exists, VERIFIED §4.13).
+    - Its X25519 is vendored from noble-curves (audited by Trail of Bits, 2023); AES-GCM and HKDF come from Web Crypto.
+    - Our tests run RFC 9180's own A.1.1 vector through it, plus low-order public keys (rejected, §7.1.4).
+  - **Storage:** the seed is kept on the device like the inbox key, so Home can open messages without a prompt. XSS could read messages, but not move money; see the review, item 5.
+  - Older accounts publish their key with one prompt ("Turn on voice messages"). Senders see the composer only for recipients with a verified key.
 - `metadataCommitment` binds `envelopeHash` plus a random salt, so tampering is detectable.
 - **Storage (built: `server/voice`, self-hosted with the test stack, not a bucket):**
   - Reads need the 256-bit locator, derived from the link and known only to link holders. That locator stands in for short-lived signed URLs. There is no listing endpoint, and responses are `no-store` and served as `application/octet-stream`.
@@ -233,6 +241,28 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
   - Limits: per-IP rate and daily upload caps, plus a total-bytes cap (507 when full); messages are deleted 45 days after upload.
   - Production: re-evaluate R2/S3 with private buckets and signed reads (INTEGRATION_LEDGER).
 - **Media failure never blocks claim, cancel or refund** (master §24.8).
+  - Link page: the message loads on its own, separately from the claim.
+  - Home: waits at most 4 s for a message, then shows the payment anyway.
+  - E2E: with the store blocked, the claim still opens.
+
+### K.1 Security self-review of messages (core team, 2026-10-02; owner asked not to wait for Codex)
+1. **Fixed, Medium: relayer broadcast.** HTTP 429/5xx/timeouts from the RPC were treated as rejections: the request was marked FAILED and, after a timeout the node had in fact accepted, the nonce was reused. Found when Monad's public testnet RPC returned 429 on a cancel.
+   - Now: 3 quick retries, then the signed transaction stays PROCESSING for the monitor (`20592b9`; offline classifier tests, fork 26/26).
+   - Edge: if the node refuses nonce gaps, a request queued behind a deferred one may fail as BroadcastRejected while the first is rebroadcast. No money at risk; it can be retried.
+2. **Accepted: link-mode key derived from voiceRootSecret,** not a content key plus wrap. The secret is 256 fresh random bits per payment, used for one message only, with a random IV. A wrap layer would add nothing.
+3. **Accepted: capability reads.** Reads take a 256-bit locator HKDF'd from the message secret, instead of signed URLs.
+   - A leaked locator (for example in a proxy log) yields ciphertext only. There is no listing, and responses are no-store.
+4. **Accepted with mitigations: unaudited HPKE library.** See above: exact pins, RFC vector, low-order rejection. Revisit if an audited JS HPKE appears.
+5. **Accepted, Low: device-stored message seed.** Same exposure as the inbox key: XSS on our origin can read messages but can't sign or move money. The strict nonce CSP (F1) is the control.
+6. **Accepted for testnet, Low: store abuse.** Uploads that never get a payment stay up to 45 days.
+   - Bounds: ≤ 1 MiB each, per-IP rate and daily caps, a 500 MB total cap (507 when full; payments still work).
+   - **Before mainnet:** bind each upload to a finalized payment. The client reveals paymentId + metadataSalt, the store checks the on-chain commitment, and anything unbound is deleted after 24 h.
+7. **Accepted: metadata.**
+   - A non-zero `metadataCommitment` shows on-chain that a payment carries a message.
+   - The store sees size, type, duration and uploader IP; the directory sees an opaque 80-byte wrap.
+   - No content, keys or plaintext leave the device.
+8. **By design: link holders hear the message before the code check.** The link is already the secret that grants access to the message, not to the money (master §24.5).
+9. **Low: sender-supplied media is decoded by the recipient's browser.** The type is limited to webm/mp4/ogg, played from a blob: URL (CSP `media-src 'self' blob:`). The note is rendered as text, never HTML.
 - Honest claim wording: master §24.7. No claim of immunity to XSS, a compromised device or a supply-chain attack.
 
 ## L. Known limitations (summary)
