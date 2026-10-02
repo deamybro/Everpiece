@@ -6,6 +6,7 @@ import {
   ESCROW_EIP712_NAME,
   ESCROW_EIP712_VERSION,
   MONAD_MAINNET_CHAIN_ID,
+  type DollarToken,
 } from "./constants.ts";
 
 /** EIP-712 types signed against the EverpieceEscrow domain (ESCROW_SPEC §6.2). */
@@ -77,8 +78,13 @@ export function escrowDomain(escrow: Address, chainId: number = MONAD_MAINNET_CH
   return { name: ESCROW_EIP712_NAME, version: ESCROW_EIP712_VERSION, chainId, verifyingContract: escrow } as const;
 }
 
-export function ausdDomain(chainId: number = MONAD_MAINNET_CHAIN_ID, ausd: Address = AUSD_ADDRESS) {
-  return { name: AUSD_EIP712_NAME, version: AUSD_EIP712_VERSION, chainId, verifyingContract: ausd } as const;
+/**
+ * EIP-712 domain of the dollar token. Pass an address for AUSD semantics ("Agora Dollar"/"1" at that address), or a
+ * DollarToken for another token with the same surface (TestDollar on testnet: "Everpiece Test Dollar"/"1").
+ */
+export function ausdDomain(chainId: number = MONAD_MAINNET_CHAIN_ID, token: Address | DollarToken = AUSD_ADDRESS) {
+  const t = typeof token === "string" ? { address: token, eip712Name: AUSD_EIP712_NAME, eip712Version: AUSD_EIP712_VERSION } : token;
+  return { name: t.eip712Name, version: t.eip712Version, chainId, verifyingContract: t.address } as const;
 }
 
 /** paymentId = EIP-712 digest of the PaymentIntent under the escrow domain; also the ERC-3009 nonce. */
@@ -90,9 +96,14 @@ export function paymentIdOf(escrow: Address, intent: PaymentIntent, chainId: num
  * Typed data the sender signs to fund a payment. Every field is derived from the intent — the contract re-derives
  * them identically, so a signature over anything else is useless (ESCROW_SPEC §7.2).
  */
-export function fundingAuthorization(escrow: Address, intent: PaymentIntent, chainId: number = MONAD_MAINNET_CHAIN_ID, ausd: Address = AUSD_ADDRESS) {
+export function fundingAuthorization(
+  escrow: Address,
+  intent: PaymentIntent,
+  chainId: number = MONAD_MAINNET_CHAIN_ID,
+  token: Address | DollarToken = AUSD_ADDRESS,
+) {
   return {
-    domain: ausdDomain(chainId, ausd),
+    domain: ausdDomain(chainId, token),
     types: ausdTypes,
     primaryType: "ReceiveWithAuthorization" as const,
     message: {

@@ -1,5 +1,5 @@
 import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
-import { AUSD_ADDRESS, MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
+import { AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
 
 /** The only escrow methods this relayer will ever submit (master §26.2 — no arbitrary calldata). */
 export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired"] as const;
@@ -10,6 +10,8 @@ export type RelayerConfig = {
   expectedChainId: number;
   escrow: Address;
   ausd: Address;
+  /** EIP-712 name of the dollar token's domain: "Agora Dollar" (AUSD) by default, "Everpiece Test Dollar" on testnet. */
+  ausdEip712Name?: string;
   relayerPrivateKey: Hex;
   port: number;
   host: string;
@@ -70,6 +72,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
     escrow: address(env, "ESCROW_ADDRESS"),
     ausd: address(env, "AUSD_ADDRESS", AUSD_ADDRESS),
+    ausdEip712Name: env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
     relayerPrivateKey: key,
     port: int(env, "PORT", 8787),
     host: env.HOST ?? "127.0.0.1",

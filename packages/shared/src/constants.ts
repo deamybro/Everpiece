@@ -10,6 +10,15 @@ export const AUSD_DECIMALS = 6;
 export const AUSD_EIP712_NAME = "Agora Dollar";
 export const AUSD_EIP712_VERSION = "1";
 
+/** Monad testnet (docs/VERIFIED.md §4.9). AUSD does not exist there; Everpiece uses TestDollar instead. */
+export const MONAD_TESTNET_CHAIN_ID = 10143;
+/** TestDollar (contracts/src/testnet): testnet-only AUSD stand-in, honestly named. Same EIP-712 version as AUSD. */
+export const TEST_DOLLAR_EIP712_NAME = "Everpiece Test Dollar";
+
+/** The dollar token a deployment uses: real AUSD on mainnet, TestDollar on testnet. */
+export type DollarToken = { address: `0x${string}`; eip712Name: string; eip712Version: string };
+export const AUSD_TOKEN: DollarToken = { address: AUSD_ADDRESS, eip712Name: AUSD_EIP712_NAME, eip712Version: AUSD_EIP712_VERSION };
+
 export const ESCROW_EIP712_NAME = "Everpiece Escrow";
 export const ESCROW_EIP712_VERSION = "1";
 

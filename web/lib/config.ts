@@ -1,10 +1,17 @@
 import type { Address } from "viem";
+import { AUSD_ADDRESS, AUSD_EIP712_NAME, type DollarToken } from "@everpiece/shared";
 
 /** Public runtime config (NEXT_PUBLIC_* are inlined at build time; keep accesses literal). */
 export const config = {
   chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? "143"),
   rpcUrl: process.env.NEXT_PUBLIC_MONAD_RPC ?? "https://rpc.monad.xyz",
   escrow: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS ?? "") as Address,
+  /** The dollar token: real AUSD unless a deployment sets another (TestDollar on Monad testnet). */
+  dollar: {
+    address: (process.env.NEXT_PUBLIC_DOLLAR_ADDRESS || AUSD_ADDRESS) as Address,
+    eip712Name: process.env.NEXT_PUBLIC_DOLLAR_EIP712_NAME || AUSD_EIP712_NAME,
+    eip712Version: "1",
+  } satisfies DollarToken,
   relayerUrl: process.env.NEXT_PUBLIC_RELAYER_URL ?? "",
   claimsUrl: process.env.NEXT_PUBLIC_CLAIMS_URL ?? "",
   directoryUrl: process.env.NEXT_PUBLIC_DIRECTORY_URL ?? "",

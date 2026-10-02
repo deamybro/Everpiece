@@ -96,7 +96,7 @@ export async function sendByLink(
 
   onStatus("SIGNING");
   const { ausdSignature, senderSig } = await withSigner(account, async (signer) => ({
-    ausdSignature: await signer.signTypedData(fundingAuthorization(config.escrow, intent, config.chainId)),
+    ausdSignature: await signer.signTypedData(fundingAuthorization(config.escrow, intent, config.chainId, config.dollar)),
     senderSig: await signer.signTypedData(
       to.channel === "email"
         ? emailInviteRegistration(config.escrow, { paymentId, emailHash: emailHash(to.email), deadline: inviteDeadline }, config.chainId)
@@ -221,7 +221,7 @@ export async function sendToUsername(
   const paymentId = paymentIdOf(config.escrow, intent, config.chainId);
 
   onStatus("SIGNING");
-  const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(fundingAuthorization(config.escrow, intent, config.chainId)));
+  const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(fundingAuthorization(config.escrow, intent, config.chainId, config.dollar)));
   const r = await relayer("/v1/payments/create", { intent, ausdSignature });
   if (r.status !== 202 && r.status !== 200) throw new FlowError(r.body.error);
   const done = await waitForRequest(r.body.requestId, onStatus);

@@ -1,5 +1,5 @@
 import { createPublicClient, defineChain, http, type Address, type Hex } from "viem";
-import { AUSD_ADDRESS, ausdAbi, everpieceEscrowAbi } from "@everpiece/shared";
+import { ausdAbi, everpieceEscrowAbi } from "@everpiece/shared";
 import { config } from "./config";
 
 const chain = defineChain({
@@ -24,7 +24,7 @@ export type Payment = {
 };
 
 export async function dollarsOf(who: Address): Promise<bigint> {
-  return client.readContract({ address: AUSD_ADDRESS, abi: ausdAbi, functionName: "balanceOf", args: [who] });
+  return client.readContract({ address: config.dollar.address, abi: ausdAbi, functionName: "balanceOf", args: [who] });
 }
 
 export async function paymentOf(paymentId: Hex): Promise<Payment> {

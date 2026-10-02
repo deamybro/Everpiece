@@ -1,5 +1,6 @@
 import { encodeFunctionData, getAddress, recoverTypedDataAddress, type Address, type Hex } from "viem";
 import {
+  AUSD_EIP712_NAME,
   PaymentMode,
   PaymentStatus,
   cancelIntent,
@@ -59,7 +60,7 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
     case "createPayment": {
       const { intent, ausdSignature } = parseCreate(body);
       if (intent.amount < cfg.minPaymentAmount) throw new PrecheckError(422, "BelowMinimumPayment");
-      const funding = fundingAuthorization(escrow, intent, chainId, cfg.ausd);
+      const funding = fundingAuthorization(escrow, intent, chainId, { address: cfg.ausd, eip712Name: cfg.ausdEip712Name ?? AUSD_EIP712_NAME, eip712Version: "1" });
       if (!(await signedBy(intent.sender, { ...funding, signature: ausdSignature }))) {
         throw new PrecheckError(401, "InvalidFundingSignature");
       }
