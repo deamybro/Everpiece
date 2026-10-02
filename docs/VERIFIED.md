@@ -467,6 +467,15 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - **Testnet:** "Supported (demo)": a cross-chain OFT demo via LayerZero with **its own test token** `0xb1ed36367611392c04d14f80812d86749dc02d9c`; Merces `0x654d4c73473e060a1de5888fab34bcb41af073cf`; ID Registry `0x3cae9f1934b9079212531673cafc070a2e44bdc8`; access "Via OFT SDK".
   - **Not stated:** support for arbitrary ERC-20s (e.g. TestDollar), transfer finality, cancel or escrow, browser key management.
   - Trust model: privacy relies on the MPC nodes not colluding.
+  - **Live on-chain (2026-10-02):** Monad testnet code exists at Merces `0x654d…73cf` (23,781 B), ID registry `0x3cae…dc8` (7,812 B) and token `0xb1ed…2d9c` (4,042 B: name/symbol "USDT0", **18 decimals**). On mainnet, `0x9Dd5…f7c1` and `0xF55D…A04a` are 135-byte proxies.
+  - **SDK `@taceo/merces-client@0.1.1` (MIT; read from the package, dist/index.js and README):**
+    - **Every action is an on-chain tx sent by the user's own walletClient** (`register`, `depositWithPermit`, `transfer`, `withdraw`), so the user needs native gas. The SDK has no relayer path, and the submitter address is public.
+    - Transfer: "Sender, receiver, and amount are all hidden behind commitments". Recipients are registered EVM addresses.
+    - Deposit needs an **ERC-2612 permit** on the token. Each Merces deployment is bound to **one** ERC-20.
+    - The auth secret comes from an EIP-712 signature (`deriveAuthSecret`) and acts as a spending credential.
+    - Node ≥ 22; ships ~11 MB of circuits (snarkjs proving).
+    - The only Monad preset (`--chain monad`) is **mainnet** (USDC, compliance URL, query nodes `query.node{0,1,2}.usdc.monad.merces.taceo.network`). **Testnet query-node URLs are not published** in the SDK or README.
+  - TODO(VERIFY): testnet node URLs, how to obtain the testnet token, and whether the Merces contract accepts relayed submissions — ask TACEO.
 - **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy.md ; https://docs.taceo.io/docs/start-here/deployments-and-status/ ; https://docs.taceo.io/docs/finance-solutions/overview/
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
