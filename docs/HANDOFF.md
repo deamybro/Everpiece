@@ -4,6 +4,34 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 15 — 2026-10-02 — Privacy research + on-chain proof
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Privacy (VERIFIED §4.11–4.12):**
+  - Monad docs list only TACEO.
+  - Monad's blog covers Unlink (2026-06-25).
+  - Monad teased its own privacy launch for **2026-10-06** (Open summit, reportedly Category Labs; no spec yet).
+  - TACEO's launch post lists no Monad testnet.
+  - **Owner decision:** wait for Monad's 6 Oct announcement before choosing the Private mode provider.
+- **Completed (master §56 part 3, §57 item 16):**
+  - Activity rows link their latest transaction on the explorer (`NEXT_PUBLIC_EXPLORER_URL`; testnet uses testnet.monadscan.com).
+  - New public `/proof` page ("Everpiece in numbers"), indexer data only:
+    - people;
+    - count and volume of sent / claimed / cancelled / expired payments;
+    - protected now, claim rate (claimed ÷ finished) and median time to claim;
+    - the latest 10 transactions;
+    - the escrow address.
+  - Indexer: `Account` entity plus `Stats.users` (distinct senders or claimers). Tests 4/4 and typecheck pass (WSL copy `~/everpiece`).
+  - Compose: indexer-db, Hasura and the indexer use `restart: unless-stopped`; the stack stays `on-failure:3`.
+- **Tests run:** deployed `0e5b561` to the VPS (re-indexed; liability still $4.00). Playwright history **1/1** on https://test.everpiece.xyz, including the explorer links and the proof page. Mobile layout checked.
+- **Next (definition of done, §57):**
+  - encrypted voice message (§24, demo part 1);
+  - submission package (README, video, deadline);
+  - Private mode after 6 Oct;
+  - mainnet canary needs the owner's GO.
+
+---
+
 ## Session 14 — 2026-10-02 — Everpiece on Monad testnet
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
