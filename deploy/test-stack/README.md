@@ -6,7 +6,7 @@ Every start makes **new random keys and a new escrow**, so passkey accounts from
 ## Shared-host rules (the target box runs other projects)
 
 - It is additive only: `/opt/everpiece` plus the compose project `everpiece-test`. Never `docker compose down` other projects, never prune, and never restart shared services.
-- Ports are published on **127.0.0.1 only** (47300–47305). Nothing is public, and the shared Caddy is untouched.
+- Ports are published on **127.0.0.1 only** (47300–47307). Nothing is public, and the shared Caddy is untouched.
 - Caps: 1200 MB RAM (no swap), 1 CPU, 512 processes, `restart: on-failure:3`, rotated logs (3 × 10 MB). An overrun kills only this container. This was verified: a Turbopack build that hit the cap was killed with `CONSTRAINT_MEMCG` and nothing else was touched.
 - The web is built with **webpack** in the container (measured peak 745 MB; Turbopack needed more than 1.15 GB). Local builds still use Turbopack.
 
@@ -18,16 +18,16 @@ deploy/test-stack/push.sh <ssh-host>
 
 ## Use it from your computer
 
-The ports are the same on both ends (47300–47306), so the tunnel can't clash with other local tunnels on 3000 or 8787. Open it and leave it running:
+The ports are the same on both ends (47300–47307), so the tunnel can't clash with other local tunnels on 3000 or 8787. Open it and leave it running:
 
 ```bash
-ssh -N -L 47300:127.0.0.1:47300 -L 47301:127.0.0.1:47301 -L 47302:127.0.0.1:47302 -L 47303:127.0.0.1:47303 -L 47304:127.0.0.1:47304 -L 47305:127.0.0.1:47305 -L 47306:127.0.0.1:47306 <ssh-host>
+ssh -N -L 47300:127.0.0.1:47300 -L 47301:127.0.0.1:47301 -L 47302:127.0.0.1:47302 -L 47303:127.0.0.1:47303 -L 47304:127.0.0.1:47304 -L 47305:127.0.0.1:47305 -L 47306:127.0.0.1:47306 -L 47307:127.0.0.1:47307 <ssh-host>
 ```
 
 The host's sshd is constantly probed from the internet and sometimes resets connections, so a self-reconnecting tunnel is handier:
 
 ```bash
-while true; do ssh -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -L 47300:127.0.0.1:47300 -L 47301:127.0.0.1:47301 -L 47302:127.0.0.1:47302 -L 47303:127.0.0.1:47303 -L 47304:127.0.0.1:47304 -L 47305:127.0.0.1:47305 -L 47306:127.0.0.1:47306 <ssh-host>; sleep 3; done
+while true; do ssh -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -L 47300:127.0.0.1:47300 -L 47301:127.0.0.1:47301 -L 47302:127.0.0.1:47302 -L 47303:127.0.0.1:47303 -L 47304:127.0.0.1:47304 -L 47305:127.0.0.1:47305 -L 47306:127.0.0.1:47306 -L 47307:127.0.0.1:47307 <ssh-host>; sleep 3; done
 ```
 
 - **The app:** http://localhost:47300. Passkeys work because the browser sees `localhost`.
@@ -43,7 +43,7 @@ With `STACK_PUBLIC_ORIGIN=https://test.everpiece.xyz` in the host's `.env`, the 
 
 - **Routing:** the host's Caddy has one Everpiece-only site block, appended with a timestamped backup, validated first and reloaded gracefully.
   - `/` → 47300 (web)
-  - `/svc/relayer|claims|directory|faucet/*` → 47302–47305, with the prefix stripped
+  - `/svc/relayer|claims|directory|faucet/*` → 47302–47305, and `/svc/voice/*` → 47307 (encrypted message store, body ≤ 1100 KB), with the prefix stripped
 - **No public raw RPC.** The browser uses `/svc/faucet/rpc`, which only allows `eth_chainId`, `eth_blockNumber`, `net_version`, `eth_getBlockByNumber(tag, false)` and `eth_call` to the escrow or AUSD. Every `anvil_*`, `evm_*` and send method is refused, and a batch is refused if any call in it is. anvil's port stays on 127.0.0.1.
 - **Rate limits:** the services see the visitor's address via `TRUST_PROXY=1`, so limits are per visitor.
 - **Passkeys** belong to `test.everpiece.xyz` (rpId = hostname). They are separate from the future production domain.

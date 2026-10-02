@@ -62,7 +62,18 @@ metadataCommitment = keccak256(abi.encode(TAG_METADATA_V1, bytes32 envelopeHash,
                    | bytes32(0)  when there is no message/voice
 envelopeHash       = keccak256(canonical metadata envelope bytes)
 ```
-The envelope (format TODO, messages milestone) holds hashes of encrypted audio and encrypted text, occasion, schema version, and MIME/duration. It never holds plaintext, usernames, phone numbers, emails, storage URLs or keys. The contract treats this value as opaque.
+It never holds plaintext, usernames, phone numbers, emails, storage URLs or keys. The contract treats this value as opaque.
+
+**Link-message envelope v1** (`packages/shared/src/voice.ts`; pinned vector and a node:crypto re-derivation in `test/voice.test.ts`). The envelope **is** the stored ciphertext object, so `envelopeHash` commits to the exact bytes the recipient downloads:
+```
+envelope   = 0x01 ‖ audioType u8 (0 none · 1 audio/webm · 2 audio/mp4 · 3 audio/ogg) ‖ durationMs u32 BE (≤ 30000; 0 iff none)
+             ‖ iv (12 random bytes) ‖ AES-256-GCM(key, iv, aad = envelope[0..6), plaintext)        ≤ 1 MiB
+plaintext  = noteLen u16 BE ‖ note (UTF-8, ≤ 200 chars / 800 bytes) ‖ audio bytes
+key        = HKDF-SHA256(voiceRootSecret, salt ∅, info "everpiece.link.voice.v1.key", 32)
+locator    = HKDF-SHA256(voiceRootSecret, salt ∅, info "everpiece.link.voice.v1.locator", 32)        store address
+metadataSalt = HKDF-SHA256(voiceRootSecret, salt ∅, info "everpiece.link.voice.v1.metadata-salt", 32)
+```
+The sender uploads before signing, so the intent commits to it. The recipient refuses any envelope whose commitment differs from the on-chain value, then GCM authenticates every byte. Username-mode messages need a recipient encryption key (THREAT_MODEL §K) and are not in v1.
 
 ---
 
@@ -76,7 +87,7 @@ clientClaimPackage v1 = { version: 1,
                           recipientSalt:   32 bytes }  // §3.1
 ```
 - `claimPrivateKey` is used only to sign `LinkClaimIntent`.
-- The voice key is derived from `voiceRootSecret` with HKDF-SHA256 using an explicit domain-separation label, e.g. `info = "everpiece.link.voice.v1"`. It is never used for signing, and the claim key is never used for AES/MAC/wrapping.
+- The message key, store locator and metadata salt are derived from `voiceRootSecret` with HKDF-SHA256 under separate labels (§3.2). They are never used for signing, and the claim key is never used for AES/MAC/wrapping.
 - Byte encoding (base64url layout) and the exact noble API name: TODO(VERIFY) at the claim-links milestone (Oct 4), against the installed `@noble/curves` version.
 - Recipient phone numbers are **not** committed on-chain in any form (master §12.3). The server alone links a payment to the phone it will send the OTP to.
 

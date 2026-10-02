@@ -216,13 +216,22 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
   - a fresh 256-bit content key;
   - AES-256-GCM via Web Crypto (never hand-rolled);
   - the server stores ciphertext, IV, hashes, MIME, duration and a wrapped key only.
-- **Link mode:** the content key is wrapped under HKDF(voiceRootSecret, `"everpiece.link.voice.v1"`).
+- **Link mode (built, v1, ESCROW_SPEC §3.2):** the AES-256-GCM key is HKDF(voiceRootSecret, `"everpiece.link.voice.v1.key"`).
+  - Deviation from "fresh content key + wrap": voiceRootSecret is itself 256 fresh random bits per payment and is used for nothing else, so a derived key gives the same one-key-per-message property without a wrap layer. The IV is random, and a key encrypts one message only. **Codex: review.**
+  - The store locator and the commitment salt come from the same secret under different labels: knowing the locator (the store does) reveals nothing about the key.
+  - The store keeps ciphertext plus the header (version, audio type, duration). It never receives plaintext, the key or the link.
+  - **Binding:** the sender uploads before signing, and the intent's `metadataCommitment` binds the exact envelope. The recipient refuses a mismatch, so neither the store nor anyone else can attach a message to someone's payment (E2E: a swapped envelope shows "couldn't be verified").
+  - Upload capture in E2E: the uploaded bytes start 0x01 and don't contain the note's plaintext.
 - **Username mode:** the content key is wrapped to the recipient's **encryption public key**.
   - That identity is a **separate cryptographic domain** and must never reuse the EVM private key (D6, master §23).
   - Candidate schemes (not frozen; TODO, messages milestone): an established audited scheme such as HPKE (RFC 9180) with X25519, with the X25519 key derived through a domain-separated KDF, or a second PRF salt used as a namespace.
   - Evaluate browser/Android support, deterministic recovery and audited implementations first. Do not invent crypto.
 - `metadataCommitment` binds `envelopeHash` plus a random salt, so tampering is detectable.
-- Private bucket; short-lived signed reads; size/MIME limits; lifecycle deletion.
+- **Storage (built: `server/voice`, self-hosted with the test stack, not a bucket):**
+  - Reads need the 256-bit locator, derived from the link and known only to link holders. That locator stands in for short-lived signed URLs. There is no listing endpoint, and responses are `no-store` and served as `application/octet-stream`.
+  - Header checks (version, type, duration ≤ 30 s); envelope ≤ 1 MiB; first write wins (a different envelope can't replace one).
+  - Limits: per-IP rate and daily upload caps, plus a total-bytes cap (507 when full); messages are deleted 45 days after upload.
+  - Production: re-evaluate R2/S3 with private buckets and signed reads (INTEGRATION_LEDGER).
 - **Media failure never blocks claim, cancel or refund** (master §24.8).
 - Honest claim wording: master §24.7. No claim of immunity to XSS, a compromised device or a supply-chain attack.
 

@@ -4,6 +4,42 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 16 — 2026-10-02 — Encrypted voice + note messages (link payments)
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Built (master §24–25, demo part 1):**
+  - `packages/shared/src/voice.ts`, link-message envelope v1 (ESCROW_SPEC §3.2):
+    - AES-256-GCM via Web Crypto;
+    - key, store locator and commitment salt each HKDF'd from the link's `voiceRootSecret` under its own label;
+    - `metadataCommitment` binds the exact envelope.
+    - Tests 8/8, including tamper, wrong key, swapped message, limits, and a pinned vector re-derived independently with `node:crypto`.
+  - `server/voice`, ciphertext-only store, 6/6 tests:
+    - header checks, first write wins;
+    - ≤ 1 MiB per message, per-IP rate and daily caps, total-bytes cap;
+    - 45-day deletion.
+  - Web:
+    - `MessageComposer`: written note (≤ 200 characters) plus a voice note (≤ 30 s, codec picked at runtime) on the review step for phone/email payments.
+    - `sendByLink` encrypts and uploads **before** signing; if that fails, nothing is signed or sent.
+    - The claim page shows the message only after checking the on-chain commitment. An outage or a swapped message never blocks the claim.
+    - CSP `media-src 'self' blob:`; `Permissions-Policy microphone=(self)`.
+  - Stacks: voice service on 8791 (compose `127.0.0.1:47307`).
+  - **Host Caddy:** `/svc/voice/*` → 47307 added to the `test.everpiece.xyz` block only, with the owner's approval (backup `/etc/caddy/Caddyfile.bak-everpiece-20261002151754`, validated, graceful reload, 7-line diff).
+- **Tests run:** deployed `e1c96db`. Playwright on https://test.everpiece.xyz: **message 1/1** (Chromium fake mic):
+  - the upload is ciphertext (starts 0x01, no plaintext note);
+  - the recipient decrypts the note and playable audio;
+  - with the store blocked, the claim still opens;
+  - a swapped envelope is refused.
+  - Regression: history 1/1, username 1/1.
+- **Decisions to review (Codex):**
+  - A derived key instead of content-key + wrap for link mode (THREAT_MODEL §K).
+  - Locator capability reads instead of signed bucket URLs.
+- **Open:**
+  - **Username-mode messages:** need a recipient encryption key (HPKE/X25519 evaluation, §23.1). Not built; the composer only appears for link payments.
+  - Real-device recording: Android Chrome, iOS Safari (mp4).
+  - Production storage choice (R2/S3 vs self-hosted).
+
+---
+
 ## Session 15 — 2026-10-02 — Privacy research + on-chain proof
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
