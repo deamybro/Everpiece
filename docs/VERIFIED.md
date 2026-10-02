@@ -412,6 +412,43 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - TODO(VERIFY): delivery to Yahoo and Outlook, and to Nigerian ISP mailboxes.
   - TODO(VERIFY): inbox placement at Gmail and Yahoo (with DMARC set).
 
+### 4.9 Monad testnet (10143) — RPC, faucet, AUSD absent
+- **Fact:** What Everpiece can use on Monad testnet
+- **Value:**
+  - Chain ID 10143 (`0x279f`, confirmed live 2026-10-02 on two RPCs).
+    - RPCs: `https://testnet-rpc.monad.xyz` (QuickNode, 50 rps; 25 rps for eth_call/estimateGas), `https://rpc.ankr.com/monad_testnet`, `https://rpc-testnet.monadinfra.com` (20 rps).
+    - Explorers: testnet.monadvision.com, testnet.monadscan.com. Faucet: https://faucet.monad.xyz. "testnet was reset from genesis on 2025-12-16".
+  - **AUSD is not on testnet:** `eth_getCode(0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a)` = `0x` on both RPCs.
+  - The official testnet token list (monad-crypto/token-list `tokenlist-testnet.json`) has 4 tokens; the only dollar token is **USDC** `0x534b2f3A21130d7a60830c2Df862319e593943A3` (6 decimals).
+  - **EverpieceEscrow is AUSD-specific.** It calls `AUSD.isReceiveWithAuthorizationUpgraded()` before funding and fails closed. A token without that function (e.g. USDC) makes every `createPayment` revert.
+  - TODO(VERIFY): whether testnet USDC implements EIP-3009 `receiveWithAuthorization` (Circle FiatToken).
+- **Official source:** https://docs.monad.xyz/developer-essentials/testnets ; https://github.com/monad-crypto/token-list ; live `eth_chainId` / `eth_getCode`
+- **Date checked:** 2026-10-02
+- **Checked by:** Everpiece team
+
+### 4.10 Unlink (private transfers) on Monad
+- **Fact:** What Unlink offers and on which Monad network
+- **Value:**
+  - Supported chains: **Monad Testnet 10143 "Available"**; **Monad mainnet 143 "Contact us for access"**. SDK `@unlink-xyz/sdk` (`/browser`, `/client`, `/admin`).
+  - Operations: deposit, transfer, withdraw, execute.
+  - Privacy:
+    - **Transfer:** "Sender, recipient, and amount are hidden by the proof"; the token type is also private.
+    - **Deposit:** amount, token and sender are public.
+    - **Withdraw and execute:** amount, token and recipient are public; the sender is private.
+  - Relayer: "Transfers and withdrawals are submitted by Unlink's relayer"; deposits need user gas; execute uses a sponsored ERC-4337 UserOperation.
+  - Accounts:
+    - deterministic from an EVM signature: `buildDeriveSeedMessage({appId, chainId})` → `personal_sign` → `account.fromEthereumSignature`, then HKDF-SHA256 to a 64-byte seed;
+    - also `fromMnemonic`, `fromSeed`, `fromKeys`;
+    - addresses are Bech32m `unlink1…`;
+    - encrypted `userStorage` with passphrase or **WebAuthn PRF** unlock.
+  - Transfer status: `confirmed | processed | failed`; "prefer processed" before spending.
+  - Test tokens come from `requestTestTokens()` / `requestPrivateTokens()`, "hosted mock token" addresses shown in the Unlink dashboard.
+  - **Not documented:** escrow, cancel, expiry or conditional release of a private transfer; per-chain pool addresses; supported-token list; audit status. Treat private transfers as final until proven otherwise.
+- **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy ; https://docs.unlink.xyz/ (supported-chains, how-unlink-works, accounts-and-keys, transfer, faucet)
+- **Date checked:** 2026-10-02
+- **Checked by:** Everpiece team
+- **Notes:** TODO(VERIFY): the dashboard/appId requirement, whether arbitrary ERC-20s (an Everpiece test dollar) can be deposited, Mera EOA `personal_sign` compatibility, and audit status. Master §28.2 gate items 6–13 must be proven on testnet before launch.
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**
