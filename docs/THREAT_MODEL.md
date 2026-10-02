@@ -254,12 +254,15 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
    - A leaked locator (for example in a proxy log) yields ciphertext only. There is no listing, and responses are no-store.
 4. **Accepted with mitigations: unaudited HPKE library.** See above: exact pins, RFC vector, low-order rejection. Revisit if an audited JS HPKE appears.
 5. **Accepted, Low: device-stored message seed.** Same exposure as the inbox key: XSS on our origin can read messages but can't sign or move money. The strict nonce CSP (F1) is the control.
-6. **Accepted for testnet, Low: store abuse.** Uploads that never get a payment stay up to 45 days.
-   - Bounds: ≤ 1 MiB each, per-IP rate and daily caps, a 500 MB total cap (507 when full; payments still work).
-   - **Before mainnet:** bind each upload to a finalized payment. The client reveals paymentId + metadataSalt, the store checks the on-chain commitment, and anything unbound is deleted after 24 h.
+6. **Fixed (`2800a84`): store abuse.** Uploads used to stay 45 days whether or not a payment carried them. Now every upload starts with a **24 h** lifetime.
+   - Sender (after confirmation) and recipient (after opening) **bind** it: they reveal the paymentId and the commitment salt, which can't decrypt anything.
+   - The store recomputes `metadataCommitment` from the bytes it holds, compares it with `getPayment` at "finalized", and then keeps the message until 15 days after the payment's expiry.
+   - RPC trouble is a retryable 503, never a deletion. Pending binds retry from Home.
+   - Still bounded: ≤ 1 MiB each, per-IP caps, 500 MB total.
+   - Privacy cost: the store now learns which payment a message belongs to (item 7).
 7. **Accepted: metadata.**
    - A non-zero `metadataCommitment` shows on-chain that a payment carries a message.
-   - The store sees size, type, duration and uploader IP; the directory sees an opaque 80-byte wrap.
+   - The store sees size, type, duration, uploader IP and, once bound, the paymentId; the directory sees an opaque 80-byte wrap.
    - No content, keys or plaintext leave the device.
 8. **By design: link holders hear the message before the code check.** The link is already the secret that grants access to the message, not to the money (master §24.5).
 9. **Low: sender-supplied media is decoded by the recipient's browser.** The type is limited to webm/mp4/ogg, played from a blob: URL (CSP `media-src 'self' blob:`). The note is rendered as text, never HTML.

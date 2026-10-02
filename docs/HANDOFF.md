@@ -4,6 +4,29 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 18 — 2026-10-02 — Message binding + clearer UI
+
+- **Branch:** `feat/escrow-v1` (local only, not pushed).
+- **Binding (THREAT_MODEL K.1 #6, `2800a84`):**
+  - Uploads start with a 24 h lifetime. `POST /v1/messages/<locator>/bind {paymentId, metadataSalt}`: the store checks the on-chain commitment at finalized, then keeps the message until expiry + 15 days.
+  - Sender and recipient both bind; pending binds retry from Home.
+  - Voice tests 9/9, including the in-place migration (old rows keep 45 days). Live: health shows `bound` rising with the E2E runs.
+- **UI clarity (owner: "make UI more understanding"):**
+  - Welcome and an empty Home show "How Everpiece works" in 3 steps.
+  - Send: Step 1–3; each recipient type says how claiming works; review shows "What happens next" and the real expiry date; the link screen is numbered steps.
+  - Home: each payment gets one sentence on where the money is and what happens next.
+  - Claim page:
+    - names the sender's @username when there is one;
+    - explains why an account and a code are needed;
+    - Step 1–2;
+    - one brand (it was doubled).
+  - **Fix:** after a confirmed cancel, the row showed "Waiting to be claimed" plus a Cancel button until the indexer caught up. It now shows Cancelled at once; regression check in `message.spec.ts`.
+  - Review rows stay as master §1.7 requires.
+- **Tests run on https://test.everpiece.xyz (`84c8dd6`):** message 2/2, history 1/1, username 1/1. A screenshot tour at phone width was checked by eye.
+- **Open:** real-phone recording (Android Chrome, iPhone Safari); the submission package.
+
+---
+
 ## Session 17 — 2026-10-02 — @username messages, self-review, relayer 429 fix
 
 - **Branch:** `feat/escrow-v1` (local only, not pushed).
