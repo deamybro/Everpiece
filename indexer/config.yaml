@@ -31,6 +31,10 @@ chains:
     rpc:
       - url: ${ENVIO_RPC_URL}
         for: ${ENVIO_RPC_FOR}
+        # Monad's public testnet RPC answers eth_getLogs over at most 100 blocks ("limited to a 100 range");
+        # cap Envio's query window below that or it backs off forever without indexing (VERIFIED §4.9).
+        initial_block_interval: 90
+        interval_ceiling: 90
     contracts:
       - name: EverpieceEscrow
         address: "${ENVIO_ESCROW_ADDRESS}"
