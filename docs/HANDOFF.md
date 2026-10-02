@@ -4,6 +4,29 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 20 — 2026-10-02 — Adversarial suite (Codex Phase A, reassigned)
+
+- **Owner:** "yes" to the core team taking over `contracts/test/adversarial/`. AGENTS.md is updated.
+  - "yes" was **not** taken as a mainnet GO. That still needs an explicit GO with amounts.
+- **Built:**
+  - `AttackMatrix.t.sol`: A01–A40, every master §44.2 row, plus fuzz properties for the exact expiry boundary and for "any other key never claims or cancels".
+  - `Reentrancy.t.sol`: a hostile token reenters during funding, claim payout and refund payout.
+  - `FINDINGS.md`: coverage table plus findings in §44.3 format.
+- **Results:** 44/44. CI profile: fuzz 10,000 runs each. Full suite 202 passed, 2 skipped (fork).
+  - Three first-run failures were test bugs (memory-struct aliasing; an external call consuming `expectRevert`), fixed. No contract bug was found.
+- **Findings:**
+  - **No CRITICAL/HIGH.**
+  - **F-01 MEDIUM:** one funded account can fill the global $5,000 liability cap with self-payments, block all new sends, then cancel at no loss. Fix options: a per-sender cap (redeploy), a higher ceiling (redeploy), relayer limits, or accept it with monitoring. **Owner decision.**
+  - F-02–F-05 INFO: stranded unsolicited AUSD; approver snapshot; pause vs expiry; boundary/freeze behavior.
+- **Open:**
+  - owner decision on F-01;
+  - mainnet GO and funding;
+  - the exact deadline;
+  - Private mode after 6 Oct;
+  - the submission package.
+
+---
+
 ## Session 19 — 2026-10-02 — Payment receipts
 
 - **Owner:** "payment receipts is important". Also confirmed a real-phone voice note works (Android; 20.8 KB note stored and bound at 17:03 UTC).
