@@ -17,6 +17,8 @@ export const config = {
   directoryUrl: process.env.NEXT_PUBLIC_DIRECTORY_URL ?? "",
   /** Envio/Hasura GraphQL (read-only public role): payment history's source of truth. Empty = device-only fallback. */
   indexerUrl: process.env.NEXT_PUBLIC_INDEXER_URL ?? "",
+  /** Block explorer for on-chain proof links (VERIFIED §1.3 / §4.9: Monadscan; testnet sets testnet.monadscan.com). */
+  explorerUrl: process.env.NEXT_PUBLIC_EXPLORER_URL || "https://monadscan.com",
   /** Local dev stack only: mints TEST Dollars on a local fork. Never set in production. */
   devFaucetUrl: process.env.NEXT_PUBLIC_DEV_FAUCET_URL ?? "",
   /** Shown on the test-money banner, e.g. "Monad testnet"; default "Local test network" (the fork). */

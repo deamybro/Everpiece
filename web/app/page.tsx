@@ -174,7 +174,10 @@ export default function Home() {
               <div>
                 <strong>{r.direction === "received" ? "+" : ""}{formatDollars(r.amount)}</strong>{" "}
                 <span className="muted">{r.direction === "received" ? "from" : "to"} {r.counterparty}</span>
-                <div className="muted small">{when(r.at)}</div>
+                <div className="muted small">
+                  {when(r.at)}
+                  {r.tx && <> · <a href={`${config.explorerUrl}/tx/${r.tx}`} target="_blank" rel="noopener noreferrer">See it on Monad</a></>}
+                </div>
               </div>
               <StatusPill item={r} />
             </div>
@@ -189,6 +192,8 @@ export default function Home() {
           </li>
         ))}
       </ul>
+
+      <p className="muted small center"><Link href="/proof">Everpiece in numbers</Link></p>
     </div>
   );
 }

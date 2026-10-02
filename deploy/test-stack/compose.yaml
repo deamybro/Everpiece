@@ -6,7 +6,7 @@
 name: everpiece-test
 
 x-shared: &shared
-  restart: on-failure:3
+  restart: on-failure:3 # the stack: a crash loop would rebuild the web (~0.75 GB) on a shared host, so give up after 3
   oom_score_adj: 1000
   logging:
     driver: json-file
@@ -71,6 +71,7 @@ services:
 
   indexer-db:
     <<: *shared
+    restart: unless-stopped # small and capped; must come back after a host-wide OOM kill
     image: postgres:18.3 # the version envio 3.12.1 uses for local dev
     container_name: everpiece-indexer-db
     mem_limit: 192m
@@ -94,6 +95,7 @@ services:
 
   indexer-hasura:
     <<: *shared
+    restart: unless-stopped # small and capped; must come back after a host-wide OOM kill
     image: hasura/graphql-engine:v2.43.0 # the version envio 3.12.1 uses
     container_name: everpiece-indexer-hasura
     mem_limit: 320m
@@ -118,6 +120,7 @@ services:
 
   indexer:
     <<: *shared
+    restart: unless-stopped # small and capped; must come back after a host-wide OOM kill
     build:
       context: ./src
       dockerfile: deploy/test-stack/indexer.Dockerfile

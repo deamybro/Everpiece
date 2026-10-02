@@ -125,4 +125,14 @@ test("history comes from the indexer: sent + received, refresh, new device, sign
   await stella2.reload();
   await expect(row(stella2, "$4.00").getByText("Cancelled")).toBeVisible();
   await expect(stella.locator(".balance")).toHaveText("$94.00"); // 100 − 6 (claimed) − 4 + 4 (cancelled, returned)
+
+  // 6. on-chain proof: each payment links to its latest transaction; the public numbers page reads the indexer
+  await expect(row(stella, "$6.00").getByRole("link", { name: "See it on Monad" })).toHaveAttribute("href", /\/tx\/0x[0-9a-f]{64}$/);
+  await expect(row(mama, "+$6.00").getByRole("link", { name: "See it on Monad" })).toHaveAttribute("href", /\/tx\/0x[0-9a-f]{64}$/);
+  await stella.getByRole("link", { name: "Everpiece in numbers" }).click();
+  const numbers = stella.getByLabel("Everpiece numbers");
+  await expect(numbers).toContainText("People");
+  await expect(numbers).toContainText("Median time to claim");
+  await expect(stella.getByRole("list", { name: "Latest transactions" }).getByRole("link", { name: "See it on Monad" }).first())
+    .toHaveAttribute("href", /\/tx\/0x[0-9a-f]{64}$/);
 });

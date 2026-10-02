@@ -89,6 +89,7 @@ writeFileSync(
     `NEXT_PUBLIC_DEV_FAUCET_URL=${svc("faucet")}`,
     `NEXT_PUBLIC_INDEXER_URL=${svc("indexer")}/v1/graphql`,
     "NEXT_PUBLIC_NETWORK_LABEL=Monad testnet",
+    "NEXT_PUBLIC_EXPLORER_URL=https://testnet.monadscan.com", // VERIFIED §4.9
     "",
   ].join("\n"),
 );

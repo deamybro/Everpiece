@@ -63,4 +63,13 @@ type Stats {
   "Mirrors the escrow's totalActiveLiability: created − claimed − cancelled − refunded."
   activeCount: Int!
   activeLiability: BigInt!
+  "Distinct addresses that sent or claimed at least one payment."
+  users: Int!
+}
+
+"An address that sent or claimed (id = the address as the event logged it)."
+type Account {
+  id: ID!
+  firstSeenAt: Int!
+  firstSeenBlock: Int!
 }

@@ -20,7 +20,17 @@ const emptyStats = (id: string) => ({
   refundedVolume: 0n,
   activeCount: 0,
   activeLiability: 0n,
+  users: 0,
 });
+
+type Stats = ReturnType<typeof emptyStats>;
+
+/** Counts an address the first time it sends or claims. */
+async function withUser(s: Stats, address: string, event: { block: { number: number; timestamp: number } }, context: EvmOnEventContext): Promise<Stats> {
+  if (await context.Account.get(address)) return s;
+  context.Account.set({ id: address, firstSeenAt: event.block.timestamp, firstSeenBlock: event.block.number });
+  return { ...s, users: s.users + 1 };
+}
 
 indexer.onEvent({ contract: "EverpieceEscrow", event: "PaymentCreated" }, async ({ event, context }) => {
   const p = event.params;
@@ -53,7 +63,7 @@ indexer.onEvent({ contract: "EverpieceEscrow", event: "PaymentCreated" }, async 
     txHash: event.transaction.hash,
     logIndex: event.logIndex,
   });
-  const s = await context.Stats.getOrCreate(emptyStats(String(event.chainId)));
+  const s = await withUser(await context.Stats.getOrCreate(emptyStats(String(event.chainId))), p.sender, event, context);
   context.Stats.set({
     ...s,
     created: s.created + 1,
@@ -94,7 +104,8 @@ async function settle(
     txHash: event.transaction.hash,
     logIndex: event.logIndex,
   });
-  const s = await context.Stats.getOrThrow(String(event.chainId));
+  const before = await context.Stats.getOrThrow(String(event.chainId));
+  const s = kind === "CLAIMED" ? await withUser(before, args.actor, event, context) : before;
   const next = { ...s, activeCount: s.activeCount - 1, activeLiability: s.activeLiability - args.amount };
   if (kind === "CLAIMED") context.Stats.set({ ...next, claimed: s.claimed + 1, claimedVolume: s.claimedVolume + args.amount });
   if (kind === "CANCELLED") context.Stats.set({ ...next, cancelled: s.cancelled + 1, cancelledVolume: s.cancelledVolume + args.amount });

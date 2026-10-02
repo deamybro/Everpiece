@@ -1,7 +1,7 @@
 #!/bin/sh
 # Follows the test stack: every stack start is a new chain with a new escrow, published in $STACK_INFO_FILE.
 # Waits for it, indexes that escrow from its deploy block with a wiped database (`envio start -r`), and starts over
-# when the file changes. If envio itself fails, exit with its code (compose restarts us, at most 3 times).
+# when the file changes. If envio itself fails, exit with its code (compose restarts us, with backoff).
 set -u
 INFO="${STACK_INFO_FILE:?}"
 field() { node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))[process.argv[2]])' "$INFO" "$1"; }

@@ -60,8 +60,9 @@ describe("EverpieceEscrow history", () => {
     expect(timeline.map((e) => [e.kind, e.actor, e.blockNumber])).toEqual([["CREATED", SENDER, 10], ["CLAIMED", RECIPIENT, 12]]);
 
     expect(await indexer.Stats.getOrThrow("143")).toMatchObject({
-      created: 1, createdVolume: 25_000_000n, claimed: 1, claimedVolume: 25_000_000n, activeCount: 0, activeLiability: 0n,
+      created: 1, createdVolume: 25_000_000n, claimed: 1, claimedVolume: 25_000_000n, activeCount: 0, activeLiability: 0n, users: 2,
     });
+    expect(await indexer.Account.getOrThrow(RECIPIENT)).toMatchObject({ firstSeenBlock: 12, firstSeenAt: 1_790_000_012 });
   });
 
   it("cancel, refund (with caller), and a still-active payment: metrics mirror the escrow's liability", async () => {
@@ -81,7 +82,7 @@ describe("EverpieceEscrow history", () => {
     expect(await indexer.Payment.getOrThrow(id(3))).toMatchObject({ status: "ACTIVE", settledBlock: undefined });
     expect(await indexer.Stats.getOrThrow("143")).toMatchObject({
       created: 3, createdVolume: 22_000_000n, cancelled: 1, cancelledVolume: 10_000_000n, refunded: 1, refundedVolume: 5_000_000n,
-      claimed: 0, activeCount: 1, activeLiability: 7_000_000n,
+      claimed: 0, activeCount: 1, activeLiability: 7_000_000n, users: 1, // one sender, three payments; cancel/refund add no one
     });
     // history queries the web will run
     expect((await indexer.Payment.getWhere({ sender: { _eq: SENDER } })).length).toBe(3);

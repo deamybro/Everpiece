@@ -27,6 +27,8 @@ export type HistoryItem = {
   expiresAt: bigint;
   /** Username payments sent from this browser: inbox delivery still pending (local only). */
   delivery?: SentPayment["delivery"];
+  /** The latest on-chain transaction for this payment (settle, else create), for the explorer link. */
+  tx?: Hex;
   /** Known on this device and on-chain, not indexed yet. */
   pendingIndex?: boolean;
 };
@@ -42,13 +44,15 @@ type IndexedPayment = {
   status: "ACTIVE" | "CLAIMED" | "CANCELLED" | "REFUNDED";
   createdAt: number;
   settledAt: number | null;
+  createdTx: string;
+  settledTx: string | null;
 };
 
 const QUERY = `query History($me: String!, $limit: Int!) {
   sent: Payment(where: { sender: { _eq: $me } }, order_by: { createdBlock: desc }, limit: $limit) { ...P }
   received: Payment(where: { recipient: { _eq: $me } }, order_by: { settledBlock: desc }, limit: $limit) { ...P }
 }
-fragment P on Payment { id sender recipient mode amount expiresAt status createdAt settledAt }`;
+fragment P on Payment { id sender recipient mode amount expiresAt status createdAt settledAt createdTx settledTx }`;
 
 const LIMIT = 100;
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -139,6 +143,7 @@ export async function loadHistory(account: { address: Address }): Promise<Histor
         counterparty,
         at: p.createdAt,
         expiresAt,
+        tx: (p.settledTx ?? p.createdTx) as Hex,
         delivery: cached?.delivery,
       };
     }),
@@ -155,6 +160,7 @@ export async function loadHistory(account: { address: Address }): Promise<Histor
         counterparty: n ? `@${n}` : short(p.sender),
         at: p.settledAt ?? p.createdAt,
         expiresAt: BigInt(p.expiresAt),
+        tx: (p.settledTx ?? p.createdTx) as Hex,
       };
     }),
   );
