@@ -3,19 +3,22 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Address, Hex } from "viem";
-import { PaymentMode, PaymentStatus } from "@everpiece/shared";
+import { NO_METADATA, PaymentMode, PaymentStatus } from "@everpiece/shared";
 import { Welcome } from "../components/Welcome";
 import { UsernameSetup } from "../components/UsernameSetup";
+import { MessageCard } from "../components/MessageCard";
 import { Progress, progressText } from "../components/status";
 import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
 import { cancelPayment, claimUsernamePayment, deliver, returnExpired, FlowError } from "../lib/flows";
 import { loadHistory, type HistoryItem } from "../lib/history";
-import { forgetAccount, friendlyPasskeyError, loadAccount, type Account } from "../lib/mera";
+import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
+import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
 import { friendlyError, type RelayStatus } from "../lib/api";
-import { readInbox, syncUsername, usernameOf } from "../lib/username";
+import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
 
-type Incoming = { paymentId: Hex; recipientSalt: Hex; amount: bigint; from: string; expiresAt: bigint };
+/** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
+type Incoming = { paymentId: Hex; recipientSalt: Hex; amount: bigint; from: string; expiresAt: bigint; messageWrap?: Hex; message: IncomingMessage | undefined; locked: boolean };
 
 const short = (a: Address) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const fromCache = new Map<Address, string>();
@@ -30,6 +33,7 @@ export default function Home() {
   const [busyId, setBusyId] = useState<Hex | null>(null);
   const [progress, setProgress] = useState("");
   const [message, setMessage] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
+  const [messagesOn, setMessagesOn] = useState<boolean | null>(null);
 
   useEffect(() => {
     const a = loadAccount();
@@ -61,11 +65,24 @@ export default function Home() {
         if (!p || Number(p.status) !== PaymentStatus.ACTIVE || Number(p.mode) !== PaymentMode.USERNAME || now >= p.expiresAt) return null;
         if (!fromCache.has(p.sender)) fromCache.set(p.sender, (await usernameOf(p.sender)) ?? "");
         const name = fromCache.get(p.sender);
-        return { ...i, amount: p.amount, from: name ? `@${name}` : short(p.sender), expiresAt: p.expiresAt };
+        // An attached message opens without a prompt (this device's message key); it never holds up the money.
+        const hasMessage = p.metadataCommitment !== NO_METADATA && !!i.messageWrap;
+        const msg = hasMessage && a.messageSeed
+          ? await Promise.race([
+              loadUsernameMessage(a.messageSeed, i.paymentId, i.messageWrap!, p.metadataCommitment),
+              new Promise<IncomingMessage>((r) => setTimeout(() => r({ status: "loading" }), 4000)),
+            ])
+          : undefined;
+        return { ...i, amount: p.amount, from: name ? `@${name}` : short(p.sender), expiresAt: p.expiresAt, message: msg, locked: hasMessage && !a.messageSeed };
       }),
     );
     setIncoming(waiting.filter((x): x is Incoming => x !== null));
   }, []);
+
+  // Can others send this account messages? (Accounts from before messages publish their key with one prompt.)
+  useEffect(() => {
+    if (account?.username && messagesAvailable()) messageKeyPublished(account).then(setMessagesOn).catch(() => {});
+  }, [account]);
 
   useEffect(() => {
     if (!account) return;
@@ -107,6 +124,28 @@ export default function Home() {
     }
   }
 
+  async function onEnableMessages() {
+    if (!account) return;
+    setMessage(null);
+    try {
+      setAccount(await enableMessages(account));
+      setMessagesOn(true);
+      setMessage({ kind: "ok", text: "Voice messages are on ✓" });
+    } catch (e) {
+      setMessage({ kind: "bad", text: friendlyPasskeyError(e) });
+    }
+  }
+
+  async function onUnlock() {
+    if (!account) return;
+    try {
+      const a = await unlockMessages(account);
+      setAccount(a);
+    } catch (e) {
+      setMessage({ kind: "bad", text: friendlyPasskeyError(e) });
+    }
+  }
+
   async function devFund() {
     if (!account) return;
     await fetch(`${config.devFaucetUrl}/faucet`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address }) });
@@ -140,6 +179,14 @@ export default function Home() {
 
       {!account.username && <UsernameSetup account={account} onDone={setAccount} />}
 
+      {account.username && messagesOn === false && (
+        <div className="card stack">
+          <strong>Get voice messages</strong>
+          <p className="muted small">Let people who pay you @{account.username} attach a voice note or a message. Only your account can open them.</p>
+          <button className="secondary" disabled={busyId !== null} onClick={onEnableMessages}>Turn on with fingerprint or screen lock</button>
+        </div>
+      )}
+
       <Progress text={progress} />
       {message && <div className={`status ${message.kind}`}>{message.text}</div>}
 
@@ -155,6 +202,10 @@ export default function Home() {
                   </div>
                   <span className="pill">Waiting for you</span>
                 </div>
+                {i.message && <MessageCard message={i.message} from={i.from} onlyYou />}
+                {i.locked && (
+                  <button className="secondary" disabled={busyId !== null} onClick={onUnlock}>Open the message with fingerprint or screen lock</button>
+                )}
                 <button disabled={busyId !== null} onClick={() => onClaim(i)}>Claim with fingerprint or screen lock</button>
               </li>
             ))}

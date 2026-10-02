@@ -15,14 +15,16 @@ import {
   PaymentMode,
   PaymentStatus,
   cleanDisplayName,
+  MESSAGE_WRAP_BYTES,
   everpieceEscrowAbi,
+  messageKeyRegistration,
   recipientCommitment,
   usernameProblem,
   usernameRegistration,
   usernameSkeleton,
 } from "@everpiece/shared";
 import type { DirectoryConfig } from "./config.ts";
-import { DirectoryStore, type User } from "./store.ts";
+import { DirectoryStore, type MessageKey, type User } from "./store.ts";
 import { log } from "./log.ts";
 
 export type Result = { httpStatus: number; body: Record<string, unknown> };
@@ -72,7 +74,8 @@ class Limiter {
   }
 }
 
-const publicUser = (u: User) => ({
+const publicMessageKey = (k: MessageKey | undefined) => (k ? { messageKey: k.message_key, deadline: k.deadline, sig: k.sig } : null);
+const publicUser = (u: User, k?: MessageKey) => ({
   username: u.username,
   account: u.account,
   displayName: u.display_name,
@@ -80,6 +83,8 @@ const publicUser = (u: User) => ({
   deadline: u.deadline,
   sig: u.sig,
   registeredAt: u.created_at,
+  /** Clients verify this signature themselves before encrypting to the key (the directory could lie). */
+  messageKey: publicMessageKey(k),
 });
 
 /**
@@ -199,6 +204,39 @@ export class DirectoryService {
     return { httpStatus: 201, body: publicUser(u) };
   }
 
+  /**
+   * The account publishes its message key (X25519, EVERPIECE_MESSAGE_KEY_V1) so senders can encrypt messages to it.
+   * Signed by the account; one key per account, immutable (it is derived from the passkey, so it never changes).
+   */
+  async registerMessageKey(body: unknown, ip: string): Promise<Result> {
+    const limited = this.guard(ip);
+    if (limited) return limited;
+    let account: Address, messageKey: Hex, deadline: bigint, sig: Hex;
+    try {
+      const o = fields(body, ["account", "messageKey", "deadline", "sig"]);
+      account = addr(o.account, "account");
+      messageKey = hex(o.messageKey, 32, "messageKey");
+      deadline = secs(o.deadline, "deadline");
+      sig = hex(o.sig, 65, "sig");
+    } catch (e) {
+      return err(400, "InvalidRequest", { detail: (e as Error).message });
+    }
+    if (!this.deadlineOk(deadline)) return err(400, "BadDeadline");
+    const typed = messageKeyRegistration(this.cfg.escrow, { account, messageKey, deadline }, this.cfg.expectedChainId);
+    if (!(await signedBy(account, { ...typed, signature: sig }))) return err(401, "InvalidSignature");
+    if (!this.store.byAccount(account)) return err(404, "NoUsername");
+    const existing = this.store.messageKeyOf(account);
+    if (existing) return existing.message_key === messageKey ? { httpStatus: 200, body: { account, idempotent: true } } : err(409, "MessageKeyExists");
+    try {
+      this.store.insertMessageKey({ account, message_key: messageKey, deadline: deadline.toString(), sig, created_at: this.now() });
+    } catch (e) {
+      if (!/UNIQUE constraint failed: message_keys./.test(String((e as Error).message))) throw e;
+      return err(409, "MessageKeyExists");
+    }
+    log("info", "directory.messageKey", { account });
+    return { httpStatus: 201, body: { account } };
+  }
+
   /** Can this name be registered right now? Same rules as register (exact, lookalike, reserved), no signature needed. */
   async available(body: unknown, ip: string): Promise<Result> {
     const limited = this.guard(ip);
@@ -229,7 +267,7 @@ export class DirectoryService {
       return err(400, "InvalidRequest", { detail: (e as Error).message });
     }
     const u = this.store.byUsername(username);
-    return u ? { httpStatus: 200, body: publicUser(u) } : err(404, "UnknownUsername");
+    return u ? { httpStatus: 200, body: publicUser(u, this.store.messageKeyOf(u.account)) } : err(404, "UnknownUsername");
   }
 
   async byAccount(body: unknown, ip: string): Promise<Result> {
@@ -242,25 +280,28 @@ export class DirectoryService {
       return err(400, "InvalidRequest", { detail: (e as Error).message });
     }
     const u = this.store.byAccount(account);
-    return u ? { httpStatus: 200, body: publicUser(u) } : err(404, "NoUsername");
+    return u ? { httpStatus: 200, body: publicUser(u, this.store.messageKeyOf(u.account)) } : err(404, "NoUsername");
   }
 
   /** Sender's client hands over the recipient salt after the payment is CONFIRMED. Self-authenticating (see class doc). */
   async deliver(body: unknown, ip: string): Promise<Result> {
     const limited = this.guard(ip);
     if (limited) return limited;
-    let paymentId: Hex, recipient: Address, recipientSalt: Hex;
+    let paymentId: Hex, recipient: Address, recipientSalt: Hex, messageWrap: Hex | null;
     try {
-      const o = fields(body, ["paymentId", "recipient", "recipientSalt"]);
+      const withMessage = typeof body === "object" && body !== null && "messageWrap" in body;
+      const o = fields(body, ["paymentId", "recipient", "recipientSalt", ...(withMessage ? ["messageWrap"] : [])]);
       paymentId = hex(o.paymentId, 32, "paymentId");
       recipient = addr(o.recipient, "recipient");
       recipientSalt = hex(o.recipientSalt, 32, "recipientSalt");
+      // Opaque to the directory: only the recipient's message key opens it, and only for this payment.
+      messageWrap = withMessage ? hex(o.messageWrap, MESSAGE_WRAP_BYTES, "messageWrap") : null;
     } catch (e) {
       return err(400, "InvalidRequest", { detail: (e as Error).message });
     }
     const existing = this.store.getInbox(paymentId);
     if (existing) {
-      return existing.recipient === recipient && existing.recipient_salt === recipientSalt
+      return existing.recipient === recipient && existing.recipient_salt === recipientSalt && (existing.message_wrap ?? null) === messageWrap
         ? { httpStatus: 200, body: { paymentId, idempotent: true } }
         : err(409, "AlreadyDelivered");
     }
@@ -271,7 +312,7 @@ export class DirectoryService {
     if (recipientCommitment(PaymentMode.USERNAME, recipient, recipientSalt).toLowerCase() !== p.recipientCommitment.toLowerCase()) {
       return err(422, "RecipientMismatch");
     }
-    this.store.insertInbox({ payment_id: paymentId, recipient, recipient_salt: recipientSalt, created_at: this.now() });
+    this.store.insertInbox({ payment_id: paymentId, recipient, recipient_salt: recipientSalt, message_wrap: messageWrap, created_at: this.now() });
     log("info", "directory.delivered", { paymentId });
     return { httpStatus: 201, body: { paymentId } };
   }
@@ -292,7 +333,9 @@ export class DirectoryService {
     const given = Buffer.from(keccak256(inboxKey).slice(2), "hex");
     const stored = Buffer.from((u?.inbox_key_hash ?? "0x" + "00".repeat(32)).slice(2), "hex");
     if (!u || !timingSafeEqual(given, stored)) return err(401, "Unauthorized");
-    const items = this.store.inboxFor(account, this.cfg.inboxPageSize).map((i) => ({ paymentId: i.payment_id, recipientSalt: i.recipient_salt, deliveredAt: i.created_at }));
+    const items = this.store.inboxFor(account, this.cfg.inboxPageSize).map((i) => ({
+      paymentId: i.payment_id, recipientSalt: i.recipient_salt, deliveredAt: i.created_at, ...(i.message_wrap ? { messageWrap: i.message_wrap } : {}),
+    }));
     return { httpStatus: 200, body: { items } };
   }
 }

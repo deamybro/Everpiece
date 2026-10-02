@@ -53,7 +53,9 @@ export default function Send() {
   const cleanPhone = phone.replace(/\s+/g, "");
   const email = normalizeEmail(emailInput);
   const note = draft.note.trim();
-  const withMessage = method !== "username" && messagesAvailable() && (note !== "" || draft.voice !== null);
+  // @username recipients can get messages once they've published a (self-signed) message key.
+  const canMessage = messagesAvailable() && (method !== "username" || !!found?.recipient.messageKey);
+  const withMessage = canMessage && (note !== "" || draft.voice !== null);
 
   async function lookUp() {
     setLooking(true);
@@ -73,10 +75,13 @@ export default function Send() {
     if (!account || amount === null) return;
     setStep("sending");
     setError("");
+    const message = withMessage
+      ? { note, audio: draft.voice ? { bytes: draft.voice.bytes, type: draft.voice.type, durationMs: draft.voice.durationMs } : undefined }
+      : undefined;
     if (method === "username") {
       if (!found) return;
       try {
-        const r = await sendToUsername(account, amount, found.recipient, (s) => setProgress(progressText(s, "Sending")));
+        const r = await sendToUsername(account, amount, found.recipient, (s) => setProgress(progressText(s, "Sending")), message);
         setDelivered(r.delivered);
         setStep("done");
       } catch (e) {
@@ -89,9 +94,6 @@ export default function Send() {
     }
     try {
       const to = method === "email" && email ? { channel: "email" as const, email } : { channel: "sms" as const, phone: cleanPhone };
-      const message = withMessage
-        ? { note, audio: draft.voice ? { bytes: draft.voice.bytes, type: draft.voice.type, durationMs: draft.voice.durationMs } : undefined }
-        : undefined;
       const { paymentId, pkg } = await sendByLink(account, amount, to, (s) => setProgress(progressText(s, "Protecting your payment")), message);
       setLink(claimLink(paymentId, pkg));
       setStep("done");
@@ -225,7 +227,15 @@ export default function Send() {
               )}
             </dl>
           </div>
-          {method !== "username" && messagesAvailable() && <MessageComposer value={draft} onChange={setDraft} disabled={step === "sending"} />}
+          {canMessage && (
+            <MessageComposer
+              value={draft} onChange={setDraft} disabled={step === "sending"}
+              audience={method === "username" && found ? `Only @${found.recipient.username}'s account can open it.` : "Only someone with the link can open it."}
+            />
+          )}
+          {method === "username" && found && messagesAvailable() && !found.recipient.messageKey && (
+            <p className="muted small">@{found.recipient.username} hasn&apos;t turned on voice messages yet, so this payment can&apos;t carry one.</p>
+          )}
           <p className="muted small">
             {method === "username" && found ? `Only @${found.recipient.username}'s account can claim it. ` : ""}
             Your money stays protected until they claim it. You can cancel any time before they do. If they never claim it,

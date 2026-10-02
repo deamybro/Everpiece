@@ -5,7 +5,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { Address, Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { PaymentMode, PaymentStatus, recipientCommitment, usernameRegistration } from "@everpiece/shared";
+import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { recoverTypedDataAddress } from "viem";
+import { PaymentMode, PaymentStatus, messageKeyRegistration, recipientCommitment, usernameRegistration } from "@everpiece/shared";
 import { DirectoryService, DirectoryStore, createDirectoryServer, setLogSink, type DirectoryConfig, type OnchainPayment } from "../src/index.ts";
 
 setLogSink(() => {});
@@ -132,6 +137,59 @@ test("inbox: deliveries must open the on-chain USERNAME commitment; reads need t
   const ok = await s.inbox({ account: recipient, inboxKey: D.inboxKey }, "ip");
   assert.equal(ok.httpStatus, 200);
   assert.deepEqual(ok.body.items, [{ paymentId: pid, recipientSalt: salt, deliveredAt: NOW }]);
+});
+
+test("message keys: signed by the account, one per account, returned with lookups", async () => {
+  const s = service();
+  const mama = pk(2);
+  const key = `0x${"4e".repeat(32)}` as Hex;
+  const deadline = BigInt(D.deadline);
+  const signed = async (signer: ReturnType<typeof pk>, messageKey: Hex, account: Address = signer.address) => ({
+    account, messageKey, deadline: deadline.toString(),
+    sig: await signer.signTypedData(messageKeyRegistration(ESCROW, { account, messageKey, deadline }, 143)),
+  });
+  // needs a username first; only the account itself can sign for it
+  assert.equal((await s.registerMessageKey(await signed(mama, key), "ip")).body.error, "NoUsername");
+  assert.equal((await s.register(await reg(mama, "mama"), "ip")).httpStatus, 201);
+  assert.equal((await s.lookup({ username: "mama" }, "ip")).body.messageKey, null);
+  assert.equal((await s.registerMessageKey(await signed(pk(3), key, mama.address), "ip")).body.error, "InvalidSignature");
+  assert.equal((await s.registerMessageKey(await signed(mama, key), "ip")).httpStatus, 201);
+  assert.equal((await s.registerMessageKey(await signed(mama, key), "ip")).body.idempotent, true);
+  assert.equal((await s.registerMessageKey(await signed(mama, `0x${"4f".repeat(32)}`), "ip")).body.error, "MessageKeyExists");
+  const looked = (await s.lookup({ username: "mama" }, "ip")).body.messageKey as { messageKey: Hex; deadline: string; sig: Hex };
+  assert.equal(looked.messageKey, key);
+  assert.deepEqual((await s.byAccount({ account: mama.address }, "ip")).body.messageKey, looked);
+  // what a sender's client checks: the record recovers to the account
+  const typed = messageKeyRegistration(ESCROW, { account: mama.address, messageKey: looked.messageKey, deadline: BigInt(looked.deadline) }, 143);
+  assert.equal(await recoverTypedDataAddress({ ...typed, signature: looked.sig }), mama.address);
+  const stale = { ...(await signed(mama, key)), deadline: String(Number(D.deadline) + 10_000) };
+  assert.equal((await s.registerMessageKey(stale, "ip")).body.error, "BadDeadline");
+});
+
+test("inbox: an optional message wrap travels with the delivery, opaque and exact-length", async () => {
+  const recipient = pk(2).address;
+  const salt = `0x${"5a".repeat(32)}` as Hex;
+  const pid = `0x${"01".repeat(32)}` as Hex;
+  const payments = new Map<string, OnchainPayment>([[pid, { status: PaymentStatus.ACTIVE, mode: PaymentMode.USERNAME, recipientCommitment: recipientCommitment(PaymentMode.USERNAME, recipient, salt) }]]);
+  const s = service(payments);
+  const wrap = `0x${"77".repeat(80)}` as Hex;
+  assert.equal((await s.deliver({ paymentId: pid, recipient, recipientSalt: salt, messageWrap: "0x1234" }, "ip")).httpStatus, 400);
+  assert.equal((await s.deliver({ paymentId: pid, recipient, recipientSalt: salt, messageWrap: wrap }, "ip")).httpStatus, 201);
+  assert.equal((await s.deliver({ paymentId: pid, recipient, recipientSalt: salt, messageWrap: wrap }, "ip")).body.idempotent, true);
+  assert.equal((await s.deliver({ paymentId: pid, recipient, recipientSalt: salt }, "ip")).body.error, "AlreadyDelivered");
+  await s.register(await reg(pk(2), "mama"), "ip");
+  assert.deepEqual((await s.inbox({ account: recipient, inboxKey: D.inboxKey }, "ip")).body.items, [{ paymentId: pid, recipientSalt: salt, deliveredAt: NOW, messageWrap: wrap }]);
+});
+
+test("store: an inbox table from before messages is migrated in place (existing entries keep working)", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "dir-")), "d.sqlite");
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE inbox (payment_id TEXT PRIMARY KEY, recipient TEXT NOT NULL, recipient_salt TEXT NOT NULL, created_at INTEGER NOT NULL);
+    INSERT INTO inbox VALUES ('0xold', '0xR', '0xS', 1);`);
+  old.close();
+  const st = new DirectoryStore(path);
+  assert.deepEqual({ ...st.getInbox("0xold") }, { payment_id: "0xold", recipient: "0xR", recipient_salt: "0xS", created_at: 1, message_wrap: null });
+  st.close();
 });
 
 test("http: routes, CORS origin, method and body checks", async () => {

@@ -1,10 +1,11 @@
 import type { Hex } from "viem";
-import { NO_METADATA, openMessage, sealMessage, type Message, type SealedMessage } from "@everpiece/shared";
+import { NO_METADATA, messageLocator, openMessage, sealMessage, unwrapMessageSecret, type Message, type SealedMessage } from "@everpiece/shared";
 import { config } from "./config";
 
 /**
- * Link-payment messages (voice and/or text). Encrypted on this device with a key from the link's voice secret
- * (packages/shared voice.ts); the store only ever receives ciphertext. Messages are optional: if the store is
+ * Payment messages (voice and/or text). Encrypted on this device under a fresh message secret: the link's voice secret,
+ * or for @username payments a random one sealed to the recipient (packages/shared voice.ts, messageKey.ts). The store
+ * only ever receives ciphertext. Messages are optional: if the store is
  * down, money can still be sent, claimed, cancelled and refunded (master §24.8).
  */
 
@@ -59,3 +60,25 @@ export const seconds = (ms: number) => {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
+
+const usernameMessages = new Map<string, Promise<IncomingMessage>>();
+/**
+ * A message on an @username payment: open the HPKE wrap with this account's message key (bound to this paymentId),
+ * then fetch, verify against the on-chain commitment and decrypt exactly like a link message. Cached per payment.
+ */
+export function loadUsernameMessage(messageSeed: Hex, paymentId: Hex, messageWrap: Hex, commitment: Hex): Promise<IncomingMessage> {
+  const key = paymentId.toLowerCase();
+  if (!usernameMessages.has(key)) {
+    usernameMessages.set(
+      key,
+      unwrapMessageSecret(messageSeed, paymentId, messageWrap).then(
+        (secret) => loadMessage(secret, messageLocator(secret), commitment),
+        (): IncomingMessage => ({ status: "invalid" }),
+      ).then((m) => {
+        if (m.status === "unavailable") usernameMessages.delete(key); // try again on the next refresh
+        return m;
+      }),
+    );
+  }
+  return usernameMessages.get(key)!;
+}

@@ -12,7 +12,8 @@ import { friendlyError } from "../lib/api";
 import { decodePackage, type ClaimPackage } from "../lib/link";
 import { claimWithCode, FlowError, requestCode } from "../lib/flows";
 import { loadAccount, type Account } from "../lib/mera";
-import { loadMessage, seconds, type IncomingMessage } from "../lib/message";
+import { loadMessage, type IncomingMessage } from "../lib/message";
+import { MessageCard } from "./MessageCard";
 import { messageLocator } from "@everpiece/shared";
 
 type Phase = "loading" | "incomplete" | "unavailable" | "account" | "request" | "code" | "claiming" | "done";
@@ -185,34 +186,6 @@ export function ClaimFlow({ paymentId }: { paymentId: Hex }) {
           </div>
           <Link className="button" href="/">Go to my Everpiece</Link>
         </div>
-      )}
-    </div>
-  );
-}
-
-function MessageCard({ message }: { message: IncomingMessage }) {
-  if (message.status === "none") return null;
-  return (
-    <div className="card stack" aria-label="Message from the sender">
-      <strong>A message from the sender</strong>
-      {message.status === "loading" && <div className="muted small">Opening the message…</div>}
-      {message.status === "unavailable" && (
-        <div className="muted small">The message can&apos;t be loaded right now. You can still claim your money.</div>
-      )}
-      {message.status === "invalid" && (
-        <div className="status warn">This message couldn&apos;t be verified, so it isn&apos;t shown. Your money is not affected.</div>
-      )}
-      {message.status === "ok" && (
-        <>
-          {message.note && <p className="note">{message.note}</p>}
-          {message.audioUrl && (
-            <>
-              <audio controls src={message.audioUrl} aria-label="Voice message" />
-              <div className="muted small">Voice note, {seconds(message.durationMs ?? 0)}</div>
-            </>
-          )}
-          <div className="muted small">Encrypted on the sender&apos;s phone. Only this link can open it.</div>
-        </>
       )}
     </div>
   );

@@ -16,6 +16,7 @@ import {
   paymentIdOf,
   phoneHash,
   recipientCommitment,
+  wrapMessageSecret,
   type Message,
   type PaymentIntent,
 } from "@everpiece/shared";
@@ -46,7 +47,7 @@ export type SentPayment = {
   createdAt: number;
   expiresAt: string;
   /** Username payments only: kept until the directory has the recipient's inbox entry (the salt is not a theft secret, ESCROW_SPEC §3.1). */
-  delivery?: { recipient: Address; recipientSalt: Hex; delivered: boolean };
+  delivery?: { recipient: Address; recipientSalt: Hex; delivered: boolean; messageWrap?: Hex };
 };
 
 export function loadSent(): SentPayment[] {
@@ -200,7 +201,8 @@ export async function claimWithCode(
 /** Hand the recipient salt to the directory inbox. Idempotent; true once the directory has it. */
 export async function deliver(p: SentPayment): Promise<boolean> {
   if (!p.delivery || p.delivery.delivered) return true;
-  const r = await directory("/v1/inbox/deliver", { paymentId: p.paymentId, recipient: p.delivery.recipient, recipientSalt: p.delivery.recipientSalt }).catch(() => null);
+  const { recipient, recipientSalt, messageWrap } = p.delivery;
+  const r = await directory("/v1/inbox/deliver", { paymentId: p.paymentId, recipient, recipientSalt, ...(messageWrap ? { messageWrap } : {}) }).catch(() => null);
   if (r && (r.status === 201 || r.status === 200)) {
     markDelivered(p.paymentId);
     return true;
@@ -211,21 +213,36 @@ export async function deliver(p: SentPayment): Promise<boolean> {
 /**
  * Send to @username (USERNAME mode, ESCROW_SPEC §3.1). ONE fingerprint prompt signs the AUSD funding authorization.
  * Only the recipient's own account can claim it (their signature is checked on-chain), so no code or link is needed.
+ * An optional message is encrypted under a fresh secret and uploaded first (the intent commits to it); that secret is
+ * then sealed to the recipient's message key for this paymentId (HPKE) and travels with the inbox entry.
  */
 export async function sendToUsername(
   account: Account,
   amount: bigint,
   to: Recipient,
-  onStatus: (s: RelayStatus | "SIGNING") => void,
+  onStatus: (s: RelayStatus | "SIGNING" | "ATTACHING") => void,
+  message?: Message,
 ): Promise<{ paymentId: Hex; delivered: boolean }> {
   if (to.account === account.address) throw new FlowError("CannotPaySelf");
+  if (message && !to.messageKey) throw new FlowError("RecipientCantGetMessages");
   const recipientSalt = randomBytes32();
+  const messageSecret = randomBytes32();
+  let metadata = NO_METADATA;
+  if (message) {
+    onStatus("ATTACHING");
+    metadata = await attachMessage(messageSecret, message).then(
+      (s) => s.commitment,
+      (e) => {
+        throw new FlowError(e instanceof MessageError ? e.code : "MessageUploadFailed");
+      },
+    );
+  }
   const t = await chainTime();
   const intent: PaymentIntent = {
     sender: account.address,
     mode: PaymentMode.USERNAME,
     recipientCommitment: recipientCommitment(PaymentMode.USERNAME, to.account, recipientSalt),
-    metadataCommitment: NO_METADATA,
+    metadataCommitment: metadata,
     approver: "0x0000000000000000000000000000000000000000",
     amount,
     expiresAt: t + MAX_EXPIRY_SECONDS,
@@ -234,6 +251,7 @@ export async function sendToUsername(
     salt: randomBytes32(),
   };
   const paymentId = paymentIdOf(config.escrow, intent, config.chainId);
+  const messageWrap = message && to.messageKey ? await wrapMessageSecret(to.messageKey, paymentId, messageSecret) : undefined;
 
   onStatus("SIGNING");
   const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(fundingAuthorization(config.escrow, intent, config.chainId, config.dollar)));
@@ -247,7 +265,7 @@ export async function sendToUsername(
   pin(to);
   const sent: SentPayment = {
     paymentId, sender: account.address, amount: amount.toString(), to: `@${to.username}`, createdAt: Date.now(), expiresAt: intent.expiresAt.toString(),
-    delivery: { recipient: to.account, recipientSalt, delivered: false },
+    delivery: { recipient: to.account, recipientSalt, delivered: false, ...(messageWrap ? { messageWrap } : {}) },
   };
   rememberSent(sent);
   for (let attempt = 0; attempt < 3; attempt++) {

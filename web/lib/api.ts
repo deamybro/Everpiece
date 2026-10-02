@@ -38,6 +38,7 @@ export function friendlyError(code: string | undefined): string {
     EmailUnavailable: "Email codes aren't available yet. Send to a phone number or @username instead.",
     EmailDailyLimit: "Too many codes today for this email. Try again later.",
     BelowMinimumPayment: "The minimum payment is $1.00.",
+    RecipientCantGetMessages: "This person can't receive messages yet. Remove the message to send the money.",
     MessageUploadFailed: "We couldn't attach your message, so nothing was sent. Try again, or remove the message to send without it.",
     MessageTooLarge: "Your message is too long. Record a shorter voice note or shorten the note.",
     MessageMalformed: "Your message couldn't be prepared. Record it again, or send without it.",

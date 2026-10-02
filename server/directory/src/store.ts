@@ -11,7 +11,10 @@ export type User = {
   sig: string;
   created_at: number;
 };
-export type InboxItem = { payment_id: string; recipient: string; recipient_salt: string; created_at: number };
+/** message_wrap: the payment's message secret sealed to the recipient's message key (HPKE), or null. Opaque here. */
+export type InboxItem = { payment_id: string; recipient: string; recipient_salt: string; message_wrap: string | null; created_at: number };
+/** An account's X25519 message key, signed by the account (MessageKeyRegistration). */
+export type MessageKey = { account: string; message_key: string; deadline: string; sig: string; created_at: number };
 
 export class DirectoryStore {
   readonly db: DatabaseSync;
@@ -25,11 +28,16 @@ export class DirectoryStore {
       CREATE TABLE IF NOT EXISTS inbox (payment_id TEXT PRIMARY KEY, recipient TEXT NOT NULL, recipient_salt TEXT NOT NULL,
         created_at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS inbox_recipient ON inbox(recipient, created_at);
+      CREATE TABLE IF NOT EXISTS message_keys (account TEXT PRIMARY KEY, message_key TEXT NOT NULL, deadline TEXT NOT NULL, sig TEXT NOT NULL,
+        created_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS registrations (ip TEXT NOT NULL, ts INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS registrations_ip ON registrations(ip, ts);
     `);
     const cols = (this.db.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]).map((c) => c.name);
     if (!cols.includes("skeleton")) throw new Error("directory db: users table predates the lookalike (skeleton) column; migrate before starting");
+    // Additive migration: inbox entries from before messages simply have no wrap.
+    const inboxCols = (this.db.prepare(`PRAGMA table_info(inbox)`).all() as { name: string }[]).map((c) => c.name);
+    if (!inboxCols.includes("message_wrap")) this.db.exec(`ALTER TABLE inbox ADD COLUMN message_wrap TEXT`);
   }
 
   byUsername(username: string): User | undefined {
@@ -58,10 +66,19 @@ export class DirectoryStore {
     return this.db.prepare(`SELECT * FROM inbox WHERE payment_id = ?`).get(paymentId) as InboxItem | undefined;
   }
   insertInbox(i: InboxItem): void {
-    this.db.prepare(`INSERT INTO inbox (payment_id, recipient, recipient_salt, created_at) VALUES (?, ?, ?, ?)`).run(i.payment_id, i.recipient, i.recipient_salt, i.created_at);
+    this.db
+      .prepare(`INSERT INTO inbox (payment_id, recipient, recipient_salt, message_wrap, created_at) VALUES (?, ?, ?, ?, ?)`)
+      .run(i.payment_id, i.recipient, i.recipient_salt, i.message_wrap, i.created_at);
   }
   inboxFor(recipient: string, limit: number): InboxItem[] {
     return this.db.prepare(`SELECT * FROM inbox WHERE recipient = ? ORDER BY created_at DESC LIMIT ?`).all(recipient, limit) as InboxItem[];
+  }
+
+  messageKeyOf(account: string): MessageKey | undefined {
+    return this.db.prepare(`SELECT * FROM message_keys WHERE account = ?`).get(account) as MessageKey | undefined;
+  }
+  insertMessageKey(k: MessageKey): void {
+    this.db.prepare(`INSERT INTO message_keys (account, message_key, deadline, sig, created_at) VALUES (?, ?, ?, ?, ?)`).run(k.account, k.message_key, k.deadline, k.sig, k.created_at);
   }
 
   close(): void {

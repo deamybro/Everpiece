@@ -7,6 +7,7 @@ const ROUTES: Record<string, (s: DirectoryService, body: unknown, ip: string) =>
   "/v1/usernames/available": (s, b, ip) => s.available(b, ip),
   "/v1/usernames/lookup": (s, b, ip) => s.lookup(b, ip),
   "/v1/usernames/by-account": (s, b, ip) => s.byAccount(b, ip),
+  "/v1/message-keys/register": (s, b, ip) => s.registerMessageKey(b, ip),
   "/v1/inbox/deliver": (s, b, ip) => s.deliver(b, ip),
   "/v1/inbox/list": (s, b, ip) => s.inbox(b, ip),
 };

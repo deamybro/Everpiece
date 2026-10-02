@@ -15,7 +15,7 @@ function recordingFormat(): string | null {
 }
 
 /** Optional message for a link payment: a written note and/or a voice note of up to 30 seconds. */
-export function MessageComposer({ value, onChange, disabled }: { value: Draft; onChange: (d: Draft) => void; disabled?: boolean }) {
+export function MessageComposer({ value, onChange, disabled, audience }: { value: Draft; onChange: (d: Draft) => void; disabled?: boolean; audience: string }) {
   const [format, setFormat] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -116,8 +116,8 @@ export function MessageComposer({ value, onChange, disabled }: { value: Draft; o
       )}
       {problem && <div className="status warn">{problem}</div>}
       <p className="muted small">
-        Your message is encrypted on this phone. Only someone with the link can play it. Everpiece stores only the encrypted
-        message, never the recording or its key.
+        Voice notes are encrypted on this phone. {audience} Everpiece stores the encrypted message, never the recording or
+        its key.
       </p>
     </div>
   );

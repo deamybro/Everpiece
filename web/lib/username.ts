@@ -1,5 +1,5 @@
 import { getAddress, recoverTypedDataAddress, type Address, type Hex } from "viem";
-import { inboxKeyHash, normalizeUsername, usernameRegistration } from "@everpiece/shared";
+import { inboxKeyHash, messageKeyRegistration, messagePublicKey, normalizeUsername, usernameRegistration } from "@everpiece/shared";
 import { config } from "./config";
 import { directory } from "./api";
 import { saveAccount, withSigner, type Account } from "./mera";
@@ -12,11 +12,24 @@ export class UsernameError extends Error {
   }
 }
 
-export type Recipient = { username: string; account: Address; displayName: string };
+/** messageKey: set only when the account itself signed it (else the recipient just can't get messages). */
+export type Recipient = { username: string; account: Address; displayName: string; messageKey?: Hex };
 /** "new": never paid before (show context, ask to confirm); "pinned": matches what we paid last time. */
 export type Pinning = "new" | "pinned";
 
-type DirectoryRecord = { username: string; account: string; displayName: string; inboxKeyHash: Hex; deadline: string; sig: Hex };
+type SignedMessageKey = { messageKey: Hex; deadline: string; sig: Hex };
+type DirectoryRecord = { username: string; account: string; displayName: string; inboxKeyHash: Hex; deadline: string; sig: Hex; messageKey?: SignedMessageKey | null };
+
+/** The account's message key, only if the account signed it: the directory can't make senders encrypt to its own key. */
+async function verifiedMessageKey(account: Address, k: SignedMessageKey | null | undefined): Promise<Hex | undefined> {
+  if (!k) return undefined;
+  try {
+    const typed = messageKeyRegistration(config.escrow, { account, messageKey: k.messageKey, deadline: BigInt(k.deadline) }, config.chainId);
+    return getAddress(await recoverTypedDataAddress({ ...typed, signature: k.sig })) === account ? k.messageKey : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Never trust the directory's word alone: the account itself must have signed "I am @username" (the directory
@@ -31,7 +44,7 @@ async function verified(r: DirectoryRecord): Promise<Recipient> {
       config.chainId,
     );
     if (getAddress(await recoverTypedDataAddress({ ...typed, signature: r.sig })) !== account) throw new Error();
-    return { username: r.username, account, displayName: r.displayName };
+    return { username: r.username, account, displayName: r.displayName, messageKey: await verifiedMessageKey(account, r.messageKey) };
   } catch {
     throw new UsernameError("RecipientUnverified");
   }
@@ -87,22 +100,63 @@ export async function checkAvailable(username: string): Promise<string | null> {
 export async function registerUsername(account: Account, username: string, displayName: string): Promise<Account> {
   // The directory accepts deadlines at most 10 minutes ahead (REQUEST_DEADLINE_MAX_SEC = 600).
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 540);
-  const { sig, inboxKey } = await withSigner(account, async (signer, inboxKey) => ({
+  // The same prompt also signs "this is my message key", so @username payments can carry messages from day one.
+  const { sig, inboxKey, messageSeed, keyReg } = await withSigner(account, async (signer, inboxKey, messageSeed) => ({
     inboxKey,
+    messageSeed,
     sig: await signer.signTypedData(
       usernameRegistration(config.escrow, { username, account: account.address, displayName, inboxKeyHash: inboxKeyHash(inboxKey), deadline }, config.chainId),
     ),
+    keyReg: await signMessageKey(signer, account.address, messageSeed, deadline),
   }));
   const r = await directory("/v1/usernames/register", {
     username, account: account.address, displayName, inboxKeyHash: inboxKeyHash(inboxKey), deadline: deadline.toString(), sig,
   }).catch(() => null);
   if (!r) throw new UsernameError("DirectoryUnavailable");
   if (r.status !== 201 && r.status !== 200) throw new UsernameError(r.body.error);
-  return saveAccount({ ...account, username, inboxKey });
+  // Messages are optional: if publishing the key fails, Home offers "Turn on messages" later.
+  const published = await publishMessageKey(keyReg);
+  return saveAccount({ ...account, username, inboxKey, messageSeed, messageKeyPublished: published });
+}
+
+// ── Message key (EVERPIECE_MESSAGE_KEY_V1) ──────────────────────────────────────────────────────────────────────
+type KeyRegistration = { account: Address; messageKey: Hex; deadline: string; sig: Hex };
+
+async function signMessageKey(signer: { signTypedData: (t: ReturnType<typeof messageKeyRegistration>) => Promise<Hex> }, account: Address, seed: Hex, deadline: bigint): Promise<KeyRegistration> {
+  const messageKey = await messagePublicKey(seed);
+  const sig = await signer.signTypedData(messageKeyRegistration(config.escrow, { account, messageKey, deadline }, config.chainId));
+  return { account, messageKey, deadline: deadline.toString(), sig };
+}
+
+async function publishMessageKey(k: KeyRegistration): Promise<boolean> {
+  const r = await directory("/v1/message-keys/register", k).catch(() => null);
+  return !!r && (r.status === 201 || r.status === 200);
+}
+
+/** Existing accounts: one fingerprint prompt publishes the message key so others can send them voice messages. */
+export async function enableMessages(account: Account): Promise<Account> {
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 540);
+  const { keyReg, messageSeed } = await withSigner(account, async (signer, _inboxKey, messageSeed) => ({
+    messageSeed,
+    keyReg: await signMessageKey(signer, account.address, messageSeed, deadline),
+  }));
+  if (!(await publishMessageKey(keyReg))) throw new UsernameError("DirectoryUnavailable");
+  return saveAccount({ ...account, messageSeed, messageKeyPublished: true });
+}
+
+/** Does the directory hold this account's own (signed) message key? Checked once per page load. */
+export async function messageKeyPublished(account: Account): Promise<boolean> {
+  const r = await directory("/v1/usernames/by-account", { account: account.address }).catch(() => null);
+  if (!r || r.status !== 200) return Boolean(account.messageKeyPublished);
+  // Immutable per account and derived from the passkey, so a verified key is necessarily this passkey's key.
+  const published = !!(await verifiedMessageKey(account.address, (r.body as DirectoryRecord).messageKey));
+  if (published !== Boolean(account.messageKeyPublished)) saveAccount({ ...account, messageKeyPublished: published });
+  return published;
 }
 
 // ── Inbox ───────────────────────────────────────────────────────────────────────────────────────────────────────
-export type InboxItem = { paymentId: Hex; recipientSalt: Hex };
+/** messageWrap: the message secret sealed to this account's message key, when the sender attached a message. */
+export type InboxItem = { paymentId: Hex; recipientSalt: Hex; messageWrap?: Hex };
 
 export async function readInbox(account: Account): Promise<InboxItem[]> {
   if (!account.inboxKey || !account.username) return [];

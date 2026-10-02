@@ -7,13 +7,15 @@ import {
 } from "@category-labs/mera";
 import { toViemAccount } from "@category-labs/mera/viem";
 import { bytesToHex, type Address, type Hex, type LocalAccount } from "viem";
-import { deriveEverpieceAccountV1, deriveEverpieceInboxKeyV1 } from "@everpiece/shared";
+import { deriveEverpieceAccountV1, deriveEverpieceInboxKeyV1, deriveEverpieceMessageSeedV1 } from "@everpiece/shared";
 
 /**
  * Mera passkey accounts, EVERPIECE_ACCOUNT_V1 (VERIFIED §3.4). Stored locally: the credential id/transports
  * (not secret, per the Mera recipe), the derived public address, the chosen @username, and the EVERPIECE_INBOX_V1
  * inbox key. The inbox key only lets this device READ the account's username-payment inbox (privacy, not funds), so
- * Home can show money waiting without a fingerprint prompt. PRF output and private keys are never persisted, logged
+ * Home can show money waiting without a fingerprint prompt. Likewise the EVERPIECE_MESSAGE_KEY_V1 seed: it only opens
+ * messages sent to this account (privacy, not funds), so Home can play them without a prompt; an XSS on our origin could
+ * read both, which is why the CSP is strict (THREAT_MODEL F1, K). PRF output and private keys are never persisted, logged
  * or sent anywhere, and are zeroed right after use (master §22.2).
  */
 const STORAGE_KEY = "everpiece.account.v1";
@@ -24,6 +26,10 @@ export type Account = {
   address: Address;
   name: string;
   inboxKey?: Hex;
+  /** EVERPIECE_MESSAGE_KEY_V1 seed (opens messages sent to this account). */
+  messageSeed?: Hex;
+  /** The directory has this account's signed message key. */
+  messageKeyPublished?: boolean;
   username?: string;
 };
 
@@ -47,14 +53,17 @@ export function forgetAccount(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-function publicFrom(prfOutput: Uint8Array): { address: Address; inboxKey: Hex } {
+function publicFrom(prfOutput: Uint8Array): { address: Address; inboxKey: Hex; messageSeed: Hex } {
   const { privateKey, address } = deriveEverpieceAccountV1(prfOutput);
   privateKey.fill(0);
   const ik = deriveEverpieceInboxKeyV1(prfOutput);
   const inboxKey = bytesToHex(ik);
   ik.fill(0);
+  const ms = deriveEverpieceMessageSeedV1(prfOutput);
+  const messageSeed = bytesToHex(ms);
+  ms.fill(0);
   prfOutput.fill(0);
-  return { address, inboxKey };
+  return { address, inboxKey, messageSeed };
 }
 
 export async function createAccount(name: string): Promise<Account> {
@@ -73,12 +82,15 @@ export async function signIn(): Promise<Account> {
  * (master §22.4 "prompt per financial action"). The same ceremony also yields the inbox key (needed once, when the
  * username is registered).
  */
-export async function withSigner<T>(account: Account, fn: (signer: LocalAccount, inboxKey: Hex) => Promise<T>): Promise<T> {
+export async function withSigner<T>(account: Account, fn: (signer: LocalAccount, inboxKey: Hex, messageSeed: Hex) => Promise<T>): Promise<T> {
   const r = await getPasskeyPrfOutput({ rpId: rpId(), credential: { credentialId: account.credentialId, transports: account.transports } });
   const { privateKey, address } = deriveEverpieceAccountV1(r.prfOutput);
   const ik = deriveEverpieceInboxKeyV1(r.prfOutput);
   const inboxKey = bytesToHex(ik);
   ik.fill(0);
+  const ms = deriveEverpieceMessageSeedV1(r.prfOutput);
+  const messageSeed = bytesToHex(ms);
+  ms.fill(0);
   r.prfOutput.fill(0);
   if (address !== account.address) {
     privateKey.fill(0);
@@ -87,10 +99,18 @@ export async function withSigner<T>(account: Account, fn: (signer: LocalAccount,
   const session = createSecp256k1SigningSession({ privateKey });
   privateKey.fill(0);
   try {
-    return await fn(toViemAccount(session), inboxKey);
+    return await fn(toViemAccount(session), inboxKey, messageSeed);
   } finally {
     session.end();
   }
+}
+
+/** This device lacks the message seed (account saved before messages existed): one prompt derives it, nothing is signed. */
+export async function unlockMessages(account: Account): Promise<Account> {
+  const r = await getPasskeyPrfOutput({ rpId: rpId(), credential: { credentialId: account.credentialId, transports: account.transports } });
+  const { address, messageSeed } = publicFrom(r.prfOutput);
+  if (address !== account.address) throw new Error("WrongPasskey");
+  return saveAccount({ ...account, messageSeed });
 }
 
 /** Mera error codes → consumer copy (master §22.5: never show raw SDK errors). */

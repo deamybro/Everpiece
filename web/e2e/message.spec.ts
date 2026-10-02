@@ -99,3 +99,58 @@ test("voice + note: encrypted on the sender's device, opened and verified by the
   await expect(stella.getByText("Money returned: $3.00.")).toBeVisible({ timeout: 60_000 });
   await expect(stella.locator(".balance")).toHaveText("$100.00");
 });
+
+async function onboard(page: Page, first: string, username: string) {
+  await page.goto("/");
+  await page.getByLabel("Your first name").fill(first);
+  await page.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
+  await expect(page.getByText(`Hi ${first}, your Dollars`)).toBeVisible();
+  await page.getByLabel("Username", { exact: true }).fill(username);
+  await expect(page.getByText(`@${username} is available ✓`)).toBeVisible();
+  await page.getByRole("button", { name: `Save @${username} with fingerprint or screen lock` }).click();
+  await expect(page.getByText(`Your username: @${username}`)).toBeVisible();
+}
+
+test("@username: the message is sealed to the recipient's own key; she hears it on Home, then claims", async ({ browser }) => {
+  const stella = await withPasskeys(await browser.newContext({ permissions: ["microphone"] }));
+  const mama = await withPasskeys(await browser.newContext());
+  const suffix = Date.now().toString(36).slice(-5);
+  const S = `msg_s_${suffix}`, M = `msg_m_${suffix}`;
+  await onboard(stella, "Stella", S);
+  await stella.getByRole("button", { name: "Get 100 test Dollars" }).click();
+  await expect(stella.locator(".balance")).toHaveText("$100.00");
+  await onboard(mama, "Mama", M); // registering the username also publishes her signed message key
+  await expect(mama.getByText("Get voice messages")).toHaveCount(0);
+
+  await stella.getByRole("link", { name: "Send money" }).click();
+  await stella.getByLabel("Amount in Dollars").fill("2");
+  await stella.getByRole("button", { name: "Continue" }).click();
+  await stella.getByRole("button", { name: "@username" }).click();
+  await stella.getByLabel("Their Everpiece username").fill(M);
+  await stella.getByRole("button", { name: "Find" }).click();
+  await stella.getByLabel(/This is the person I mean/).check();
+  await stella.getByRole("button", { name: "Continue" }).click();
+  await expect(stella.getByText(`Only @${M}'s account can open it.`)).toBeVisible();
+  await stella.getByLabel("Written note").fill("Happy birthday Mama");
+  await stella.getByRole("button", { name: /Record a voice note/ }).click();
+  await expect(stella.getByText(/Recording… 0:0[2-9]/)).toBeVisible({ timeout: 10_000 });
+  await stella.getByRole("button", { name: "Stop recording" }).click();
+  const deliver = stella.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/v1/inbox/deliver"));
+  await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
+  const delivered = JSON.parse((await deliver).postData()!);
+  expect(delivered.messageWrap).toMatch(/^0x[0-9a-f]{160}$/); // 80-byte HPKE wrap, opaque to the directory
+  expect(JSON.stringify(delivered)).not.toContain("Happy birthday");
+  await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible({ timeout: 60_000 });
+
+  await mama.reload();
+  const card = mama.getByLabel("Message from the sender");
+  await expect(card.getByText(`A message from @${S}`)).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByText("Happy birthday Mama")).toBeVisible();
+  await expect(card.getByText("Only your account can open it.")).toBeVisible();
+  const audio = card.getByLabel("Voice message");
+  await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.readyState), { timeout: 10_000 }).toBeGreaterThan(0);
+
+  // the message never gets in the way of the money
+  await mama.getByRole("button", { name: "Claim with fingerprint or screen lock" }).click();
+  await expect(mama.getByText(`You received $2.00 from @${S} ✓`)).toBeVisible({ timeout: 60_000 });
+});
