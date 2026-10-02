@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Address, Hex } from "viem";
 import { NO_METADATA, PaymentMode, PaymentStatus } from "@everpiece/shared";
 import { Welcome } from "../components/Welcome";
@@ -12,7 +12,7 @@ import { Progress, progressText } from "../components/status";
 import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
 import { cancelPayment, claimUsernamePayment, deliver, retryMessageBinds, returnExpired, FlowError } from "../lib/flows";
-import { loadHistory, type HistoryItem } from "../lib/history";
+import { loadHistory, type HistoryItem, type HistoryState } from "../lib/history";
 import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
 import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
 import { friendlyError, type RelayStatus } from "../lib/api";
@@ -35,6 +35,8 @@ export default function Home() {
   const [progress, setProgress] = useState("");
   const [message, setMessage] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
   const [messagesOn, setMessagesOn] = useState<boolean | null>(null);
+  // Cancels/returns this page saw CONFIRMED (final on-chain) that the indexer may not show yet: never offer them again.
+  const settled = useRef(new Map<string, HistoryState>());
 
   useEffect(() => {
     const a = loadAccount();
@@ -50,7 +52,14 @@ export default function Home() {
     // History from the indexer (source of truth); this browser's sent list only adds labels / not-yet-indexed sends.
     const h = await loadHistory(a).catch(() => null);
     if (h) {
-      setHistory(h.items);
+      setHistory(
+        h.items.map((i) => {
+          const s = settled.current.get(i.paymentId.toLowerCase());
+          if (!s) return i;
+          if (i.state !== "protected" && i.state !== "expired") settled.current.delete(i.paymentId.toLowerCase()); // indexer caught up
+          return i.state === "protected" || i.state === "expired" ? { ...i, state: s } : i;
+        }),
+      );
       setHistorySource(h.source);
       // Username payments whose inbox entry didn't reach the directory yet: keep retrying (idempotent).
       for (const i of h.items) {
@@ -100,6 +109,7 @@ export default function Home() {
     try {
       if (r.state === "expired") await returnExpired(r.paymentId, (s: RelayStatus) => setProgress(progressText(s, "Returning your money")));
       else await cancelPayment(account, r.paymentId, (s) => setProgress(progressText(s, "Returning your money")));
+      settled.current.set(r.paymentId.toLowerCase(), r.state === "expired" ? "refunded" : "cancelled");
       setMessage({ kind: "ok", text: `Money returned: ${formatDollars(r.amount)}.` });
     } catch (e) {
       setMessage({ kind: "bad", text: e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e) });

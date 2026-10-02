@@ -100,6 +100,9 @@ test("voice + note: encrypted on the sender's device, opened and verified by the
   const row = stella.getByRole("list", { name: "Activity" }).locator("li", { hasText: "$3.00" });
   await row.getByRole("button", { name: "Cancel and get my money back" }).click();
   await expect(stella.getByText("Money returned: $3.00.")).toBeVisible({ timeout: 60_000 });
+  // confirmed on-chain: the row updates at once (no second Cancel offered while the indexer catches up)
+  await expect(row.getByRole("button", { name: "Cancel and get my money back" })).toHaveCount(0, { timeout: 3_000 });
+  await expect(row.getByText("Cancelled")).toBeVisible();
   await expect(stella.locator(".balance")).toHaveText("$100.00");
 });
 
