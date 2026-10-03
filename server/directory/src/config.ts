@@ -8,6 +8,8 @@ export type DirectoryConfig = {
   escrow: Address;
   /** verifyingContract of the directory's EIP-712 domain. Defaults to the escrow; pinned when the escrow is redeployed so existing signed usernames stay valid. */
   domainAddress: Address;
+  /** EverpiecePay, to verify that an instant payment settled a request. Optional. */
+  payAddress?: Address;
   port: number;
   host: string;
   dbPath: string;
@@ -45,6 +47,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DirectoryConfi
     expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
     escrow: getAddress(escrow),
     domainAddress: getAddress(env.DIRECTORY_DOMAIN_ADDRESS || escrow),
+    payAddress: env.PAY_ADDRESS ? getAddress(env.PAY_ADDRESS) : undefined,
     port: int(env, "PORT", 8789),
     host: env.HOST ?? "127.0.0.1",
     dbPath: env.DIRECTORY_DB_PATH ?? "directory.sqlite",

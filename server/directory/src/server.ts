@@ -8,6 +8,10 @@ const ROUTES: Record<string, (s: DirectoryService, body: unknown, ip: string) =>
   "/v1/usernames/lookup": (s, b, ip) => s.lookup(b, ip),
   "/v1/usernames/by-account": (s, b, ip) => s.byAccount(b, ip),
   "/v1/message-keys/register": (s, b, ip) => s.registerMessageKey(b, ip),
+  "/v1/requests/create": (s, b, ip) => s.createRequest(b, ip),
+  "/v1/requests/get": (s, b, ip) => s.getRequest(b, ip),
+  "/v1/requests/paid": (s, b, ip) => s.requestPaid(b, ip),
+  "/v1/requests/mine": (s, b, ip) => s.myRequests(b, ip),
   "/v1/inbox/deliver": (s, b, ip) => s.deliver(b, ip),
   "/v1/inbox/list": (s, b, ip) => s.inbox(b, ip),
 };

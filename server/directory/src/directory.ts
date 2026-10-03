@@ -17,6 +17,12 @@ import {
   cleanDisplayName,
   MESSAGE_WRAP_BYTES,
   everpieceEscrowAbi,
+  everpiecePayAbi,
+  instantPaymentId,
+  paymentIdOf,
+  paymentRequestTyped,
+  requestProblem,
+  RequestMode,
   messageKeyRegistration,
   recipientCommitment,
   usernameProblem,
@@ -24,7 +30,7 @@ import {
   usernameSkeleton,
 } from "@everpiece/shared";
 import type { DirectoryConfig } from "./config.ts";
-import { DirectoryStore, type MessageKey, type User } from "./store.ts";
+import { DirectoryStore, type MessageKey, type RequestRow, type User } from "./store.ts";
 import { log } from "./log.ts";
 
 export type Result = { httpStatus: number; body: Record<string, unknown> };
@@ -58,6 +64,20 @@ const str = (v: unknown, n: string, max: number): string => {
 
 export type OnchainPayment = { status: number; mode: number; recipientCommitment: Hex };
 export type PaymentReader = (paymentId: Hex) => Promise<OnchainPayment>;
+/** EverpiecePay.settled(id) at "finalized". */
+export type SettledReader = (paymentId: Hex) => Promise<boolean>;
+
+const dec = (v: unknown, n: string): bigint => {
+  if (typeof v !== "string" || !/^(0|[1-9][0-9]{0,77})$/.test(v)) throw new Bad(`${n}: decimal string`);
+  return BigInt(v);
+};
+const publicRequest = (r: RequestRow, u: User | undefined) => ({
+  request: { version: 1, requestId: r.request_id, recipient: r.recipient, asset: r.asset, amount: r.amount, mode: r.mode, expiresAt: r.expires_at, memoHash: r.memo_hash },
+  sig: r.sig,
+  // what the payer's app shows, still to be verified by it (the recipient's signed @username record)
+  recipientRecord: u ? publicUser(u) : null,
+  paid: r.paid_payment_id ? { paymentId: r.paid_payment_id, kind: r.paid_kind, at: r.paid_at } : null,
+});
 
 class Limiter {
   private hits = new Map<string, number[]>();
@@ -102,11 +122,12 @@ export class DirectoryService {
   readonly cfg: DirectoryConfig;
   readonly store: DirectoryStore;
   readonly client: PublicClient;
-  private readonly readPayment: PaymentReader;
+  readonly readPayment: PaymentReader;
+  readonly readSettled: SettledReader;
   private readonly ipLimiter: Limiter;
-  private readonly now: () => number;
+  readonly now: () => number;
 
-  constructor(cfg: DirectoryConfig, opts: { store?: DirectoryStore; now?: () => number; readPayment?: PaymentReader } = {}) {
+  constructor(cfg: DirectoryConfig, opts: { store?: DirectoryStore; now?: () => number; readPayment?: PaymentReader; readSettled?: SettledReader } = {}) {
     this.cfg = cfg;
     this.store = opts.store ?? new DirectoryStore(cfg.dbPath);
     this.now = opts.now ?? Date.now;
@@ -128,6 +149,12 @@ export class DirectoryService {
           args: [paymentId],
           blockTag: "finalized", // inclusion ≠ success (VERIFIED §1.14)
         })) as unknown as OnchainPayment);
+    this.readSettled =
+      opts.readSettled ??
+      (async (paymentId) =>
+        cfg.payAddress
+          ? Boolean(await this.client.readContract({ address: cfg.payAddress, abi: everpiecePayAbi, functionName: "settled", args: [paymentId], blockTag: "finalized" }))
+          : false);
   }
 
   async start(): Promise<void> {
@@ -149,7 +176,7 @@ export class DirectoryService {
     const n = this.nowSec();
     return deadline >= n && deadline <= n + BigInt(this.cfg.requestDeadlineMaxSec);
   }
-  private guard(ip: string): Result | null {
+  guard(ip: string): Result | null {
     return this.ipLimiter.allow(ip, this.now()) ? null : err(429, "RateLimited");
   }
 
@@ -339,6 +366,134 @@ export class DirectoryService {
     return { httpStatus: 200, body: { items } };
   }
 }
+
+export const REQUESTS_PER_IP_PER_DAY = 100;
+
+// ── Payment requests (owner mandate §8–10) ─────────────────────────────────────────────────────────────────────
+// Methods are attached to the prototype below to keep the class body above readable.
+export interface DirectoryService {
+  createRequest(body: unknown, ip: string): Promise<Result>;
+  getRequest(body: unknown, ip: string): Promise<Result>;
+  requestPaid(body: unknown, ip: string): Promise<Result>;
+  myRequests(body: unknown, ip: string): Promise<Result>;
+}
+
+const REQUEST_KEYS = ["version", "requestId", "recipient", "asset", "amount", "mode", "expiresAt", "memoHash"] as const;
+
+/** The recipient signs every security-critical field; the directory stores it only if that signature is the recipient's. */
+DirectoryService.prototype.createRequest = async function (this: DirectoryService, body: unknown, ip: string): Promise<Result> {
+  const limited = (this as unknown as { guard(ip: string): Result | null }).guard(ip);
+  if (limited) return limited;
+  let r: { version: number; requestId: Hex; recipient: Address; asset: Address; amount: bigint; mode: 1 | 2; expiresAt: bigint; memoHash: Hex }, sig: Hex;
+  try {
+    const o = fields(body, ["request", "sig"]);
+    const q = fields(o.request, REQUEST_KEYS);
+    if (q.version !== 1) throw new Bad("version");
+    if (q.mode !== RequestMode.INSTANT && q.mode !== RequestMode.PROTECTED) throw new Bad("mode");
+    r = { version: 1, requestId: hex(q.requestId, 32, "requestId"), recipient: addr(q.recipient, "recipient"), asset: addr(q.asset, "asset"),
+      amount: dec(q.amount, "amount"), mode: q.mode as 1 | 2, expiresAt: secs(q.expiresAt, "expiresAt"), memoHash: hex(q.memoHash, 32, "memoHash") };
+    sig = hex(o.sig, 65, "sig");
+  } catch (e) {
+    return err(400, "InvalidRequest", { detail: (e as Error).message });
+  }
+  const nowSec = BigInt(Math.floor(this.now() / 1000));
+  const problem = requestProblem(r, nowSec, this.cfg.expectedChainId);
+  if (problem) return err(422, problem);
+  if (r.expiresAt > nowSec + 30n * 86_400n) return err(422, "EXPIRY_TOO_FAR");
+  if (!(await signedBy(r.recipient, { ...paymentRequestTyped(this.cfg.domainAddress, r, this.cfg.expectedChainId), signature: sig }))) return err(401, "InvalidSignature");
+  const u = this.store.byAccount(r.recipient);
+  if (!u) return err(404, "NoUsername"); // requests are "Pay @name": the payer must be able to see who it is
+  const existing = this.store.getRequest(r.requestId);
+  if (existing) return existing.sig === sig ? { httpStatus: 200, body: { ...publicRequest(existing, u), idempotent: true } } : err(409, "RequestExists");
+  if (this.store.requestsFor(r.recipient, REQUESTS_PER_IP_PER_DAY).filter((x) => x.created_at > this.now() - 86_400_000).length >= REQUESTS_PER_IP_PER_DAY) return err(429, "TooManyRequests");
+  const row: RequestRow = { request_id: r.requestId, recipient: r.recipient, asset: r.asset, amount: r.amount.toString(), mode: r.mode,
+    expires_at: r.expiresAt.toString(), memo_hash: r.memoHash, sig, created_at: this.now(), paid_payment_id: null, paid_kind: null, paid_at: null };
+  this.store.insertRequest(row);
+  log("info", "request.created", { mode: r.mode });
+  return { httpStatus: 201, body: publicRequest(row, u) };
+};
+
+DirectoryService.prototype.getRequest = async function (this: DirectoryService, body: unknown, ip: string): Promise<Result> {
+  const limited = (this as unknown as { guard(ip: string): Result | null }).guard(ip);
+  if (limited) return limited;
+  let id: Hex;
+  try {
+    id = hex(fields(body, ["requestId"]).requestId, 32, "requestId");
+  } catch (e) {
+    return err(400, "InvalidRequest", { detail: (e as Error).message });
+  }
+  const r = this.store.getRequest(id);
+  return r ? { httpStatus: 200, body: publicRequest(r, this.store.byAccount(r.recipient)) } : err(404, "UnknownRequest");
+};
+
+DirectoryService.prototype.myRequests = async function (this: DirectoryService, body: unknown, ip: string): Promise<Result> {
+  const limited = (this as unknown as { guard(ip: string): Result | null }).guard(ip);
+  if (limited) return limited;
+  let account: Address;
+  try {
+    account = addr(fields(body, ["account"]).account, "account");
+  } catch (e) {
+    return err(400, "InvalidRequest", { detail: (e as Error).message });
+  }
+  const u = this.store.byAccount(account);
+  return { httpStatus: 200, body: { items: this.store.requestsFor(account, 50).map((r) => publicRequest(r, u)) } };
+};
+
+/**
+ * "This request is paid": accepted only with a self-authenticating proof. The payer sends the payment's own terms;
+ * the directory recomputes its id and checks the chain at "finalized":
+ *   instant   — EverpiecePay Payment with ref = requestId, recipient and amount = the request's; settled(id) = true
+ *   protected — escrow PaymentIntent with salt = requestId, USERNAME mode, amount = the request's, the recipient
+ *               commitment opening to the request's recipient; getPayment(id) exists
+ */
+DirectoryService.prototype.requestPaid = async function (this: DirectoryService, body: unknown, ip: string): Promise<Result> {
+  const limited = (this as unknown as { guard(ip: string): Result | null }).guard(ip);
+  if (limited) return limited;
+  let o: Record<string, unknown>;
+  let requestId: Hex;
+  try {
+    const kind = (body as { kind?: unknown })?.kind;
+    o = fields(body, kind === "protected" ? ["requestId", "kind", "intent", "recipientSalt"] : ["requestId", "kind", "payment"]);
+    requestId = hex(o.requestId, 32, "requestId");
+  } catch (e) {
+    return err(400, "InvalidRequest", { detail: (e as Error).message });
+  }
+  const r = this.store.getRequest(requestId);
+  if (!r) return err(404, "UnknownRequest");
+  if (r.paid_payment_id) return { httpStatus: 200, body: { ...publicRequest(r, this.store.byAccount(r.recipient)), idempotent: true } };
+  let paymentId: Hex;
+  try {
+    if (o.kind === "instant") {
+      if (r.mode !== RequestMode.INSTANT || !this.cfg.payAddress) return err(422, "WrongKind");
+      const p = fields(o.payment, ["ref", "sender", "recipient", "amount", "sourceToken", "maxSourceAmount", "deadline"]);
+      const payment = { ref: hex(p.ref, 32, "ref"), sender: addr(p.sender, "sender"), recipient: addr(p.recipient, "recipient"), amount: dec(p.amount, "amount"),
+        sourceToken: addr(p.sourceToken, "sourceToken"), maxSourceAmount: dec(p.maxSourceAmount, "maxSourceAmount"), deadline: dec(p.deadline, "deadline") };
+      if (payment.ref !== requestId || payment.recipient !== getAddress(r.recipient) || payment.amount !== BigInt(r.amount)) return err(422, "NotThisRequest");
+      paymentId = instantPaymentId(this.cfg.payAddress, payment, this.cfg.expectedChainId);
+      if (!(await this.readSettled(paymentId))) return err(422, "PaymentNotFinalized");
+    } else if (o.kind === "protected") {
+      if (r.mode !== RequestMode.PROTECTED) return err(422, "WrongKind");
+      const i = fields(o.intent, ["sender", "mode", "recipientCommitment", "metadataCommitment", "approver", "amount", "expiresAt", "validAfter", "validBefore", "salt"]);
+      const intent = { sender: addr(i.sender, "sender"), mode: Number(i.mode), recipientCommitment: hex(i.recipientCommitment, 32, "rc"), metadataCommitment: hex(i.metadataCommitment, 32, "mc"),
+        approver: addr(i.approver, "approver"), amount: dec(i.amount, "amount"), expiresAt: dec(i.expiresAt, "expiresAt"), validAfter: dec(i.validAfter, "validAfter"),
+        validBefore: dec(i.validBefore, "validBefore"), salt: hex(i.salt, 32, "salt") };
+      const salt = hex(o.recipientSalt, 32, "recipientSalt");
+      if (intent.salt !== requestId || intent.mode !== PaymentMode.USERNAME || intent.amount !== BigInt(r.amount)) return err(422, "NotThisRequest");
+      if (recipientCommitment(PaymentMode.USERNAME, getAddress(r.recipient), salt).toLowerCase() !== intent.recipientCommitment) return err(422, "NotThisRequest");
+      paymentId = paymentIdOf(this.cfg.escrow, intent, this.cfg.expectedChainId);
+      const onchain = await this.readPayment(paymentId);
+      if (onchain.status === PaymentStatus.NONE) return err(422, "PaymentNotFinalized");
+      if (onchain.recipientCommitment.toLowerCase() !== intent.recipientCommitment) return err(422, "NotThisRequest");
+    } else return err(400, "InvalidRequest");
+  } catch (e) {
+    if (e instanceof Bad) return err(400, "InvalidRequest", { detail: e.message });
+    log("warn", "request.paid_rpc_error", { err: String(e).slice(0, 200) });
+    return err(503, "ChainUnavailable");
+  }
+  this.store.markRequestPaid(requestId, paymentId, String(o.kind), this.now());
+  log("info", "request.paid", { kind: String(o.kind) });
+  return { httpStatus: 200, body: publicRequest(this.store.getRequest(requestId)!, this.store.byAccount(r.recipient)) };
+};
 
 async function signedBy(expected: Address, typed: Parameters<typeof recoverTypedDataAddress>[0]): Promise<boolean> {
   try {

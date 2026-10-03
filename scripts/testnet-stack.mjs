@@ -126,7 +126,7 @@ run("claims", ["server/claims/src/main.ts"], {
   ...(process.env.RESEND_API_KEY && process.env.EMAIL_FROM ? { EMAIL_PROVIDER: "resend", RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_FROM: process.env.EMAIL_FROM } : {}),
 });
 run("directory", ["server/directory/src/main.ts"], {
-  ...common, DIRECTORY_DB_PATH: join(DATA, "directory.sqlite"), PORT: String(P.directory), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN,
+  ...common, DIRECTORY_DB_PATH: join(DATA, "directory.sqlite"), PORT: String(P.directory), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN, ...(PAY ? { PAY_ADDRESS: PAY } : {}),
   ...(process.env.REGISTRATIONS_PER_IP_PER_DAY ? { REGISTRATIONS_PER_IP_PER_DAY: process.env.REGISTRATIONS_PER_IP_PER_DAY } : {}),
 });
 

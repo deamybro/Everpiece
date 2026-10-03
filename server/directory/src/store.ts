@@ -12,6 +12,11 @@ export type User = {
   created_at: number;
 };
 /** message_wrap: the payment's message secret sealed to the recipient's message key (HPKE), or null. Opaque here. */
+/** A signed payment request ("Pay @maris $25"): the recipient's EIP-712 PaymentRequest + signature, as strings. */
+export type RequestRow = {
+  request_id: string; recipient: string; asset: string; amount: string; mode: number; expires_at: string; memo_hash: string;
+  sig: string; created_at: number; paid_payment_id: string | null; paid_kind: string | null; paid_at: number | null;
+};
 export type InboxItem = { payment_id: string; recipient: string; recipient_salt: string; message_wrap: string | null; created_at: number };
 /** An account's X25519 message key, signed by the account (MessageKeyRegistration). */
 export type MessageKey = { account: string; message_key: string; deadline: string; sig: string; created_at: number };
@@ -30,6 +35,10 @@ export class DirectoryStore {
       CREATE INDEX IF NOT EXISTS inbox_recipient ON inbox(recipient, created_at);
       CREATE TABLE IF NOT EXISTS message_keys (account TEXT PRIMARY KEY, message_key TEXT NOT NULL, deadline TEXT NOT NULL, sig TEXT NOT NULL,
         created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS requests (request_id TEXT PRIMARY KEY, recipient TEXT NOT NULL, asset TEXT NOT NULL, amount TEXT NOT NULL,
+        mode INTEGER NOT NULL, expires_at TEXT NOT NULL, memo_hash TEXT NOT NULL, sig TEXT NOT NULL, created_at INTEGER NOT NULL,
+        paid_payment_id TEXT, paid_kind TEXT, paid_at INTEGER);
+      CREATE INDEX IF NOT EXISTS requests_recipient ON requests(recipient, created_at);
       CREATE TABLE IF NOT EXISTS registrations (ip TEXT NOT NULL, ts INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS registrations_ip ON registrations(ip, ts);
     `);
@@ -79,6 +88,23 @@ export class DirectoryStore {
   }
   insertMessageKey(k: MessageKey): void {
     this.db.prepare(`INSERT INTO message_keys (account, message_key, deadline, sig, created_at) VALUES (?, ?, ?, ?, ?)`).run(k.account, k.message_key, k.deadline, k.sig, k.created_at);
+  }
+
+  getRequest(id: string): RequestRow | undefined {
+    return this.db.prepare(`SELECT * FROM requests WHERE request_id = ?`).get(id) as RequestRow | undefined;
+  }
+  insertRequest(r: RequestRow): void {
+    this.db
+      .prepare(`INSERT INTO requests (request_id, recipient, asset, amount, mode, expires_at, memo_hash, sig, created_at, paid_payment_id, paid_kind, paid_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)`)
+      .run(r.request_id, r.recipient, r.asset, r.amount, r.mode, r.expires_at, r.memo_hash, r.sig, r.created_at);
+  }
+  /** First proof wins; a request is paid once. */
+  markRequestPaid(id: string, paymentId: string, kind: string, at: number): boolean {
+    return Number(this.db.prepare(`UPDATE requests SET paid_payment_id = ?, paid_kind = ?, paid_at = ? WHERE request_id = ? AND paid_payment_id IS NULL`).run(paymentId, kind, at, id).changes) === 1;
+  }
+  requestsFor(recipient: string, limit: number): RequestRow[] {
+    return this.db.prepare(`SELECT * FROM requests WHERE recipient = ? ORDER BY created_at DESC LIMIT ?`).all(recipient, limit) as RequestRow[];
   }
 
   close(): void {
