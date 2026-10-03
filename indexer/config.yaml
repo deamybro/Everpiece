@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=./node_modules/envio/evm.schema.json
-# Everpiece history indexer (master §29): the four canonical EverpieceEscrow payment events on Monad mainnet (143).
+# Everpiece history indexer (master §29): the four EverpieceEscrow payment events and EverpiecePay's Paid event.
 # Keys follow node_modules/envio/evm.schema.json of envio 3.12.1 (pinned). History only: financial truth stays
 # getPayment at "finalized" (ESCROW_SPEC §17).
 name: everpiece-indexer
@@ -22,6 +22,10 @@ contracts:
       - event: PaymentClaimed(bytes32 indexed paymentId, address indexed recipient, uint256 amount)
       - event: PaymentCancelled(bytes32 indexed paymentId, address indexed sender, uint256 amount)
       - event: PaymentRefunded(bytes32 indexed paymentId, address indexed sender, uint256 amount, address caller)
+  - name: EverpiecePay
+    events:
+      # Must match contracts/src/EverpiecePay.sol (checked against the shared ABI in test/abi.test.ts).
+      - event: Paid(bytes32 indexed paymentId, bytes32 indexed ref, address indexed sender, address recipient, uint256 amount, address sourceToken, uint256 sourceAmount, address pair)
 chains:
   - id: ${ENVIO_CHAIN_ID}
     start_block: ${ENVIO_ESCROW_START_BLOCK}
@@ -38,3 +42,6 @@ chains:
     contracts:
       - name: EverpieceEscrow
         address: "${ENVIO_ESCROW_ADDRESS}"
+      # Instant payments (deployed after the escrow, so the escrow's start block covers it). Zero address = none.
+      - name: EverpiecePay
+        address: "${ENVIO_PAY_ADDRESS}"

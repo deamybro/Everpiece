@@ -11,8 +11,10 @@ while :; do
   gen="$(cat "$INFO")"
   ENVIO_ESCROW_ADDRESS="$(field escrow)"
   ENVIO_ESCROW_START_BLOCK="$(field deployBlock)"
-  export ENVIO_ESCROW_ADDRESS ENVIO_ESCROW_START_BLOCK
-  echo "indexer: escrow $ENVIO_ESCROW_ADDRESS from block $ENVIO_ESCROW_START_BLOCK (lag $ENVIO_BLOCK_LAG)"
+  ENVIO_PAY_ADDRESS="$(field pay)"
+  case "$ENVIO_PAY_ADDRESS" in 0x*) ;; *) ENVIO_PAY_ADDRESS=0x0000000000000000000000000000000000000000 ;; esac
+  export ENVIO_ESCROW_ADDRESS ENVIO_ESCROW_START_BLOCK ENVIO_PAY_ADDRESS
+  echo "indexer: escrow $ENVIO_ESCROW_ADDRESS, pay $ENVIO_PAY_ADDRESS from block $ENVIO_ESCROW_START_BLOCK (lag $ENVIO_BLOCK_LAG)"
   npx envio start -r &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do

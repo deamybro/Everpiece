@@ -10,7 +10,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPublicClient, createWalletClient, defineChain, getAddress, http, isAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { MONAD_TESTNET_CHAIN_ID, TEST_DOLLAR_EIP712_NAME } from "@everpiece/shared";
+import {
+  AGORA_TESTNET, AUSD_EIP712_NAME, AUSD_TESTNET_ADDRESS, CTK_TESTNET_ADDRESS, MONAD_TESTNET_CHAIN_ID, TEST_DOLLAR_EIP712_NAME,
+  agoraPairAbi, agoraWhitelisterAbi,
+} from "@everpiece/shared";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const env = (n, d) => {
@@ -24,6 +27,13 @@ const ORIGIN = env("STACK_PUBLIC_ORIGIN").replace(/\/$/, "");
 const DOLLAR = getAddress(env("TESTNET_DOLLAR_ADDRESS"));
 const ESCROW = getAddress(env("TESTNET_ESCROW_ADDRESS"));
 const ESCROW_BLOCK = Number(env("TESTNET_ESCROW_BLOCK"));
+// Real Agora AUSD on testnet (docs/INTEGRATION_VERIFICATION.md) unless an old TestDollar deployment is configured.
+const REAL_AUSD = DOLLAR === AUSD_TESTNET_ADDRESS;
+const DOLLAR_NAME = REAL_AUSD ? AUSD_EIP712_NAME : TEST_DOLLAR_EIP712_NAME;
+const PAY = process.env.TESTNET_PAY_ADDRESS ? getAddress(process.env.TESTNET_PAY_ADDRESS) : "";
+const PAY_BLOCK = Number(process.env.TESTNET_PAY_BLOCK || ESCROW_BLOCK);
+// @usernames and message keys are signed in a domain whose verifyingContract was the first escrow: keep it pinned.
+const DIRECTORY_DOMAIN = process.env.TESTNET_DIRECTORY_DOMAIN ? getAddress(process.env.TESTNET_DIRECTORY_DOMAIN) : ESCROW;
 const DATA = env("STACK_DATA_DIR", "/data");
 const BIND = env("STACK_BIND_HOST", "0.0.0.0");
 const INFO_FILE = process.env.STACK_INFO_FILE;
@@ -71,7 +81,7 @@ const chainId = await pub.getChainId();
 if (chainId !== MONAD_TESTNET_CHAIN_ID) throw new Error(`testnet-stack: RPC chainId ${chainId} is not Monad testnet`);
 if (INFO_FILE) rmSync(INFO_FILE, { force: true });
 mkdirSync(DATA, { recursive: true });
-say(`Monad testnet ${chainId}: TestDollar ${DOLLAR}, escrow ${ESCROW} (from block ${ESCROW_BLOCK})`);
+say(`Monad testnet ${chainId}: ${REAL_AUSD ? "Agora AUSD" : "TestDollar"} ${DOLLAR}, escrow ${ESCROW} (from block ${ESCROW_BLOCK}), pay ${PAY || "(none)"}`);
 
 // 1. web config (build-time) + production build before the services start (memory peak alone)
 writeFileSync(
@@ -82,7 +92,9 @@ writeFileSync(
     `NEXT_PUBLIC_MONAD_RPC=${RPC}`,
     `NEXT_PUBLIC_ESCROW_ADDRESS=${ESCROW}`,
     `NEXT_PUBLIC_DOLLAR_ADDRESS=${DOLLAR}`,
-    `NEXT_PUBLIC_DOLLAR_EIP712_NAME=${TEST_DOLLAR_EIP712_NAME}`,
+    `NEXT_PUBLIC_DOLLAR_EIP712_NAME=${DOLLAR_NAME}`,
+    `NEXT_PUBLIC_PAY_ADDRESS=${PAY}`,
+    `NEXT_PUBLIC_DIRECTORY_DOMAIN=${DIRECTORY_DOMAIN}`,
     `NEXT_PUBLIC_RELAYER_URL=${svc("relayer")}`,
     `NEXT_PUBLIC_CLAIMS_URL=${svc("claims")}`,
     `NEXT_PUBLIC_DIRECTORY_URL=${svc("directory")}`,
@@ -103,7 +115,7 @@ if (b.status !== 0) throw new Error("next build failed");
 const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_ID), ESCROW_ADDRESS: ESCROW, ALLOWED_ORIGIN: ORIGIN, LOG_LEVEL: "info", HOST: BIND, TRUST_PROXY: "1" };
 run("relayer", ["server/relayer/src/main.ts"], {
   ...common, RELAYER_PRIVATE_KEY: env("TESTNET_RELAYER_KEY"), RELAYER_DB_PATH: join(DATA, "relayer.sqlite"), PORT: String(P.relayer),
-  AUSD_ADDRESS: DOLLAR, DOLLAR_EIP712_NAME: TEST_DOLLAR_EIP712_NAME, MIN_RELAYER_BALANCE_WEI: String(2n * 10n ** 17n), // 0.2 MON
+  AUSD_ADDRESS: DOLLAR, DOLLAR_EIP712_NAME: DOLLAR_NAME, ...(PAY ? { PAY_ADDRESS: PAY } : {}), MIN_RELAYER_BALANCE_WEI: String(2n * 10n ** 17n), // 0.2 MON
 });
 const twilio = process.env.TWILIO_API_USER && process.env.TWILIO_API_SECRET && process.env.TWILIO_VERIFY_SERVICE_SID;
 run("claims", ["server/claims/src/main.ts"], {
@@ -114,7 +126,7 @@ run("claims", ["server/claims/src/main.ts"], {
   ...(process.env.RESEND_API_KEY && process.env.EMAIL_FROM ? { EMAIL_PROVIDER: "resend", RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_FROM: process.env.EMAIL_FROM } : {}),
 });
 run("directory", ["server/directory/src/main.ts"], {
-  ...common, DIRECTORY_DB_PATH: join(DATA, "directory.sqlite"), PORT: String(P.directory),
+  ...common, DIRECTORY_DB_PATH: join(DATA, "directory.sqlite"), PORT: String(P.directory), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN,
   ...(process.env.REGISTRATIONS_PER_IP_PER_DAY ? { REGISTRATIONS_PER_IP_PER_DAY: process.env.REGISTRATIONS_PER_IP_PER_DAY } : {}),
 });
 
@@ -125,17 +137,53 @@ run("voice", ["server/voice/src/main.ts"], { ...common, VOICE_DB_PATH: join(DATA
 const minter = privateKeyToAccount(env("TESTNET_DEPLOYER_KEY"));
 const wallet = createWalletClient({ chain, transport: http(RPC, { timeout: 20_000, retryCount: 2 }), account: minter });
 const mintAbi = [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] }];
+const erc20Abi = [
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "transfer", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [{ type: "bool" }] },
+];
+const agoraFaucetAbi = [{ type: "function", name: "requestFunds", stateMutability: "nonpayable", inputs: [{ type: "address" }], outputs: [] }];
+const AUSD_DRIP = 100_000_000n; // $100, like "Get 100 test Dollars"
+const CTK_DRIP = 100n * 10n ** 18n;
+async function sent(hash) {
+  const r = await pub.waitForTransactionReceipt({ hash, timeout: 60_000 });
+  if (r.status !== "success") throw new Error(`tx ${hash} reverted`);
+  return hash;
+}
+const bal = (token) => pub.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [minter.address] });
+/** AUSD float: Agora's testnet faucet gives 10,000 per request (docs: "Getting Testnet Tokens"). */
+async function ensureAusd(min) {
+  if ((await bal(DOLLAR)) >= min) return;
+  await sent(await wallet.writeContract({ address: AGORA_TESTNET.ausdFaucet, abi: agoraFaucetAbi, functionName: "requestFunds", args: [minter.address], chain: null }));
+  say("faucet: refilled the AUSD float from Agora's testnet faucet");
+}
+/** CTK float: bought on the real Agora CTK/AUSD pair (the documented CTK faucet doesn't exist on Monad testnet). */
+async function ensureCtk(min) {
+  if ((await bal(CTK_TESTNET_ADDRESS)) >= min) return;
+  const pair = AGORA_TESTNET.ctkAusdPair;
+  const ok = await pub.readContract({ address: pair, abi: agoraPairAbi, functionName: "hasRole", args: ["APPROVED_SWAPPER", minter.address] });
+  if (!ok) await sent(await wallet.writeContract({ address: AGORA_TESTNET.whitelister, abi: agoraWhitelisterAbi, functionName: "setApprovedSwapper", args: [minter.address], chain: null }));
+  const out = 5_000n * 10n ** 18n;
+  const [inMax] = await pub.readContract({ address: pair, abi: agoraPairAbi, functionName: "getAmountsIn", args: [out, [DOLLAR, CTK_TESTNET_ADDRESS]] });
+  await ensureAusd(inMax + AUSD_DRIP);
+  await sent(await wallet.writeContract({ address: DOLLAR, abi: erc20Abi, functionName: "approve", args: [pair, inMax], chain: null }));
+  await sent(await wallet.writeContract({ address: pair, abi: agoraPairAbi, functionName: "swapTokensForExactTokens", args: [out, inMax, [DOLLAR, CTK_TESTNET_ADDRESS], minter.address, BigInt(Math.floor(Date.now() / 1000) + 300)], chain: null }));
+  say("faucet: bought 5,000 test CTK on the Agora CTK/AUSD pair for the float");
+}
 const lastByAddress = new Map();
 const byIpDay = new Map();
 let queue = Promise.resolve();
 const ADDRESS_COOLDOWN_MS = 10 * 60_000;
 const IP_PER_DAY = 20;
-const mintTo = (address) =>
+const mintTo = (address, token = "AUSD") =>
   (queue = queue.then(async () => {
-    const hash = await wallet.writeContract({ address: DOLLAR, abi: mintAbi, functionName: "mint", args: [address, 100_000_000n], chain: null });
-    const r = await pub.waitForTransactionReceipt({ hash, timeout: 60_000 });
-    if (r.status !== "success") throw new Error("mint reverted");
-    return hash;
+    if (!REAL_AUSD) return sent(await wallet.writeContract({ address: DOLLAR, abi: mintAbi, functionName: "mint", args: [address, AUSD_DRIP], chain: null }));
+    if (token === "CTK") {
+      await ensureCtk(CTK_DRIP);
+      return sent(await wallet.writeContract({ address: CTK_TESTNET_ADDRESS, abi: erc20Abi, functionName: "transfer", args: [address, CTK_DRIP], chain: null }));
+    }
+    await ensureAusd(AUSD_DRIP);
+    return sent(await wallet.writeContract({ address: DOLLAR, abi: erc20Abi, functionName: "transfer", args: [address, AUSD_DRIP], chain: null }));
   }));
 
 async function faucetHandler(req, res) {
@@ -148,27 +196,29 @@ async function faucetHandler(req, res) {
       body += c;
       if (body.length > 1024) return res.writeHead(413).end();
     }
-    let address;
+    let address, token;
     try {
-      address = JSON.parse(body).address;
+      ({ address, token = "AUSD" } = JSON.parse(body));
     } catch {
       return res.writeHead(400).end();
     }
+    if (token !== "AUSD" && token !== "CTK") return json(res, 400, { error: "bad token" });
     if (typeof address !== "string" || !isAddress(address)) return json(res, 400, { error: "bad address" });
     address = getAddress(address);
     const now = Date.now();
     const ip = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || req.socket.remoteAddress || "?";
     const day = new Date().toISOString().slice(0, 10);
     const ipKey = `${ip}:${day}`;
-    if (now - (lastByAddress.get(address) ?? 0) < ADDRESS_COOLDOWN_MS) return json(res, 429, { error: "This account got test Dollars recently. Try again in a few minutes." });
+    const coolKey = `${address}:${token}`;
+    if (now - (lastByAddress.get(coolKey) ?? 0) < ADDRESS_COOLDOWN_MS) return json(res, 429, { error: "This account got test Dollars recently. Try again in a few minutes." });
     if ((byIpDay.get(ipKey) ?? 0) >= IP_PER_DAY) return json(res, 429, { error: "Daily test Dollar limit reached for this network." });
-    lastByAddress.set(address, now);
+    lastByAddress.set(coolKey, now);
     byIpDay.set(ipKey, (byIpDay.get(ipKey) ?? 0) + 1);
     try {
-      const hash = await mintTo(address);
+      const hash = await mintTo(address, token);
       return json(res, 200, { ok: true, hash });
     } catch (e) {
-      lastByAddress.delete(address);
+      lastByAddress.delete(coolKey);
       say(`faucet mint failed: ${String(e?.shortMessage ?? e).slice(0, 120)}`);
       return json(res, 503, { error: "Test Dollars are unavailable right now." });
     }
@@ -200,5 +250,5 @@ await waitFor(`http://127.0.0.1:${P.voice}/healthz`);
 // 4. web, then tell the indexer what to index (stable content: it only re-indexes when the escrow changes)
 run("web", [nextBin, "start", "--port", String(P.web), "--hostname", BIND], {}, join(root, "web"));
 await waitFor(`http://127.0.0.1:${P.web}`);
-if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow: ESCROW, deployBlock: ESCROW_BLOCK, chainId: MONAD_TESTNET_CHAIN_ID, rpc: RPC }) + "\n");
+if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow: ESCROW, deployBlock: ESCROW_BLOCK, pay: PAY || null, payBlock: PAY ? PAY_BLOCK : null, chainId: MONAD_TESTNET_CHAIN_ID, rpc: RPC }) + "\n");
 say(`✅ Everpiece on Monad testnet is up → ${ORIGIN}`);

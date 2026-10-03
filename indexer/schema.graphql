@@ -65,6 +65,9 @@ type Stats {
   activeLiability: BigInt!
   "Distinct addresses that sent or claimed at least one payment."
   users: Int!
+  "Instant payments (EverpiecePay): final at once, no escrow."
+  instantCount: Int!
+  instantVolume: BigInt!
 }
 
 "An address that sent or claimed (id = the address as the event logged it)."
@@ -72,4 +75,21 @@ type Account {
   id: ID!
   firstSeenAt: Int!
   firstSeenBlock: Int!
+}
+
+"An instant payment (EverpiecePay.Paid, id = paymentId): the recipient received exactly `amount` AUSD. Final."
+type InstantPayment {
+  id: ID!
+  ref: String!
+  sender: String! @index
+  recipient: String! @index
+  amount: BigInt!
+  "AUSD for a direct payment, otherwise the token converted through Agora Instant Settlement."
+  sourceToken: String!
+  sourceAmount: BigInt!
+  "The Agora pair used (zero address for a direct AUSD payment)."
+  pair: String!
+  block: Int!
+  timestamp: Int!
+  txHash: String!
 }

@@ -21,6 +21,8 @@ const emptyStats = (id: string) => ({
   activeCount: 0,
   activeLiability: 0n,
   users: 0,
+  instantCount: 0,
+  instantVolume: 0n,
 });
 
 type Stats = ReturnType<typeof emptyStats>;
@@ -125,4 +127,25 @@ indexer.onEvent({ contract: "EverpieceEscrow", event: "PaymentCancelled" }, asyn
 indexer.onEvent({ contract: "EverpieceEscrow", event: "PaymentRefunded" }, async ({ event, context }) => {
   const p = event.params;
   await settle("REFUNDED", { paymentId: p.paymentId, actor: p.sender, amount: p.amount, sender: p.sender, refundCaller: p.caller }, event, context);
+});
+
+indexer.onEvent({ contract: "EverpiecePay", event: "Paid" }, async ({ event, context }) => {
+  const p = event.params;
+  if (await context.InstantPayment.get(p.paymentId)) throw new Error(`Paid twice for ${p.paymentId}`); // the contract forbids it
+  context.InstantPayment.set({
+    id: p.paymentId,
+    ref: p.ref,
+    sender: p.sender,
+    recipient: p.recipient,
+    amount: p.amount,
+    sourceToken: p.sourceToken,
+    sourceAmount: p.sourceAmount,
+    pair: p.pair,
+    block: event.block.number,
+    timestamp: event.block.timestamp,
+    txHash: event.transaction.hash,
+  });
+  let s = await withUser(await context.Stats.getOrCreate(emptyStats(String(event.chainId))), p.sender, event, context);
+  s = await withUser(s, p.recipient, event, context);
+  context.Stats.set({ ...s, instantCount: s.instantCount + 1, instantVolume: s.instantVolume + p.amount });
 });

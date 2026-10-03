@@ -47,6 +47,14 @@ const refunded = (n: number, amount: bigint, block: number) => ({
   params: { paymentId: id(n), sender: SENDER, amount, caller: ANYONE },
 });
 
+const paid = (n: number, amount: bigint, block: number, recipient: Hex = RECIPIENT) => ({
+  contract: "EverpiecePay" as const,
+  event: "Paid" as const,
+  block: { number: block, timestamp: 1_790_000_000 + block },
+  transaction: { hash: tx(block) },
+  params: { paymentId: id(500 + n), ref: id(900 + n), sender: SENDER, recipient, amount, sourceToken: ANYONE, sourceAmount: amount * 10n ** 12n, pair: ANYONE },
+});
+
 describe("EverpieceEscrow history", () => {
   it("created → claimed: status, recipient, timeline, metrics", async () => {
     const indexer = createTestIndexer();
@@ -99,5 +107,14 @@ describe("EverpieceEscrow history", () => {
     ).rejects.toThrow(/amount 4 != created 5/);
     const wrongSender = { ...cancelled(1, 5n, 11), params: { paymentId: id(1), sender: ANYONE, amount: 5n } };
     await expect(createTestIndexer().process({ chains: { 143: { simulate: [created(1, 5n, 10), wrongSender] } } })).rejects.toThrow(/sender .* != creator/);
+  });
+
+  it("instant payments (EverpiecePay.Paid): recorded once, counted in metrics, users include the recipient", async () => {
+    const indexer = createTestIndexer();
+    await indexer.process({ chains: { 143: { simulate: [paid(1, 25_000_000n, 10), paid(2, 5_000_000n, 11)] } } });
+    expect(await indexer.InstantPayment.getOrThrow(id(501))).toMatchObject({ sender: SENDER, recipient: RECIPIENT, amount: 25_000_000n, sourceAmount: 25_000_000n * 10n ** 12n, block: 10, txHash: tx(10) });
+    expect(await indexer.Stats.getOrThrow("143")).toMatchObject({ instantCount: 2, instantVolume: 30_000_000n, users: 2, created: 0, activeLiability: 0n });
+    expect((await indexer.InstantPayment.getWhere({ recipient: { _eq: RECIPIENT } })).length).toBe(2);
+    await expect(createTestIndexer().process({ chains: { 143: { simulate: [paid(1, 1n, 10), paid(1, 1n, 11)] } } })).rejects.toThrow(/Paid twice/);
   });
 });

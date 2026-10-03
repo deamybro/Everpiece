@@ -52,6 +52,9 @@ services:
       TESTNET_DOLLAR_ADDRESS: ${TESTNET_DOLLAR_ADDRESS:-}
       TESTNET_ESCROW_ADDRESS: ${TESTNET_ESCROW_ADDRESS:-}
       TESTNET_ESCROW_BLOCK: ${TESTNET_ESCROW_BLOCK:-}
+      TESTNET_PAY_ADDRESS: ${TESTNET_PAY_ADDRESS:-}
+      TESTNET_PAY_BLOCK: ${TESTNET_PAY_BLOCK:-}
+      TESTNET_DIRECTORY_DOMAIN: ${TESTNET_DIRECTORY_DOMAIN:-}
     volumes:
       - stack-info:/shared
       - stack-data:/data # persistent relayer/claims/directory databases (testnet)
