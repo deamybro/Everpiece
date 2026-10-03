@@ -21,7 +21,7 @@ const NOW = (Number(D.deadline) - 300) * 1000;
 const pk = (n: number) => privateKeyToAccount(`0x${n.toString(16).padStart(64, "0")}` as Hex);
 
 const cfg: DirectoryConfig = {
-  rpcUrl: "http://127.0.0.1:1", expectedChainId: 143, escrow: ESCROW, port: 0, host: "127.0.0.1", dbPath: ":memory:",
+  rpcUrl: "http://127.0.0.1:1", expectedChainId: 143, escrow: ESCROW, domainAddress: ESCROW, port: 0, host: "127.0.0.1", dbPath: ":memory:",
   requestDeadlineMaxSec: 600, perIpPerMinute: 1000, registrationsPerIpPerDay: 3, inboxPageSize: 100, allowedOrigin: "http://localhost:3000", maxBodyBytes: 4096,
 };
 

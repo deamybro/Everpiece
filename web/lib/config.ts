@@ -6,6 +6,10 @@ export const config = {
   chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? "143"),
   rpcUrl: process.env.NEXT_PUBLIC_MONAD_RPC ?? "https://rpc.monad.xyz",
   escrow: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS ?? "") as Address,
+  /** EIP-712 domain of @username records, message keys and payment requests. Pinned across escrow redeploys. */
+  directoryDomain: (process.env.NEXT_PUBLIC_DIRECTORY_DOMAIN || process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "") as Address,
+  /** EverpiecePay (instant payments). Empty = instant payments unavailable. */
+  pay: (process.env.NEXT_PUBLIC_PAY_ADDRESS ?? "") as Address,
   /** The dollar token: real AUSD unless a deployment sets another (TestDollar on Monad testnet). */
   dollar: {
     address: (process.env.NEXT_PUBLIC_DOLLAR_ADDRESS || AUSD_ADDRESS) as Address,

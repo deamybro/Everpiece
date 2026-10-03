@@ -4,7 +4,7 @@
 set -euo pipefail
 HOST="${1:?usage: push.sh <ssh-host>}"
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
-ART="contracts/out/EverpieceEscrow.sol/EverpieceEscrow.json contracts/out/TestDollar.sol/TestDollar.json"
+ART="contracts/out/EverpieceEscrow.sol/EverpieceEscrow.json contracts/out/TestDollar.sol/TestDollar.json contracts/out/EverpiecePay.sol/EverpiecePay.json"
 cd "$ROOT"
 for a in $ART; do [ -f "$a" ] || { echo "missing $a: run forge build in contracts/" >&2; exit 1; }; done
 [ -z "$(git status --porcelain -- . ':!docs')" ] || echo "warning: uncommitted changes are NOT shipped (git archive HEAD)" >&2

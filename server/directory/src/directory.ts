@@ -175,7 +175,7 @@ export class DirectoryService {
     // The signed string must already be the canonical form, so what senders see is exactly what was signed.
     if (cleanDisplayName(displayName) !== displayName) return err(400, "InvalidDisplayName");
     if (!this.deadlineOk(deadline)) return err(400, "BadDeadline");
-    const typed = usernameRegistration(this.cfg.escrow, { username, account, displayName, inboxKeyHash, deadline }, this.cfg.expectedChainId);
+    const typed = usernameRegistration(this.cfg.domainAddress, { username, account, displayName, inboxKeyHash, deadline }, this.cfg.expectedChainId);
     if (!(await signedBy(account, { ...typed, signature: sig }))) return err(401, "InvalidSignature");
 
     const byName = this.store.byUsername(username);
@@ -222,7 +222,7 @@ export class DirectoryService {
       return err(400, "InvalidRequest", { detail: (e as Error).message });
     }
     if (!this.deadlineOk(deadline)) return err(400, "BadDeadline");
-    const typed = messageKeyRegistration(this.cfg.escrow, { account, messageKey, deadline }, this.cfg.expectedChainId);
+    const typed = messageKeyRegistration(this.cfg.domainAddress, { account, messageKey, deadline }, this.cfg.expectedChainId);
     if (!(await signedBy(account, { ...typed, signature: sig }))) return err(401, "InvalidSignature");
     if (!this.store.byAccount(account)) return err(404, "NoUsername");
     const existing = this.store.messageKeyOf(account);

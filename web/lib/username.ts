@@ -24,7 +24,7 @@ type DirectoryRecord = { username: string; account: string; displayName: string;
 async function verifiedMessageKey(account: Address, k: SignedMessageKey | null | undefined): Promise<Hex | undefined> {
   if (!k) return undefined;
   try {
-    const typed = messageKeyRegistration(config.escrow, { account, messageKey: k.messageKey, deadline: BigInt(k.deadline) }, config.chainId);
+    const typed = messageKeyRegistration(config.directoryDomain, { account, messageKey: k.messageKey, deadline: BigInt(k.deadline) }, config.chainId);
     return getAddress(await recoverTypedDataAddress({ ...typed, signature: k.sig })) === account ? k.messageKey : undefined;
   } catch {
     return undefined;
@@ -39,7 +39,7 @@ async function verified(r: DirectoryRecord): Promise<Recipient> {
   try {
     const account = getAddress(r.account);
     const typed = usernameRegistration(
-      config.escrow,
+      config.directoryDomain,
       { username: r.username, account, displayName: r.displayName, inboxKeyHash: r.inboxKeyHash, deadline: BigInt(r.deadline) },
       config.chainId,
     );
@@ -105,7 +105,7 @@ export async function registerUsername(account: Account, username: string, displ
     inboxKey,
     messageSeed,
     sig: await signer.signTypedData(
-      usernameRegistration(config.escrow, { username, account: account.address, displayName, inboxKeyHash: inboxKeyHash(inboxKey), deadline }, config.chainId),
+      usernameRegistration(config.directoryDomain, { username, account: account.address, displayName, inboxKeyHash: inboxKeyHash(inboxKey), deadline }, config.chainId),
     ),
     keyReg: await signMessageKey(signer, account.address, messageSeed, deadline),
   }));
@@ -124,7 +124,7 @@ type KeyRegistration = { account: Address; messageKey: Hex; deadline: string; si
 
 async function signMessageKey(signer: { signTypedData: (t: ReturnType<typeof messageKeyRegistration>) => Promise<Hex> }, account: Address, seed: Hex, deadline: bigint): Promise<KeyRegistration> {
   const messageKey = await messagePublicKey(seed);
-  const sig = await signer.signTypedData(messageKeyRegistration(config.escrow, { account, messageKey, deadline }, config.chainId));
+  const sig = await signer.signTypedData(messageKeyRegistration(config.directoryDomain, { account, messageKey, deadline }, config.chainId));
   return { account, messageKey, deadline: deadline.toString(), sig };
 }
 
