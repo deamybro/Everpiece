@@ -10,6 +10,8 @@ const ROUTES: Record<string, Method> = {
   "/v1/payments/claim-link": "claimLinkPayment",
   "/v1/payments/cancel": "cancel",
   "/v1/payments/refund": "refundExpired",
+  "/v1/pay/ausd": "payWithAusd",
+  "/v1/pay/token": "payWithToken",
 };
 
 class HttpError extends Error {
@@ -76,6 +78,11 @@ export function createHttpServer(relayer: Relayer): Server {
       if (req.method === "GET" && m) {
         const row = relayer.getRequest(m[1]);
         return row ? send(res, 200, publicView(row), origin) : send(res, 404, { error: "NotFound" }, origin);
+      }
+      if (url.pathname === "/v1/quotes") {
+        if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
+        const out = await relayer.quote(await readJson(req, relayer.cfg.maxBodyBytes));
+        return send(res, out.httpStatus, out.body, origin);
       }
       const method = ROUTES[url.pathname];
       if (!method) return send(res, 404, { error: "NotFound" }, origin);

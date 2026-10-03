@@ -1,10 +1,12 @@
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, TimeoutError, keccak256, parseEventLogs, type Hex } from "viem";
-import { everpieceEscrowAbi, PaymentStatus } from "@everpiece/shared";
-import { METHODS, type Method, type RelayerConfig } from "./config.ts";
+import { agoraPairAbi, everpieceEscrowAbi, everpiecePayAbi, PaymentStatus, ausdAbi, tokenFor, type RouteQuote } from "@everpiece/shared";
+import { randomUUID } from "node:crypto";
+import { METHODS, PAY_METHODS, type Method, type RelayerConfig } from "./config.ts";
 import { connect, readPayment, relayAbi, startupChecks, type Chain } from "./chain.ts";
 import { prepare, PrecheckError, type EscrowEvent } from "./actions.ts";
 import { Store, type RequestRow } from "./store.ts";
-import { ValidationError } from "./validate.ts";
+import { ValidationError, parseQuote } from "./validate.ts";
+import { LocalRulesPolicy, decide, type ComplianceProvider } from "./policy.ts";
 import { log } from "./log.ts";
 
 export type ApiResult = { httpStatus: number; body: Record<string, unknown> };
@@ -15,7 +17,13 @@ const EXPECTED: Record<Method, { event: EscrowEvent; status: number }> = {
   claimLinkPayment: { event: "PaymentClaimed", status: PaymentStatus.CLAIMED },
   cancel: { event: "PaymentCancelled", status: PaymentStatus.CANCELLED },
   refundExpired: { event: "PaymentRefunded", status: PaymentStatus.REFUNDED },
+  payWithAusd: { event: "Paid", status: 1 },
+  payWithToken: { event: "Paid", status: 1 },
 };
+
+const isPay = (m: Method) => PAY_METHODS.includes(m);
+/** EverpiecePay ABI + AUSD errors, so pay simulations decode Agora/AUSD/pay reverts by name. */
+const payRelayAbi = [...everpiecePayAbi, ...ausdAbi.filter((x) => x.type === "error")] as const;
 
 /** Sliding-window limiter (in-memory; per process). */
 class RateLimiter {
@@ -65,6 +73,7 @@ export class Relayer {
   private ticking = false;
   private lastRebroadcast = new Map<string, number>();
   private alertedStuck = new Set<string>();
+  readonly policy: ComplianceProvider;
 
   constructor(cfg: RelayerConfig, opts: { store?: Store; chain?: Chain; now?: () => number } = {}) {
     this.cfg = cfg;
@@ -73,6 +82,12 @@ export class Relayer {
     this.now = opts.now ?? Date.now;
     this.ipLimiter = new RateLimiter(cfg.perIpPerMinute);
     this.signerLimiter = new RateLimiter(cfg.perSignerPerMinute);
+    this.policy = new LocalRulesPolicy(cfg.policy);
+  }
+
+  /** Where a method's transaction goes: fixed by config, never by the client. */
+  private targetOf(m: Method) {
+    return isPay(m) ? this.cfg.pay! : this.cfg.escrow;
   }
 
   private now: () => number;
@@ -129,6 +144,28 @@ export class Relayer {
       }
     }
 
+    // Policy before anything is queued or simulated. Fail closed; every decision is recorded.
+    if (prep.money) {
+      const m = prep.money;
+      let agoraWhitelisted: boolean | null = null;
+      if (m.route === "AGORA_INSTANT_SETTLEMENT") {
+        const pair = tokenFor(this.chain.chainId, m.sourceToken)?.pair;
+        agoraWhitelisted = pair
+          ? await this.chain.client.readContract({ address: pair, abi: agoraPairAbi, functionName: "hasRole", args: ["APPROVED_SWAPPER", this.cfg.pay!] }).catch(() => null)
+          : false;
+      }
+      const verdict = await decide(this.policy, {
+        chainId: this.chain.chainId, sender: m.sender, recipient: m.recipient, amount: m.amount, sourceToken: m.sourceToken,
+        route: m.route, mode: m.mode, sentToday: this.store.allowedVolumeSince(m.sender, dayStart(now)), agoraWhitelisted,
+        kyc: "NOT_REQUIRED",
+      });
+      this.store.recordDecision({ paymentId: prep.paymentId, method: prep.method, sender: m.sender, recipient: m.recipient, amount: m.amount,
+        sourceToken: m.sourceToken, route: m.route, decision: verdict.decision, reasons: verdict.reasons, ruleVersion: verdict.ruleVersion, provider: verdict.provider }, now);
+      log("info", "policy.decision", { paymentId: prep.paymentId, method: prep.method, decision: verdict.decision, reasons: verdict.reasons.join(","), rule: verdict.ruleVersion });
+      if (verdict.decision === "DENY") return { httpStatus: 403, body: { error: "POLICY_DENIED", reasons: verdict.reasons } };
+      if (verdict.decision === "REVIEW") return { httpStatus: 409, body: { error: "POLICY_REVIEW", reasons: verdict.reasons } };
+    }
+
     const gasLimit = this.cfg.gasLimits[prep.method];
     // Synchronous claim of the idempotency key (no await between findLive and insert).
     const row = this.store.insert({
@@ -161,8 +198,8 @@ export class Relayer {
     // Known-revert filtering: never pay for a transaction that simulation says will revert.
     try {
       await this.chain.client.simulateContract({
-        address: this.cfg.escrow,
-        abi: relayAbi,
+        address: prep.target,
+        abi: isPay(prep.method) ? payRelayAbi : relayAbi,
         functionName: prep.method,
         args: prep.args,
         account: this.address,
@@ -214,7 +251,7 @@ export class Relayer {
       raw = await this.chain.account.signTransaction({
         type: "eip1559",
         chainId: this.chain.chainId,
-        to: this.cfg.escrow, // fixed target; calldata was built server-side from the allow-listed ABI
+        to: this.targetOf(row.method), // fixed per method by config; calldata was built server-side from the allow-listed ABI
         data: row.calldata as Hex,
         value: 0n,
         gas: BigInt(row.gas_limit),
@@ -304,6 +341,7 @@ export class Relayer {
     if (r.included_block !== receipt.blockNumber.toString()) this.store.update(r.id, { included_block: receipt.blockNumber.toString() });
     if (receipt.blockNumber > finalized) return; // included, maybe executed speculatively — not final yet
 
+    if (isPay(r.method)) return this.reconcilePay(r, receipt);
     const payment = await readPayment(this.cfg, this.chain, r.payment_id as Hex, "finalized");
     const chainStatus = Number(payment.status);
     const gasUsed = receipt.gasUsed.toString();
@@ -318,7 +356,7 @@ export class Relayer {
     const events = parseEventLogs({
       abi: everpieceEscrowAbi,
       logs: receipt.logs.filter((l) => l.address.toLowerCase() === this.cfg.escrow.toLowerCase()),
-      eventName: expected.event,
+      eventName: expected.event as Exclude<EscrowEvent, "Paid">,
     }) as unknown as { args: { paymentId: Hex } }[];
     const eventOk = events.some((ev) => ev.args.paymentId.toLowerCase() === r.payment_id.toLowerCase());
     // create: the payment may already have moved on by finality (claimed/cancelled) — it must at least exist.
@@ -330,6 +368,73 @@ export class Relayer {
     } else {
       this.store.update(r.id, { status: "FAILED", error: "ExpectedEventOrStateMissing", gas_used: gasUsed, chain_status: chainStatus });
       log("alert", "relayer.unexpected_outcome", { id: r.id, eventOk, stateOk, chainStatus });
+    }
+  }
+
+  /** Instant payments: CONFIRMED only with status 1, the Paid event for this id from EverpiecePay, and settled(id) at "finalized". */
+  private async reconcilePay(r: RequestRow, receipt: Awaited<ReturnType<typeof this.chain.client.getTransactionReceipt>>): Promise<void> {
+    const gasUsed = receipt.gasUsed.toString();
+    const settled = await this.chain.client.readContract({
+      address: this.cfg.pay!, abi: everpiecePayAbi, functionName: "settled", args: [r.payment_id as Hex], blockTag: "finalized",
+    });
+    if (receipt.status !== "success") {
+      this.store.update(r.id, { status: "FAILED", error: "RevertedOnChain", gas_used: gasUsed, chain_status: settled ? 1 : 0 });
+      log("warn", "relayer.reverted_on_chain", { id: r.id, hash: r.tx_hash });
+      return;
+    }
+    const events = parseEventLogs({
+      abi: everpiecePayAbi,
+      logs: receipt.logs.filter((l) => l.address.toLowerCase() === this.cfg.pay!.toLowerCase()),
+      eventName: "Paid",
+    }) as unknown as { args: { paymentId: Hex } }[];
+    const eventOk = events.some((ev) => ev.args.paymentId.toLowerCase() === r.payment_id.toLowerCase());
+    if (eventOk && settled) {
+      this.store.update(r.id, { status: "CONFIRMED", error: null, gas_used: gasUsed, chain_status: 1 });
+      log("info", "relayer.confirmed", { id: r.id, method: r.method, hash: r.tx_hash, block: receipt.blockNumber, gasUsed });
+    } else {
+      this.store.update(r.id, { status: "FAILED", error: "ExpectedEventOrStateMissing", gas_used: gasUsed, chain_status: settled ? 1 : 0 });
+      log("alert", "relayer.unexpected_outcome", { id: r.id, eventOk, settled });
+    }
+  }
+
+  /**
+   * Route quote (owner mandate §13): which provider can deliver EXACTLY `buyAmount` AUSD to `recipient` from `sellToken`.
+   * DIRECT_AUSD: sell = buy. AGORA_INSTANT_SETTLEMENT: the pair's own getAmountsIn via EverpiecePay.quote (fees included),
+   * plus headroom the payer authorizes as a ceiling; the contract returns whatever the swap didn't use. Anything else:
+   * UNSUPPORTED_TOKEN (never a fake quote). 0x has no Monad testnet support (docs/ROUTING.md), so it never quotes here.
+   */
+  async quote(body: unknown): Promise<ApiResult> {
+    let q;
+    try {
+      q = parseQuote(body);
+    } catch (e) {
+      return { httpStatus: 400, body: { error: "InvalidRequest", detail: (e as Error).message } };
+    }
+    if (!this.cfg.pay) return { httpStatus: 503, body: { error: "PROVIDER_UNAVAILABLE" } };
+    const token = tokenFor(this.chain.chainId, q.sellToken);
+    if (!token) return { httpStatus: 422, body: { error: "UNSUPPORTED_TOKEN" } };
+    if (q.buyAmount < this.cfg.minPaymentAmount) return { httpStatus: 422, body: { error: "BelowMinimumPayment" } };
+    const base = { quoteId: randomUUID(), environment: (token.testnet ? "testnet" : "mainnet") as "testnet" | "mainnet", chainId: this.chain.chainId, sellToken: token.address,
+      sellTokenDecimals: token.decimals, buyToken: this.cfg.ausd, buyAmount: q.buyAmount, networkFee: 0n,
+      expiresAt: Math.floor(this.now() / 1000) + this.cfg.quoteTtlSec, recipient: q.recipient, simulated: false as const };
+    if (token.route === "DIRECT_AUSD") {
+      const quote: RouteQuote = { ...base, provider: "DIRECT_AUSD", sellAmount: q.buyAmount, maxSellAmount: q.buyAmount, providerFee: 0n };
+      return { httpStatus: 200, body: { quote } };
+    }
+    if (token.route !== "AGORA_INSTANT_SETTLEMENT" || !token.pair) return { httpStatus: 422, body: { error: "NO_ROUTE" } };
+    try {
+      const whitelisted = await this.chain.client.readContract({ address: token.pair, abi: agoraPairAbi, functionName: "hasRole", args: ["APPROVED_SWAPPER", this.cfg.pay] });
+      if (!whitelisted) return { httpStatus: 503, body: { error: "AGORA_NOT_WHITELISTED" } };
+      const sellAmount = await this.chain.client.readContract({ address: this.cfg.pay, abi: everpiecePayAbi, functionName: "quote", args: [token.address, q.buyAmount] });
+      const maxSellAmount = sellAmount + (sellAmount * this.cfg.quoteHeadroomBps + 9_999n) / 10_000n;
+      // Agora fees are inside getAmountsIn; reported here as the difference from a 1:1 conversion of decimals.
+      const parity = q.buyAmount * 10n ** BigInt(token.decimals - 6);
+      const quote: RouteQuote = { ...base, provider: "AGORA_INSTANT_SETTLEMENT", sellAmount, maxSellAmount, providerFee: sellAmount > parity ? sellAmount - parity : 0n };
+      return { httpStatus: 200, body: { quote } };
+    } catch (e) {
+      const reason = revertName(e);
+      log("warn", "quote.failed", { err: String(e).slice(0, 200) });
+      return { httpStatus: reason ? 422 : 503, body: { error: reason ? "NO_ROUTE" : "PROVIDER_UNAVAILABLE" } };
     }
   }
 

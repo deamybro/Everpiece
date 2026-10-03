@@ -51,6 +51,13 @@ export class Store {
       CREATE INDEX IF NOT EXISTS requests_status ON requests(status);
       CREATE INDEX IF NOT EXISTS requests_signer ON requests(signer, created_at);
       CREATE TABLE IF NOT EXISTS gas_budget (day TEXT PRIMARY KEY, used TEXT NOT NULL);
+      -- Policy audit (owner mandate §23): every decision on a money-moving action. No message content, no secrets.
+      CREATE TABLE IF NOT EXISTS compliance_decisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, payment_id TEXT NOT NULL, method TEXT NOT NULL, sender TEXT NOT NULL,
+        recipient TEXT, amount TEXT NOT NULL, source_token TEXT NOT NULL, route TEXT NOT NULL, decision TEXT NOT NULL,
+        reasons TEXT NOT NULL, rule_version TEXT NOT NULL, provider TEXT NOT NULL, created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS compliance_sender ON compliance_decisions(sender, created_at);
     `);
   }
 
@@ -117,6 +124,25 @@ export class Store {
     if (!row) return;
     const left = BigInt(row.used) - gas;
     this.db.prepare(`UPDATE gas_budget SET used = ? WHERE day = ?`).run((left < 0n ? 0n : left).toString(), day);
+  }
+
+  recordDecision(d: { paymentId: string; method: string; sender: string; recipient: string | null; amount: bigint; sourceToken: string; route: string; decision: string; reasons: string[]; ruleVersion: string; provider: string }, now: number): void {
+    this.db
+      .prepare(`INSERT INTO compliance_decisions (payment_id, method, sender, recipient, amount, source_token, route, decision, reasons, rule_version, provider, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(d.paymentId, d.method, d.sender, d.recipient, d.amount.toString(), d.sourceToken, d.route, d.decision, d.reasons.join(","), d.ruleVersion, d.provider, now);
+  }
+
+  /** AUSD this sender moved through Everpiece since `since` (allowed money actions; velocity rule input). */
+  allowedVolumeSince(sender: string, since: number): bigint {
+    const rows = this.db
+      .prepare(`SELECT DISTINCT payment_id, amount FROM compliance_decisions WHERE sender = ? AND decision = 'ALLOW' AND created_at >= ?`)
+      .all(sender, since) as { amount: string }[];
+    return rows.reduce((s, r) => s + BigInt(r.amount), 0n);
+  }
+
+  decisionsFor(paymentId: string): { decision: string; reasons: string; rule_version: string; created_at: number }[] {
+    return this.db.prepare(`SELECT decision, reasons, rule_version, created_at FROM compliance_decisions WHERE payment_id = ? ORDER BY id`).all(paymentId) as never;
   }
 
   close(): void {

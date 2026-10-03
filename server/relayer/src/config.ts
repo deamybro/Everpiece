@@ -1,14 +1,17 @@
 import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
 import { AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
 
-/** The only escrow methods this relayer will ever submit (master §26.2 — no arbitrary calldata). */
-export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired"] as const;
+/** The only methods this relayer will ever submit (master §26.2 — no arbitrary calldata): escrow + EverpiecePay. */
+export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken"] as const;
+export const PAY_METHODS: readonly Method[] = ["payWithAusd", "payWithToken"];
 export type Method = (typeof METHODS)[number];
 
 export type RelayerConfig = {
   rpcUrl: string;
   expectedChainId: number;
   escrow: Address;
+  /** EverpiecePay (instant payments). Optional: without it the pay methods are refused. */
+  pay?: Address;
   ausd: Address;
   /** EIP-712 name of the dollar token's domain: "Agora Dollar" (AUSD) by default, "Everpiece Test Dollar" on testnet. */
   ausdEip712Name?: string;
@@ -34,6 +37,11 @@ export type RelayerConfig = {
   rebroadcastAfterMs: number;
   stuckAfterMs: number;
   allowedOrigin?: string;
+  /** Policy (server/relayer/src/policy.ts). Amounts in AUSD base units. */
+  policy: { maxPerPayment: bigint; maxPerSenderPerDay: bigint; reviewAbove: bigint; denylist: ReadonlySet<string> };
+  /** Headroom added to a token quote's sell amount (basis points); unused input is returned by the contract. */
+  quoteHeadroomBps: bigint;
+  quoteTtlSec: number;
 };
 
 function req(env: NodeJS.ProcessEnv, name: string): string {
@@ -71,6 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     rpcUrl: req(env, "MONAD_RPC"),
     expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
     escrow: address(env, "ESCROW_ADDRESS"),
+    pay: env.PAY_ADDRESS ? address(env, "PAY_ADDRESS") : undefined,
     ausd: address(env, "AUSD_ADDRESS", AUSD_ADDRESS),
     ausdEip712Name: env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
     relayerPrivateKey: key,
@@ -83,6 +92,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       claimLinkPayment: big(env, "GAS_LIMIT_CLAIM_LINK", 240_000n),
       cancel: big(env, "GAS_LIMIT_CANCEL", 195_000n),
       refundExpired: big(env, "GAS_LIMIT_REFUND", 145_000n),
+      payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 200_000n),
+      payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 420_000n),
     },
     maxFeePerGasWei: big(env, "MAX_FEE_PER_GAS_WEI", parseGwei("500")),
     priorityFeeWei: big(env, "PRIORITY_FEE_WEI", parseGwei("2")), // Monad RPC suggests 2 gwei (VERIFIED §1.14)
@@ -97,5 +108,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     rebroadcastAfterMs: int(env, "REBROADCAST_AFTER_MS", 15_000),
     stuckAfterMs: int(env, "STUCK_AFTER_MS", 120_000),
     allowedOrigin: env.ALLOWED_ORIGIN,
+    policy: {
+      maxPerPayment: big(env, "POLICY_MAX_PER_PAYMENT", 500_000_000n), // $500, same as the escrow ceiling
+      maxPerSenderPerDay: big(env, "POLICY_MAX_PER_SENDER_PER_DAY", 2_000_000_000n), // $2,000
+      reviewAbove: big(env, "POLICY_REVIEW_ABOVE", 0n),
+      denylist: new Set((env.POLICY_DENYLIST ?? "").split(",").map((s) => s.trim()).filter(Boolean).map((s) => getAddress(s))),
+    },
+    quoteHeadroomBps: big(env, "QUOTE_HEADROOM_BPS", 50n), // 0.5%
+    quoteTtlSec: int(env, "QUOTE_TTL_SEC", 60),
   };
 }

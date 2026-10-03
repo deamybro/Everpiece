@@ -7,13 +7,18 @@ import {
   claimApproval,
   claimIntent,
   everpieceEscrowAbi,
+  everpiecePayAbi,
   fundingAuthorization,
+  instantAusdAuthorization,
+  instantPaymentId,
+  instantPaymentTyped,
+  tokenFor,
   linkClaimIntent,
   paymentIdOf,
 } from "@everpiece/shared";
 import type { Method, RelayerConfig } from "./config.ts";
 import { readPayment, type Chain } from "./chain.ts";
-import { parseCancel, parseClaimLink, parseClaimUsername, parseCreate, parseRefund } from "./validate.ts";
+import { parseCancel, parseClaimLink, parseClaimUsername, parseCreate, parsePayAusd, parsePayToken, parseRefund } from "./validate.ts";
 
 /** Refused before any RPC-costly step; `code` is returned to the client. */
 export class PrecheckError extends Error {
@@ -26,7 +31,7 @@ export class PrecheckError extends Error {
   }
 }
 
-export type EscrowEvent = "PaymentCreated" | "PaymentClaimed" | "PaymentCancelled" | "PaymentRefunded";
+export type EscrowEvent = "PaymentCreated" | "PaymentClaimed" | "PaymentCancelled" | "PaymentRefunded" | "Paid";
 
 export type Prepared = {
   method: Method;
@@ -36,8 +41,19 @@ export type Prepared = {
   paymentId: Hex;
   idemKey: string;
   expectedEvent: EscrowEvent;
-  /** On-chain Status that must be observed at "finalized" for CONFIRMED. */
+  /** On-chain Status that must be observed at "finalized" for CONFIRMED (EverpiecePay: 1 = settled). */
   expectedStatus: number;
+  /** Contract the transaction goes to (escrow or EverpiecePay), from config; never client-chosen. */
+  target: Address;
+  /** What the policy engine needs for money-moving actions. */
+  money?: {
+    sender: Address;
+    recipient: Address | null;
+    amount: bigint;
+    sourceToken: Address;
+    route: "DIRECT_AUSD" | "AGORA_INSTANT_SETTLEMENT" | "ESCROW";
+    mode: "INSTANT" | "PROTECTED";
+  };
 };
 
 async function signedBy(expected: Address, typed: Parameters<typeof recoverTypedDataAddress>[0]): Promise<boolean> {
@@ -49,7 +65,8 @@ async function signedBy(expected: Address, typed: Parameters<typeof recoverTyped
 }
 
 function encode(method: Method, args: readonly unknown[]): Hex {
-  return encodeFunctionData({ abi: everpieceEscrowAbi, functionName: method, args } as Parameters<typeof encodeFunctionData>[0]);
+  const abi = method === "payWithAusd" || method === "payWithToken" ? everpiecePayAbi : everpieceEscrowAbi;
+  return encodeFunctionData({ abi, functionName: method, args } as Parameters<typeof encodeFunctionData>[0]);
 }
 
 export async function prepare(method: Method, body: unknown, cfg: RelayerConfig, chain: Chain): Promise<Prepared> {
@@ -68,7 +85,8 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
       const args = [intent, ausdSignature] as const;
       return {
         method, args, data: encode(method, args), signer: intent.sender, paymentId,
-        idemKey: `${method}:${paymentId}`, expectedEvent: "PaymentCreated", expectedStatus: PaymentStatus.ACTIVE,
+        idemKey: `${method}:${paymentId}`, expectedEvent: "PaymentCreated", expectedStatus: PaymentStatus.ACTIVE, target: escrow,
+        money: { sender: intent.sender, recipient: null, amount: intent.amount, sourceToken: cfg.ausd, route: "ESCROW", mode: "PROTECTED" },
       };
     }
 
@@ -82,7 +100,7 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
       return {
         method, args, data: encode(method, args), signer: p.recipient, paymentId: p.paymentId,
         idemKey: `${method}:${p.paymentId}:${p.recipient}:${p.actionNonce}`,
-        expectedEvent: "PaymentClaimed", expectedStatus: PaymentStatus.CLAIMED,
+        expectedEvent: "PaymentClaimed", expectedStatus: PaymentStatus.CLAIMED, target: escrow,
       };
     }
 
@@ -101,7 +119,7 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
       return {
         method, args, data: encode(method, args), signer: p.recipient, paymentId: p.paymentId,
         idemKey: `${method}:${p.paymentId}:${p.recipient}:${p.actionNonce}:${p.approvalNonce}`,
-        expectedEvent: "PaymentClaimed", expectedStatus: PaymentStatus.CLAIMED,
+        expectedEvent: "PaymentClaimed", expectedStatus: PaymentStatus.CLAIMED, target: escrow,
       };
     }
 
@@ -114,7 +132,7 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
       const args = [p.paymentId, p.actionNonce, p.deadline, p.senderSig] as const;
       return {
         method, args, data: encode(method, args), signer: payment.sender, paymentId: p.paymentId,
-        idemKey: `${method}:${p.paymentId}:${p.actionNonce}`, expectedEvent: "PaymentCancelled", expectedStatus: PaymentStatus.CANCELLED,
+        idemKey: `${method}:${p.paymentId}:${p.actionNonce}`, expectedEvent: "PaymentCancelled", expectedStatus: PaymentStatus.CANCELLED, target: escrow,
       };
     }
 
@@ -123,7 +141,41 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
       const args = [p.paymentId] as const;
       return {
         method, args, data: encode(method, args), signer: null, paymentId: p.paymentId,
-        idemKey: `${method}:${p.paymentId}`, expectedEvent: "PaymentRefunded", expectedStatus: PaymentStatus.REFUNDED,
+        idemKey: `${method}:${p.paymentId}`, expectedEvent: "PaymentRefunded", expectedStatus: PaymentStatus.REFUNDED, target: escrow,
+      };
+    }
+
+    case "payWithAusd": {
+      if (!cfg.pay) throw new PrecheckError(503, "InstantPaymentsUnavailable");
+      const { payment, ausdSignature } = parsePayAusd(body);
+      if (payment.sourceToken !== cfg.ausd) throw new PrecheckError(422, "UNSUPPORTED_TOKEN");
+      if (payment.amount < cfg.minPaymentAmount) throw new PrecheckError(422, "BelowMinimumPayment");
+      const auth = instantAusdAuthorization(cfg.pay, payment, chainId, cfg.ausd);
+      if (!(await signedBy(payment.sender, { ...auth, signature: ausdSignature }))) throw new PrecheckError(401, "InvalidFundingSignature");
+      const paymentId = instantPaymentId(cfg.pay, payment, chainId);
+      const args = [payment, ausdSignature] as const;
+      return {
+        method, args, data: encode(method, args), signer: payment.sender, paymentId, idemKey: `${method}:${paymentId}`,
+        expectedEvent: "Paid", expectedStatus: 1, target: cfg.pay,
+        money: { sender: payment.sender, recipient: payment.recipient, amount: payment.amount, sourceToken: cfg.ausd, route: "DIRECT_AUSD", mode: "INSTANT" },
+      };
+    }
+
+    case "payWithToken": {
+      if (!cfg.pay) throw new PrecheckError(503, "InstantPaymentsUnavailable");
+      const { payment, payerSignature, permit } = parsePayToken(body);
+      const token = tokenFor(chainId, payment.sourceToken);
+      if (!token || token.route !== "AGORA_INSTANT_SETTLEMENT") throw new PrecheckError(422, "UNSUPPORTED_TOKEN");
+      if (payment.amount < cfg.minPaymentAmount) throw new PrecheckError(422, "BelowMinimumPayment");
+      // the permit alone doesn't bind the recipient: the payer signs the whole Payment too
+      const typed = instantPaymentTyped(cfg.pay, payment, chainId);
+      if (!(await signedBy(payment.sender, { ...typed, signature: payerSignature }))) throw new PrecheckError(401, "InvalidPayerSignature");
+      const paymentId = instantPaymentId(cfg.pay, payment, chainId);
+      const args = [payment, payerSignature, permit.deadline, permit.v, permit.r, permit.s] as const;
+      return {
+        method, args, data: encode(method, args), signer: payment.sender, paymentId, idemKey: `${method}:${paymentId}`,
+        expectedEvent: "Paid", expectedStatus: 1, target: cfg.pay,
+        money: { sender: payment.sender, recipient: payment.recipient, amount: payment.amount, sourceToken: payment.sourceToken, route: "AGORA_INSTANT_SETTLEMENT", mode: "INSTANT" },
       };
     }
   }

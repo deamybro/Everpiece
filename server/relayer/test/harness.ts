@@ -87,7 +87,7 @@ export function baseConfig(rpc: string, escrow: Address, over: Partial<RelayerCo
     port: 0,
     host: "127.0.0.1",
     dbPath: ":memory:",
-    gasLimits: { createPayment: 350_000n, claimUsernamePayment: 215_000n, claimLinkPayment: 240_000n, cancel: 195_000n, refundExpired: 145_000n },
+    gasLimits: { createPayment: 350_000n, claimUsernamePayment: 215_000n, claimLinkPayment: 240_000n, cancel: 195_000n, refundExpired: 145_000n, payWithAusd: 200_000n, payWithToken: 420_000n },
     maxFeePerGasWei: parseEther("0.000001"), // 1000 gwei cap
     priorityFeeWei: 2_000_000_000n,
     minRelayerBalanceWei: parseEther("1"),
@@ -98,6 +98,9 @@ export function baseConfig(rpc: string, escrow: Address, over: Partial<RelayerCo
     minPaymentAmount: 1_000_000n,
     maxBodyBytes: 8_192,
     pollIntervalMs: 100,
+    policy: { maxPerPayment: 500_000_000n, maxPerSenderPerDay: 100_000_000_000n, reviewAbove: 0n, denylist: new Set() },
+    quoteHeadroomBps: 50n,
+    quoteTtlSec: 60,
     rebroadcastAfterMs: 60_000,
     stuckAfterMs: 120_000,
     ...over,

@@ -138,3 +138,53 @@ export function parseRefund(body: unknown): RefundParams {
   const o = obj(body, "body", ["paymentId"]);
   return { paymentId: b32(o.paymentId, "paymentId") };
 }
+
+// ── EverpiecePay ─────────────────────────────────────────────────────────────────────────────────────────────────
+export type PayPayment = {
+  ref: Hex;
+  sender: Address;
+  recipient: Address;
+  amount: bigint;
+  sourceToken: Address;
+  maxSourceAmount: bigint;
+  deadline: bigint;
+};
+export type PayAusdParams = { payment: PayPayment; ausdSignature: Hex };
+export type PayTokenParams = { payment: PayPayment; payerSignature: Hex; permit: { deadline: bigint; v: number; r: Hex; s: Hex } };
+
+const PAYMENT_KEYS = ["ref", "sender", "recipient", "amount", "sourceToken", "maxSourceAmount", "deadline"] as const;
+
+function parsePayment(v: unknown): PayPayment {
+  const p = obj(v, "payment", PAYMENT_KEYS);
+  return {
+    ref: b32(p.ref, "payment.ref"),
+    sender: addr(p.sender, "payment.sender"),
+    recipient: addr(p.recipient, "payment.recipient"),
+    amount: u256(p.amount, "payment.amount"),
+    sourceToken: addr(p.sourceToken, "payment.sourceToken"),
+    maxSourceAmount: u256(p.maxSourceAmount, "payment.maxSourceAmount"),
+    deadline: u256(p.deadline, "payment.deadline"),
+  };
+}
+
+export function parsePayAusd(body: unknown): PayAusdParams {
+  const o = obj(body, "body", ["payment", "ausdSignature"]);
+  return { payment: parsePayment(o.payment), ausdSignature: sig(o.ausdSignature, "ausdSignature") };
+}
+
+export function parsePayToken(body: unknown): PayTokenParams {
+  const o = obj(body, "body", ["payment", "payerSignature", "permit"]);
+  const pm = obj(o.permit, "permit", ["deadline", "v", "r", "s"]);
+  if (pm.v !== 27 && pm.v !== 28) throw new ValidationError("permit.v: 27 or 28");
+  return {
+    payment: parsePayment(o.payment),
+    payerSignature: sig(o.payerSignature, "payerSignature"),
+    permit: { deadline: u256(pm.deadline, "permit.deadline"), v: pm.v, r: b32(pm.r, "permit.r"), s: b32(pm.s, "permit.s") },
+  };
+}
+
+export type QuoteParams = { sellToken: Address; buyAmount: bigint; recipient: Address; sender: Address };
+export function parseQuote(body: unknown): QuoteParams {
+  const o = obj(body, "body", ["sellToken", "buyAmount", "recipient", "sender"]);
+  return { sellToken: addr(o.sellToken, "sellToken"), buyAmount: u256(o.buyAmount, "buyAmount"), recipient: addr(o.recipient, "recipient"), sender: addr(o.sender, "sender") };
+}
