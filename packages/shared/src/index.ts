@@ -7,3 +7,4 @@ export * from "./claimsTypedData.ts";
 export * from "./directory.ts";
 export * from "./voice.ts";
 export * from "./messageKey.ts";
+export * from "./pay.ts";
