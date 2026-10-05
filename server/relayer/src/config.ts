@@ -42,11 +42,6 @@ export type RelayerConfig = {
   /** Headroom added to a token quote's sell amount (basis points); unused input is returned by the contract. */
   quoteHeadroomBps: bigint;
   quoteTtlSec: number;
-  /**
-   * A simulation that reverts is retried twice, this far apart, before the request is refused. A load-balanced RPC can
-   * answer `latest` from a node a few seconds behind, e.g. before the payer's just-received funds (seen on testnet).
-   */
-  simulationRetryMs: number;
 };
 
 function req(env: NodeJS.ProcessEnv, name: string): string {
@@ -121,6 +116,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     },
     quoteHeadroomBps: big(env, "QUOTE_HEADROOM_BPS", 50n), // 0.5%
     quoteTtlSec: int(env, "QUOTE_TTL_SEC", 60),
-    simulationRetryMs: int(env, "SIMULATION_RETRY_MS", 1_500),
   };
 }

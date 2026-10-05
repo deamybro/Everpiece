@@ -101,7 +101,6 @@ export function baseConfig(rpc: string, escrow: Address, over: Partial<RelayerCo
     policy: { maxPerPayment: 500_000_000n, maxPerSenderPerDay: 100_000_000_000n, reviewAbove: 0n, denylist: new Set() },
     quoteHeadroomBps: 50n,
     quoteTtlSec: 60,
-    simulationRetryMs: 0,
     rebroadcastAfterMs: 60_000,
     stuckAfterMs: 120_000,
     ...over,
