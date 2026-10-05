@@ -367,7 +367,7 @@ export class DirectoryService {
   }
 }
 
-export const REQUESTS_PER_IP_PER_DAY = 100;
+export const REQUESTS_PER_RECIPIENT_PER_DAY = 100;
 
 // ── Payment requests (owner mandate §8–10) ─────────────────────────────────────────────────────────────────────
 // Methods are attached to the prototype below to keep the class body above readable.
@@ -405,7 +405,7 @@ DirectoryService.prototype.createRequest = async function (this: DirectoryServic
   if (!u) return err(404, "NoUsername"); // requests are "Pay @name": the payer must be able to see who it is
   const existing = this.store.getRequest(r.requestId);
   if (existing) return existing.sig === sig ? { httpStatus: 200, body: { ...publicRequest(existing, u), idempotent: true } } : err(409, "RequestExists");
-  if (this.store.requestsFor(r.recipient, REQUESTS_PER_IP_PER_DAY).filter((x) => x.created_at > this.now() - 86_400_000).length >= REQUESTS_PER_IP_PER_DAY) return err(429, "TooManyRequests");
+  if (this.store.requestsFor(r.recipient, REQUESTS_PER_RECIPIENT_PER_DAY).filter((x) => x.created_at > this.now() - 86_400_000).length >= REQUESTS_PER_RECIPIENT_PER_DAY) return err(429, "TooManyRequests");
   const row: RequestRow = { request_id: r.requestId, recipient: r.recipient, asset: r.asset, amount: r.amount.toString(), mode: r.mode,
     expires_at: r.expiresAt.toString(), memo_hash: r.memoHash, sig, created_at: this.now(), paid_payment_id: null, paid_kind: null, paid_at: null };
   this.store.insertRequest(row);
