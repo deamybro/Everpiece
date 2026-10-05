@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
           // Claim links carry secrets in the #fragment; never leak the URL onward (THREAT_MODEL C6).
           { key: "Referrer-Policy", value: "no-referrer" },
           // Voice messages record on our own origin only.
-          { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)" },
+          { key: "Permissions-Policy", value: "camera=(self), geolocation=(), payment=(), usb=(), microphone=(self)" }, // camera: QR scanning only
         ],
       },
       // Claim pages and anything secret-adjacent are never cached (master §2.6).

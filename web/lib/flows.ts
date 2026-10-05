@@ -238,7 +238,9 @@ export async function sendToUsername(
   to: Recipient,
   onStatus: (s: RelayStatus | "SIGNING" | "ATTACHING") => void,
   message?: Message,
-): Promise<{ paymentId: Hex; delivered: boolean }> {
+  /** Paying a protected payment request: salt = requestId, so the directory can verify the payment against it. */
+  opts: { salt?: Hex } = {},
+): Promise<{ paymentId: Hex; delivered: boolean; intent: PaymentIntent; recipientSalt: Hex }> {
   if (to.account === account.address) throw new FlowError("CannotPaySelf");
   if (message && !to.messageKey) throw new FlowError("RecipientCantGetMessages");
   const recipientSalt = randomBytes32();
@@ -264,7 +266,7 @@ export async function sendToUsername(
     expiresAt: t + MAX_EXPIRY_SECONDS,
     validAfter: 0n,
     validBefore: t + 3600n,
-    salt: randomBytes32(),
+    salt: opts.salt ?? randomBytes32(),
   };
   const paymentId = paymentIdOf(config.escrow, intent, config.chainId);
   const messageWrap = message && to.messageKey ? await wrapMessageSecret(to.messageKey, paymentId, messageSecret) : undefined;
@@ -287,10 +289,10 @@ export async function sendToUsername(
   rememberSent(sent);
   if (sent.messageBind) void bindMessage(sent.messageBind.locator, sent.messageBind.metadataSalt, paymentId).then((ok) => ok && markBound(paymentId));
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (await deliver(sent)) return { paymentId, delivered: true };
+    if (await deliver(sent)) return { paymentId, delivered: true, intent, recipientSalt };
     await new Promise((res) => setTimeout(res, 1500));
   }
-  return { paymentId, delivered: false };
+  return { paymentId, delivered: false, intent, recipientSalt };
 }
 
 /** Claim a username payment into the signed-in account. One fingerprint prompt. */

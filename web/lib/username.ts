@@ -31,6 +31,11 @@ async function verifiedMessageKey(account: Address, k: SignedMessageKey | null |
   }
 }
 
+/** Verify a directory record (the account itself signed "I am @username"); exported for payment requests. */
+export async function verifiedRecord(r: unknown): Promise<Recipient> {
+  return verified(r as DirectoryRecord);
+}
+
 /**
  * Never trust the directory's word alone: the account itself must have signed "I am @username" (the directory
  * cannot attribute a name to an account that did not sign for it).

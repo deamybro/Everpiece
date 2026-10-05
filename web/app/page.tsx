@@ -180,6 +180,10 @@ export default function Home() {
         {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
         <div className="balance">{balance === null ? "…" : formatDollars(balance)}</div>
         <Link className="button" href="/send">Send money</Link>
+        <div className="row" role="group">
+          <Link className="button secondary" href="/request">Request</Link>
+          <Link className="button secondary" href="/scan">Scan to pay</Link>
+        </div>
       </div>
 
       {isDevStack && (
