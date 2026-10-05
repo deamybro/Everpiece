@@ -171,9 +171,17 @@ export async function readInbox(account: Account): Promise<InboxItem[]> {
 }
 
 /** Sender's name for context on an incoming payment ("from @stella"). Verified, or null. */
+// An account's @username never changes (one per account; the directory has no rename or delete), so a verified answer
+// is kept for the tab's lifetime. Home refreshes re-asked for every row and hit the directory's per-IP rate limit.
+const verifiedNames = new Map<Address, string>();
+
 export async function usernameOf(address: Address): Promise<string | null> {
+  const known = verifiedNames.get(getAddress(address));
+  if (known) return known;
   const r = await directory("/v1/usernames/by-account", { account: address }).catch(() => null);
   if (!r || r.status !== 200) return null;
   const who = await verified(r.body as DirectoryRecord).catch(() => null);
-  return who && who.account === getAddress(address) ? who.username : null;
+  if (!who || who.account !== getAddress(address)) return null;
+  verifiedNames.set(who.account, who.username);
+  return who.username;
 }
