@@ -4,6 +4,40 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 22 — 2026-10-05 — Payment requests + scan-to-pay (web)
+
+- **Branch:** `feat/payment-intents-agora` (local only, not pushed).
+- **Built (`e19388a`):**
+  - `/request`: the recipient signs an exact AUSD request (Instant or Protected, 24 h) and shows it as a QR code and link. The page watches the directory, which marks the request paid only with an on-chain proof.
+  - `/pay/<requestId>`: the request is verified before it is shown: the recipient's signature over every field plus their signed @username record. Then the payer picks AUSD or a routed token (live relayer quote, countdown, refresh before expiry).
+    - Instant: EverpiecePay, final.
+    - Protected: a token is first converted to the payer's own AUSD, then escrowed with `salt = requestId` (so refunds come back in AUSD). That is two passkey prompts.
+  - `/scan`: a BarcodeDetector camera scan or a pasted link. Only this origin's `/pay/<32-byte id>` links are followed.
+  - Home: "Request" and "Scan to pay" buttons. `Permissions-Policy` now allows the camera on our own origin only.
+- **Fixed in review:** the scanner leaked the camera stream if the page closed while the permission prompt was open; a JSDoc in `username.ts` had become detached from its function.
+- **Tests run:** web typecheck clean; `node --test web/test/scan.test.ts` 2/2; `next build` clean.
+  - **Not run:** an E2E of request → scan → pay on testnet. The web has not been deployed to test.everpiece.xyz this session.
+- **Open:**
+  - deploy the web to testnet and add a Playwright spec (create request, pay in AUSD and in CTK, both modes, "paid" mark);
+  - real-phone QR scan (Android Chrome has BarcodeDetector; iPhone Safari does not, so iPhone users get only the paste fallback);
+  - owner decisions below are unchanged.
+
+---
+
+## Session 21 — 2026-10-03 — EverpiecePay + payment intents on real Agora AUSD (backfilled 10-05)
+
+- **Branch:** `feat/payment-intents-agora`. This session wasn't logged at the time; the entry is reconstructed from the commits.
+- **Contracts (`22f05ee`):** `EverpiecePay` — instant payments, no owner/admin, each payment settles once.
+  - `payWithAusd`: one AUSD ERC-3009 signature with nonce = payment id.
+  - `payWithToken`: payer EIP-712 signature + ERC-2612 permit; swaps through the fixed Agora pair for exactly the AUSD amount to the recipient, and refunds the rest.
+  - Tests: 14 unit (incl. fuzz) on a mock pair; 3 fork tests on real Monad testnet AUSD + the CTK/AUSD pair + Whitelister.
+  - Docs: `BASELINE.md`, `INTEGRATION_VERIFICATION.md`.
+- **Shared (`f70e262`):** token registry, exact amounts without floats, EverpiecePay typed data (id vector checked in Solidity), signed `PaymentRequest`, central lifecycle `canTransition`. 30/30.
+- **Relayer (`1b90aee`):** instant pay endpoints (CONFIRMED only with the `Paid` event + `settled(id)` at finalized); `/v1/quotes` (direct or Agora, never a fake quote); `LocalRulesPolicy` — labelled TEST, no sanctions/identity screening — that fails closed and records every decision. 14 offline + 32 with fork.
+- **Deploy/stack/indexer (`a09876c`, `4e1ddf1`):** the testnet deploy script redeploys the unchanged escrow over real AUSD plus EverpiecePay and whitelists it with Agora. The directory signing domain is pinned so existing @usernames and message keys stay valid. The faucet hands out real test AUSD or test CTK. The indexer records instant payments (5/5).
+- **Directory (`aec3733`):** payment requests create/get/mine/paid; "paid" is accepted only with a proof recomputed against the chain. 13/13.
+- **Open:** the policy engine is test-only (no real screening) — needs an owner decision before mainnet.
+
 ## Session 20 — 2026-10-02 — Adversarial suite (Codex Phase A, reassigned)
 
 - **Owner:** "yes" to the core team taking over `contracts/test/adversarial/`. AGENTS.md is updated.
