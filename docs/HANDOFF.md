@@ -4,23 +4,31 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
-## Session 22 — 2026-10-05 — Payment requests + scan-to-pay (web)
+## Session 22 — 2026-10-05/06 — Payment requests + scan-to-pay, deployed; four testnet bugs fixed
 
-- **Branch:** `feat/payment-intents-agora` (local only, not pushed).
+- **Branch:** `feat/payment-intents-agora` (local only, not pushed). **Deployed** `2c7b2f2` to https://test.everpiece.xyz (owner: "yes" / "can't u do this urself?").
 - **Built (`e19388a`):**
-  - `/request`: the recipient signs an exact AUSD request (Instant or Protected, 24 h) and shows it as a QR code and link. The page watches the directory, which marks the request paid only with an on-chain proof.
-  - `/pay/<requestId>`: the request is verified before it is shown: the recipient's signature over every field plus their signed @username record. Then the payer picks AUSD or a routed token (live relayer quote, countdown, refresh before expiry).
-    - Instant: EverpiecePay, final.
-    - Protected: a token is first converted to the payer's own AUSD, then escrowed with `salt = requestId` (so refunds come back in AUSD). That is two passkey prompts.
-  - `/scan`: a BarcodeDetector camera scan or a pasted link. Only this origin's `/pay/<32-byte id>` links are followed.
-  - Home: "Request" and "Scan to pay" buttons. `Permissions-Policy` now allows the camera on our own origin only.
-- **Fixed in review:** the scanner leaked the camera stream if the page closed while the permission prompt was open; a JSDoc in `username.ts` had become detached from its function.
-- **Tests run:** web typecheck clean; `node --test web/test/scan.test.ts` 2/2; `next build` clean.
-  - **Not run:** an E2E of request → scan → pay on testnet. The web has not been deployed to test.everpiece.xyz this session.
+  - `/request`: the recipient signs an exact AUSD request (Instant or Protected, 24 h) and shows it as a QR code and link. The page flips to Paid only when the directory has an on-chain proof.
+  - `/pay/<requestId>`: verified before it is shown (the recipient's signature over every field plus their signed @username record). The payer picks AUSD or test CTK (live relayer quote, countdown, refresh before expiry).
+    - Protected + CTK: converted to the payer's own AUSD first, then escrowed with `salt = requestId`; two passkey prompts.
+  - `/scan`: BarcodeDetector camera or a pasted link; only this origin's `/pay/<32-byte id>` links are followed.
+  - Home: "Request" and "Scan to pay". Camera allowed on our own origin only. Own 404 page (`cdd059b`): Next's default uses inline styles the CSP blocks.
+  - `web/e2e/request.spec.ts` (`a0881df`).
+- **Bugs found on testnet and fixed:**
+  1. **Every direct-AUSD instant payment was refused** (`60a0526`): `payWithAusd` needs 223,216 gas on Monad testnet, and the relayer's limit was 200k. The fork tests fit because a local fork uses Ethereum's gas schedule. Now 240k. **`payWithToken` (420k) was not measured separately**; it passed the E2E.
+     - A first diagnosis ("lagging RPC node") was wrong: the replays omitted the gas limit. That change was reverted (`e5f93b5`).
+  2. **Each deploy re-indexed testnet from scratch** (`93d0bd5`, `83682cd`) and saturated the public RPC's 50 req/s per-IP limit for ~20 min, so faucet sends failed with 429. The indexer now resumes when the contracts and its code are unchanged (marker in a new `indexer-state` volume) and wipes only after 3 failed runs in a row. `backoff_millis: 2000`. Faucet sends retry 5×.
+  3. **Receipts showed an address instead of @username** (`2c7b2f2`): Home re-fetched names for every Activity row on every refresh and hit the directory's 60/min per-IP limit. Verified names are now cached for the tab (usernames never change).
+  4. Rename: `REQUESTS_PER_RECIPIENT_PER_DAY` (it counts per recipient).
+- **Tests run:**
+  - Testnet E2E on `2c7b2f2`: request 1/1, history 1/1, message 2/2.
+  - Relayer 14/14 offline and 32/32 with fork (run on `2e13794`; the gas-limit change was checked with the offline suite only). Directory 13/13. Web typecheck, `next build`, scan unit test 2/2.
+  - Back-to-back specs from one IP can still trip the directory's per-minute limit (a test artifact; run them one at a time).
+- **Ops:** directory DB backed up before deploy: `/data/directory.sqlite*.bak-20261005220928`. SSH to the host still resets now and then; the deploy completed each time (check `/opt/everpiece/src/REVISION`).
 - **Open:**
-  - deploy the web to testnet and add a Playwright spec (create request, pay in AUSD and in CTK, both modes, "paid" mark);
-  - real-phone QR scan (Android Chrome has BarcodeDetector; iPhone Safari does not, so iPhone users get only the paste fallback);
-  - owner decisions below are unchanged.
+  - real-phone QR scan (iPhone Safari has no BarcodeDetector; paste fallback only);
+  - the relayer policy engine is TEST-only (no sanctions/identity screening): owner decision before mainnet;
+  - F-01, mainnet GO and funding, the deadline, Private mode after 6 Oct, the submission package.
 
 ---
 
