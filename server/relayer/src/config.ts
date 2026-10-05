@@ -86,16 +86,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     port: int(env, "PORT", 8787),
     host: env.HOST ?? "127.0.0.1",
     dbPath: env.RELAYER_DB_PATH ?? "relayer.sqlite",
+    // Worst cases measured on real AUSD with cold state by contracts/test/fork/RelayerGas.t.sol (mainnet and testnet),
+    // plus 5–10%. Monad charges the full limit (VERIFIED §1.5); too low fails the payment (testnet: payWithAusd at 200k).
+    // test/gasLimits.test.ts keeps these equal to that test's constants.
     gasLimits: {
-      createPayment: big(env, "GAS_LIMIT_CREATE", 350_000n),
-      claimUsernamePayment: big(env, "GAS_LIMIT_CLAIM_USERNAME", 215_000n),
-      claimLinkPayment: big(env, "GAS_LIMIT_CLAIM_LINK", 240_000n),
-      cancel: big(env, "GAS_LIMIT_CANCEL", 195_000n),
-      refundExpired: big(env, "GAS_LIMIT_REFUND", 145_000n),
-      // Measured 223,216 on Monad testnet (eth_estimateGas, 2026-10-05: fresh authorization nonce, recipient's first
-      // AUSD). 200k ran out of gas there, though a local fork (Ethereum gas schedule) fit. Monad bills the full limit.
-      payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 240_000n),
-      payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 420_000n),
+      createPayment: big(env, "GAS_LIMIT_CREATE", 350_000n), // measured ≤ 318,483
+      claimUsernamePayment: big(env, "GAS_LIMIT_CLAIM_USERNAME", 230_000n), // ≤ 208,121
+      claimLinkPayment: big(env, "GAS_LIMIT_CLAIM_LINK", 270_000n), // ≤ 250,278
+      cancel: big(env, "GAS_LIMIT_CANCEL", 205_000n), // ≤ 189,469
+      refundExpired: big(env, "GAS_LIMIT_REFUND", 155_000n), // ≤ 138,273
+      payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 280_000n), // ≤ 255,331 (live testnet: 223,216)
+      payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 490_000n), // ≤ 449,716 (live testnet: 400,622)
     },
     maxFeePerGasWei: big(env, "MAX_FEE_PER_GAS_WEI", parseGwei("500")),
     priorityFeeWei: big(env, "PRIORITY_FEE_WEI", parseGwei("2")), // Monad RPC suggests 2 gwei (VERIFIED §1.14)
