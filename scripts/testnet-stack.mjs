@@ -135,7 +135,8 @@ run("voice", ["server/voice/src/main.ts"], { ...common, VOICE_DB_PATH: join(DATA
 // 3. faucet: mints TestDollar with the deployer (= TestDollar.minter). One mint at a time (nonce order);
 //    per-address cooldown and per-IP daily cap, so the minter's MON lasts.
 const minter = privateKeyToAccount(env("TESTNET_DEPLOYER_KEY"));
-const wallet = createWalletClient({ chain, transport: http(RPC, { timeout: 20_000, retryCount: 2 }), account: minter });
+// Sends retry longer (1, 2, 4, 8, 16 s): the public RPC answers 429 under load, and a rejected send is safe to resend.
+const wallet = createWalletClient({ chain, transport: http(RPC, { timeout: 20_000, retryCount: 5, retryDelay: 1_000 }), account: minter });
 const mintAbi = [{ type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] }];
 const erc20Abi = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
@@ -219,7 +220,7 @@ async function faucetHandler(req, res) {
       return json(res, 200, { ok: true, hash });
     } catch (e) {
       lastByAddress.delete(coolKey);
-      say(`faucet mint failed: ${String(e?.shortMessage ?? e).slice(0, 120)}`);
+      say(`faucet mint failed: ${String(e?.shortMessage ?? e).slice(0, 120)}${e?.details ? ` (${String(e.details).slice(0, 80)})` : ""}`);
       return json(res, 503, { error: "Test Dollars are unavailable right now." });
     }
   }

@@ -39,6 +39,8 @@ chains:
         # cap Envio's query window below that or it backs off forever without indexing (VERIFIED §4.9).
         initial_block_interval: 90
         interval_ceiling: 90
+        # back off for 2 s after an error (e.g. the public RPC's 429), so a catch-up never starves the stack's sends
+        backoff_millis: 2000
     contracts:
       - name: EverpieceEscrow
         address: "${ENVIO_ESCROW_ADDRESS}"

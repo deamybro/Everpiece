@@ -154,8 +154,10 @@ services:
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
     volumes:
       - stack-info:/shared:ro
+      - indexer-state:/state # what was last indexed, so a restart on the same contracts resumes
 
 volumes:
   stack-info:
+  indexer-state:
   stack-data:
   indexer-db:
