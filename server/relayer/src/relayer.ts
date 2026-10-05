@@ -195,23 +195,31 @@ export class Relayer {
       return reject(503, "DailyBudgetExhausted");
     }
 
-    // Known-revert filtering: never pay for a transaction that simulation says will revert.
-    try {
-      await this.chain.client.simulateContract({
-        address: prep.target,
-        abi: isPay(prep.method) ? payRelayAbi : relayAbi,
-        functionName: prep.method,
-        args: prep.args,
-        account: this.address,
-        gas: gasLimit,
-        blockTag: "latest",
-      } as Parameters<typeof this.chain.client.simulateContract>[0]);
-    } catch (e) {
-      this.store.releaseGas(day, gasLimit);
-      const reason = revertName(e);
-      if (reason) return reject(422, reason);
-      log("error", "relayer.simulation_rpc_error", { method: prep.method, err: String(e) });
-      return reject(503, "UpstreamUnavailable");
+    // Known-revert filtering: never pay for a transaction that simulation says will revert. A revert is re-checked
+    // (cfg.simulationRetryMs): the RPC may have answered from a lagging node that hasn't seen the payer's funds yet.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.chain.client.simulateContract({
+          address: prep.target,
+          abi: isPay(prep.method) ? payRelayAbi : relayAbi,
+          functionName: prep.method,
+          args: prep.args,
+          account: this.address,
+          gas: gasLimit,
+          blockTag: "latest",
+        } as Parameters<typeof this.chain.client.simulateContract>[0]);
+        break;
+      } catch (e) {
+        const reason = revertName(e);
+        if (reason && attempt < 2 && this.cfg.simulationRetryMs > 0) {
+          await new Promise((res) => setTimeout(res, this.cfg.simulationRetryMs));
+          continue;
+        }
+        this.store.releaseGas(day, gasLimit);
+        if (reason) return reject(422, reason);
+        log("error", "relayer.simulation_rpc_error", { method: prep.method, err: String(e) });
+        return reject(503, "UpstreamUnavailable");
+      }
     }
 
     await this.enqueueBroadcast(row.id, day);
