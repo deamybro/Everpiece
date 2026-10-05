@@ -43,6 +43,34 @@ async function requestMoney(page: Page, amount: string, mode: "Instant" | "Prote
   return `/pay/${requestId}`;
 }
 
+/**
+ * Scan the request's on-screen QR code with the payer's camera: the camera is faked with a canvas that shows the exact
+ * SVG Maris's page renders, and the page's own detector is removed so the jsQR path (iPhone Safari's) is exercised.
+ */
+async function scanQr(payer: Page, qrSvg: string) {
+  await payer.addInitScript((svg) => {
+    delete (window as unknown as { BarcodeDetector?: unknown }).BarcodeDetector;
+    navigator.mediaDevices.getUserMedia = async () => {
+      const canvas = Object.assign(document.createElement("canvas"), { width: 480, height: 480 });
+      const ctx = canvas.getContext("2d")!;
+      const img = new Image();
+      img.src = `data:image/svg+xml;base64,${btoa(svg)}`;
+      await img.decode();
+      const draw = () => {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, 480, 480);
+        ctx.drawImage(img, 40, 40, 400, 400);
+      };
+      draw();
+      setInterval(draw, 100);
+      return canvas.captureStream(10);
+    };
+  }, qrSvg);
+  await payer.goto("/");
+  await payer.getByRole("link", { name: "Scan to pay" }).click();
+  await expect(payer).toHaveURL(/\/pay\/0x[0-9a-f]{64}$/);
+}
+
 test.afterEach(async ({ browser }) => {
   for (const c of browser.contexts()) await c.close();
 });
@@ -63,7 +91,13 @@ test("request → pay in Dollars (instant) and in CTK via Agora (protected); pai
 
   // --- instant request, paid in Dollars: final, exact amount, Maris's page flips to Paid
   const instant = await requestMoney(maris, "3", "Instant");
-  await payer.goto(instant);
+  const svg = await maris.getByRole("img", { name: "Payment request QR code" }).evaluate((e) => {
+    const c = e.cloneNode(true) as Element;
+    c.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    return c.outerHTML;
+  });
+  await scanQr(payer, svg);
+  await expect(payer).toHaveURL(new RegExp(`${instant}$`));
   await expect(payer.getByText(`Pay @${M}`)).toBeVisible();
   await payer.getByText("Dollars (AUSD)").click();
   await expect(payer.getByText("Instant · final")).toBeVisible();

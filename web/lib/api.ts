@@ -11,7 +11,17 @@ async function post(base: string, path: string, body: unknown): Promise<ApiRespo
 
 export const relayer = (path: string, body: unknown) => post(config.relayerUrl, path, body);
 export const claims = (path: string, body: unknown) => post(config.claimsUrl, path, body);
-export const directory = (path: string, body: unknown) => post(config.directoryUrl, path, body);
+/**
+ * The directory limits requests per IP per minute, and Home polls it. A 429 is refused before anything is done, so it's
+ * safe to retry: twice, 1.5 s then 3 s later, before the caller sees it.
+ */
+export async function directory(path: string, body: unknown): Promise<ApiResponse> {
+  for (let attempt = 0; ; attempt++) {
+    const r = await post(config.directoryUrl, path, body);
+    if (r.status !== 429 || attempt === 2) return r;
+    await new Promise((res) => setTimeout(res, 1500 * 2 ** attempt));
+  }
+}
 
 export type RelayStatus = "SUBMITTED" | "PROCESSING" | "CONFIRMED" | "FAILED" | "REJECTED";
 

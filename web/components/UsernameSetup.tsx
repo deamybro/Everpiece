@@ -19,10 +19,25 @@ export function UsernameSetup({ account, onDone }: { account: Account; onDone: (
   const problem = username ? usernameProblem(username) : input.trim() ? "Invalid" : null;
   const name = cleanDisplayName(displayName);
 
+  const [checkFailed, setCheckFailed] = useState(false);
+
+  // Check as they type; if the directory can't answer, say so and keep trying (it used to show nothing at all).
   useEffect(() => {
     setTaken(undefined);
+    setCheckFailed(false);
     if (!username || problem) return;
-    const t = setTimeout(() => checkAvailable(username).then(setTaken).catch(() => setTaken(undefined)), 400);
+    let t: ReturnType<typeof setTimeout>;
+    const check = () =>
+      checkAvailable(username)
+        .then((v) => {
+          setCheckFailed(false);
+          setTaken(v);
+        })
+        .catch(() => {
+          setCheckFailed(true);
+          t = setTimeout(check, 4000);
+        });
+    t = setTimeout(check, 400);
     return () => clearTimeout(t);
   }, [username, problem]);
 
@@ -51,6 +66,7 @@ export function UsernameSetup({ account, onDone }: { account: Account; onDone: (
       {problem === "Reserved" && <p className="muted small">That username isn&apos;t available.</p>}
       {!problem && taken === null && <p className="muted small">@{username} is available ✓</p>}
       {!problem && typeof taken === "string" && <p className="muted small">{friendlyError(taken)}</p>}
+      {!problem && taken === undefined && checkFailed && <p className="muted small">Couldn&apos;t check that username right now — trying again…</p>}
       <div>
         <label htmlFor="displayName">Name people will see</label>
         <input id="displayName" autoComplete="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />

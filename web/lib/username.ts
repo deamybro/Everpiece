@@ -97,7 +97,7 @@ export async function syncUsername(account: Account): Promise<Account> {
 /** null = available; otherwise the reason code (UsernameTaken, UsernameTooSimilar, UsernameReserved, …). */
 export async function checkAvailable(username: string): Promise<string | null> {
   const r = await directory("/v1/usernames/available", { username }).catch(() => null);
-  if (!r || r.status !== 200) throw new UsernameError("DirectoryUnavailable");
+  if (!r || r.status !== 200) throw new UsernameError(r?.status === 429 ? "RateLimited" : "DirectoryUnavailable");
   return r.body.available === true ? null : String(r.body.reason ?? "UsernameTaken");
 }
 
