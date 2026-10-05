@@ -92,7 +92,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       claimLinkPayment: big(env, "GAS_LIMIT_CLAIM_LINK", 240_000n),
       cancel: big(env, "GAS_LIMIT_CANCEL", 195_000n),
       refundExpired: big(env, "GAS_LIMIT_REFUND", 145_000n),
-      payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 200_000n),
+      // Measured 223,216 on Monad testnet (eth_estimateGas, 2026-10-05: fresh authorization nonce, recipient's first
+      // AUSD). 200k ran out of gas there, though a local fork (Ethereum gas schedule) fit. Monad bills the full limit.
+      payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 240_000n),
       payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 420_000n),
     },
     maxFeePerGasWei: big(env, "MAX_FEE_PER_GAS_WEI", parseGwei("500")),
