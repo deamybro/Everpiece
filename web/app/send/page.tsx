@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { E164, normalizeEmail } from "@everpiece/shared";
+import { E164, fromBaseUnits, normalizeEmail } from "@everpiece/shared";
+import { fundingAvailable } from "../../lib/funding";
 import { Welcome } from "../../components/Welcome";
 import { Progress, progressText } from "../../components/status";
 import { MessageComposer, type Draft } from "../../components/MessageComposer";
@@ -133,7 +134,12 @@ export default function Send() {
           <h1>How much?</h1>
           <input className="big" inputMode="decimal" placeholder="$0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount in Dollars" />
           {balance !== null && <p className="muted center">You have {formatDollars(balance)}</p>}
-          {amount !== null && balance !== null && amount > balance && <div className="status bad">You don&apos;t have enough Dollars for this.</div>}
+          {amount !== null && balance !== null && amount > balance && (
+            <div className="status bad">
+              You don&apos;t have enough Dollars for this.{" "}
+              {fundingAvailable() && <Link href={`/add?amount=${fromBaseUnits(amount - balance, 6)}&return=/send`}>Add money from another chain</Link>}
+            </div>
+          )}
           <button disabled={amount === null || amount < 1_000_000n || (balance !== null && amount > balance)} onClick={() => setStep("who")}>
             Continue
           </button>

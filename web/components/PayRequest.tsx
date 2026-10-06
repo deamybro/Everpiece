@@ -13,6 +13,7 @@ import { FlowError, sendToUsername } from "../lib/flows";
 import { friendlyPasskeyError, loadAccount, type Account } from "../lib/mera";
 import { PayError, RequestMode, balanceOfToken, getQuote, loadRequest, payInstant, payTokens, reportPaid, type LoadedRequest } from "../lib/pay";
 import { receiptPath } from "../lib/receipt";
+import { fundingAvailable } from "../lib/funding";
 
 const tokenLabel = (t: TokenInfo) => (t.route === "DIRECT_AUSD" ? "Dollars (AUSD)" : `Test ${t.symbol}`);
 const amountOf = (t: TokenInfo, v: bigint) => (t.route === "DIRECT_AUSD" ? formatDollars(v) : `${fromBaseUnits(v, t.decimals)} ${t.symbol}`);
@@ -209,7 +210,16 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
           )}
         </div>
       )}
-      {token && !enough(token) && <div className="status warn">You don&apos;t have enough {tokenLabel(token)} for this.</div>}
+      {token && !enough(token) && (
+        <div className="status warn">
+          You don&apos;t have enough {tokenLabel(token)} for this.{" "}
+          {token.route === "DIRECT_AUSD" && fundingAvailable() && (
+            <Link href={`/add?amount=${fromBaseUnits(request.amount - (balances[token.address] ?? 0n), 6)}&return=/pay/${requestId}`}>
+              Add money from another chain
+            </Link>
+          )}
+        </div>
+      )}
       <Progress text={progress} />
       {error && <div className="status bad">{error}</div>}
       <button disabled={!token || phase === "paying" || !enough(token) || (token.route !== "DIRECT_AUSD" && !quote)} onClick={pay}>

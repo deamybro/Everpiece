@@ -6,7 +6,7 @@
 set -euo pipefail
 HOST="${1:?usage: e2e.sh <ssh-host> [spec ...]}"
 shift
-SPECS="${*:-request history message username flow email}"
+SPECS="${*:-request add history message username flow email}"
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 PW="$(node -p "require('$ROOT/web/package.json').devDependencies['@playwright/test']")"
 

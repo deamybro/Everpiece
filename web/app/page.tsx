@@ -17,6 +17,7 @@ import { receiptPath } from "../lib/receipt";
 import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
 import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
 import { friendlyError, type RelayStatus } from "../lib/api";
+import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
 import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
 
 /** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
@@ -29,6 +30,7 @@ export default function Home() {
   const [account, setAccount] = useState<Account | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [balance, setBalance] = useState<bigint | null>(null);
+  const [openTopUps, setOpenTopUps] = useState<TopUp[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historySource, setHistorySource] = useState<"indexer" | "device" | null>(null);
   const [incoming, setIncoming] = useState<Incoming[]>([]);
@@ -49,6 +51,7 @@ export default function Home() {
 
   const refresh = useCallback(async (a: Account, inboxToo = true) => {
     setBalance(await dollarsOf(a.address).catch(() => null));
+    setOpenTopUps(activeTopUps());
     const now = await chainTime().catch(() => BigInt(Math.floor(Date.now() / 1000)));
     // History from the indexer (source of truth); this browser's sent list only adds labels / not-yet-indexed sends.
     const h = await loadHistory(a).catch(() => null);
@@ -198,7 +201,15 @@ export default function Home() {
           <Link className="button secondary" href="/request">Request</Link>
           <Link className="button secondary" href="/scan">Scan to pay</Link>
         </div>
+        {fundingAvailable() && <Link className="button ghost" href="/add">Add money from another chain</Link>}
       </div>
+
+      {openTopUps.map((t) => (
+        <Link key={t.depositAddress} href="/add" className="card stack" aria-label="Top-up in progress">
+          <strong>Adding {formatDollars(BigInt(t.dollars))} from {t.origin.chainLabel}</strong>
+          <span className="muted small">{t.phase === "ARRIVED" ? "It's arrived. Tap to turn it into Dollars." : "In progress. Tap to see where it is."}</span>
+        </Link>
+      ))}
 
       {isDevStack && (
         <div className="dev stack">

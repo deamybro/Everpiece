@@ -27,6 +27,8 @@ export const config = {
   explorerUrl: process.env.NEXT_PUBLIC_EXPLORER_URL || "https://monadscan.com",
   /** Local dev stack only: mints TEST Dollars on a local fork. Never set in production. */
   devFaucetUrl: process.env.NEXT_PUBLIC_DEV_FAUCET_URL ?? "",
+  /** "Add Dollars from another chain" (Aurora Intents): "live", "simulated" (test site: nothing crosses a chain) or "off". */
+  funding: (process.env.NEXT_PUBLIC_FUNDING === "live" || process.env.NEXT_PUBLIC_FUNDING === "simulated" ? process.env.NEXT_PUBLIC_FUNDING : "off") as "live" | "simulated" | "off",
   /** Shown on the test-money banner, e.g. "Monad testnet"; default "Local test network" (the fork). */
   networkLabel: process.env.NEXT_PUBLIC_NETWORK_LABEL || "Local test network",
 };
