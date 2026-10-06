@@ -44,7 +44,7 @@ test("naira flow screenshots", async ({ page, context }) => {
   await expect(page.getByText(/≈ \$/)).toBeVisible();
   await shot(page, "06-bank-amount");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByLabel("Payment summary")).toContainText("per Dollar");
+  await expect(page.getByLabel("Payment summary")).toContainText("/ $1");
   await shot(page, "07-bank-review");
   await page.getByRole("button", { name: "Pay with fingerprint or screen lock" }).click();
   await expect(page.getByLabel("Payout progress")).toBeVisible({ timeout: 120_000 });

@@ -156,11 +156,11 @@ export default function BankPage() {
             <dt>You pay</dt>
             <dd>{estimate ? `about ${formatDollars(estimate.stableAmount)}` : "…"}</dd>
             <dt>Rate</dt>
-            <dd>{estimate ? `₦${Number(estimate.rate).toLocaleString("en-NG")} per Dollar` : "…"}</dd>
+            <dd>{estimate ? `₦${Number(estimate.rate).toLocaleString("en-NG")} / $1` : "…"}</dd>
             <dt>Network fee</dt>
-            <dd>$0.00 (paid by Everpiece)</dd>
-            <dt>If the bank transfer fails</dt>
-            <dd>you&apos;re refunded</dd>
+            <dd>Free</dd>
+            <dt>If it fails</dt>
+            <dd>Full refund</dd>
           </dl>
           <p className="muted small">The price includes a small buffer and the payout provider&apos;s fee, so the bank receives at least {formatNaira(kobo)}.</p>
         </div>

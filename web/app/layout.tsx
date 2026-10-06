@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "../components/ServiceWorker";
 
 // Self-hosted at build time by next/font (no runtime request to Google; the CSP stays font-src 'self').
-const font = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap", variable: "--font" });
+const font = Inter({ subsets: ["latin"], display: "swap", variable: "--font" });
 
 export const metadata: Metadata = {
   title: "Everpiece",

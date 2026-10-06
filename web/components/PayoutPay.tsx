@@ -132,13 +132,13 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
             <dt>You pay</dt>
             <dd>about {formatDollars(quote.stableAmount)}</dd>
             <dt>Rate</dt>
-            <dd>₦{Number(quote.rate).toLocaleString("en-NG")} per Dollar{payoutSimulated() ? " (live Paycrest rate)" : ""}</dd>
+            <dd>₦{Number(quote.rate).toLocaleString("en-NG")} / $1</dd>
             <dt>Includes</dt>
-            <dd>a {(quote.bufferBps / 100).toFixed(1)}% buffer so they get at least {formatNaira(request.fiatAmount)}, plus the payout provider&apos;s fee</dd>
+            <dd>{(quote.bufferBps / 100).toFixed(1)}% buffer + provider fee</dd>
             <dt>Network fee</dt>
-            <dd>$0.00 (paid by Everpiece)</dd>
-            <dt>If the bank transfer fails</dt>
-            <dd>you&apos;re refunded</dd>
+            <dd>Free</dd>
+            <dt>If it fails</dt>
+            <dd>Full refund</dd>
           </dl>
         </div>
       )}

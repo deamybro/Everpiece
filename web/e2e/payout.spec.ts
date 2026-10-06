@@ -75,7 +75,7 @@ test("₦3,000 to a verified bank account: one prompt, 'Delivered' only on the p
   await expect(summary).toContainText("₦3,000");
   await expect(summary).toContainText("Guaranty Trust Bank ••6789");
   await expect(summary).toContainText("TEST ACCOUNT 6789 (SIMULATED)");
-  await expect(payer.getByLabel("Payment summary")).toContainText("per Dollar");
+  await expect(payer.getByLabel("Payment summary")).toContainText("/ $1");
   await payer.getByRole("button", { name: "Pay with fingerprint or screen lock" }).click();
   await expect(payer.getByText("Delivered to the bank account ✓")).toBeVisible({ timeout: 180_000 });
   await expect(maris.getByText("You received at least")).toBeVisible({ timeout: 60_000 });
@@ -101,7 +101,7 @@ test("₦3,000 to a verified bank account: one prompt, 'Delivered' only on the p
   await payer.getByRole("button", { name: "₦5,000" }).click();
   await expect(payer.getByText(/≈ \$[0-9.]+ from your Dollars/)).toBeVisible();
   await payer.getByRole("button", { name: "Continue" }).click();
-  await expect(payer.getByLabel("Payment summary")).toContainText("per Dollar");
+  await expect(payer.getByLabel("Payment summary")).toContainText("/ $1");
   await payer.getByRole("button", { name: "Pay with fingerprint or screen lock" }).click();
   await expect(payer.getByLabel("Payout progress").getByText("Delivered")).toBeVisible();
   await expect(payer.locator(".timeline li.done").filter({ hasText: "Delivered" })).toBeVisible({ timeout: 180_000 });
