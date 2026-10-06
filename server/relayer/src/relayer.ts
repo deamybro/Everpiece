@@ -8,6 +8,7 @@ import { Store, type RequestRow } from "./store.ts";
 import { ValidationError, parseQuote } from "./validate.ts";
 import { LocalRulesPolicy, decide, type ComplianceProvider } from "./policy.ts";
 import { log } from "./log.ts";
+import { Funding } from "./funding.ts";
 
 export type ApiResult = { httpStatus: number; body: Record<string, unknown> };
 
@@ -63,6 +64,8 @@ export function publicView(r: RequestRow): Record<string, unknown> {
 
 export class Relayer {
   readonly cfg: RelayerConfig;
+  /** Cross-chain top-ups (null when AURORA_API_KEY isn't configured). */
+  readonly funding: Funding | null;
   readonly chain: Chain;
   readonly store: Store;
   private ipLimiter: RateLimiter;
@@ -77,6 +80,7 @@ export class Relayer {
 
   constructor(cfg: RelayerConfig, opts: { store?: Store; chain?: Chain; now?: () => number } = {}) {
     this.cfg = cfg;
+    this.funding = cfg.funding ? new Funding(cfg.funding) : null;
     this.chain = opts.chain ?? connect(cfg);
     this.store = opts.store ?? new Store(cfg.dbPath);
     this.now = opts.now ?? Date.now;

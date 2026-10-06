@@ -1,5 +1,6 @@
 import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
-import { AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
+import { AURORA_API_URL, AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID, USDC_MAINNET_ADDRESS } from "@everpiece/shared";
+import type { FundingConfig } from "./funding.ts";
 
 /** The only methods this relayer will ever submit (master §26.2 — no arbitrary calldata): escrow + EverpiecePay. */
 export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken"] as const;
@@ -42,6 +43,8 @@ export type RelayerConfig = {
   /** Headroom added to a token quote's sell amount (basis points); unused input is returned by the contract. */
   quoteHeadroomBps: bigint;
   quoteTtlSec: number;
+  /** "Add Dollars from another chain" (Aurora Intents). Off unless AURORA_API_KEY is set. */
+  funding?: FundingConfig;
 };
 
 function req(env: NodeJS.ProcessEnv, name: string): string {
@@ -119,5 +122,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     },
     quoteHeadroomBps: big(env, "QUOTE_HEADROOM_BPS", 50n), // 0.5%
     quoteTtlSec: int(env, "QUOTE_TTL_SEC", 60),
+    funding: fundingConfig(env),
+  };
+}
+
+/** Aurora funding: needs AURORA_API_KEY; delivers USDC on mainnet, or AURORA_DESTINATION_TOKEN (test stacks). */
+function fundingConfig(env: NodeJS.ProcessEnv): FundingConfig | undefined {
+  if (!env.AURORA_API_KEY) return undefined;
+  if (!/^[A-Za-z0-9._-]{8,200}$/.test(env.AURORA_API_KEY)) throw new Error("config: AURORA_API_KEY has unexpected characters");
+  const chainId = int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID);
+  const destination = env.AURORA_DESTINATION_TOKEN
+    ? address(env, "AURORA_DESTINATION_TOKEN")
+    : chainId === MONAD_MAINNET_CHAIN_ID ? USDC_MAINNET_ADDRESS : undefined;
+  if (!destination) throw new Error("config: AURORA_DESTINATION_TOKEN is required off mainnet");
+  return {
+    apiUrl: (env.AURORA_API_URL || AURORA_API_URL).replace(/\/$/, ""),
+    apiKey: env.AURORA_API_KEY,
+    destinationToken: destination,
+    slippageBps: int(env, "FUNDING_SLIPPAGE_BPS", 50), // stable → stable; excess input is refunded by Aurora
+    deadlineMinutes: int(env, "FUNDING_DEADLINE_MINUTES", 30),
+    maxWholeTokens: int(env, "FUNDING_MAX_WHOLE_TOKENS", 600), // the $500 payment ceiling + room for fees
+    perIpPerMinute: int(env, "FUNDING_PER_IP_PER_MINUTE", 60),
   };
 }

@@ -79,6 +79,18 @@ export function createHttpServer(relayer: Relayer): Server {
         const row = relayer.getRequest(m[1]);
         return row ? send(res, 200, publicView(row), origin) : send(res, 404, { error: "NotFound" }, origin);
       }
+      if (url.pathname.startsWith("/v1/funding/")) {
+        const f = relayer.funding;
+        if (!f) return send(res, 503, { error: "FUNDING_UNAVAILABLE" }, origin);
+        const ip = clientIp(req);
+        let out;
+        if (req.method === "GET" && url.pathname === "/v1/funding/sources") out = await f.sources(ip);
+        else if (req.method === "GET" && url.pathname === "/v1/funding/status") out = await f.status(url.searchParams.get("depositAddress") ?? "", ip);
+        else if (req.method === "POST" && url.pathname === "/v1/funding/quote") out = await f.quote(await readJson(req, relayer.cfg.maxBodyBytes), ip);
+        else if (req.method === "POST" && url.pathname === "/v1/funding/deposit") out = await f.deposit(await readJson(req, relayer.cfg.maxBodyBytes), ip);
+        else return send(res, 404, { error: "NotFound" }, origin);
+        return send(res, out.httpStatus, out.body, origin);
+      }
       if (url.pathname === "/v1/quotes") {
         if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
         const out = await relayer.quote(await readJson(req, relayer.cfg.maxBodyBytes));
