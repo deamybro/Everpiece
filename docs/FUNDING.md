@@ -29,7 +29,7 @@ payer's USDC on Base / Ethereum / Arbitrum / …        (the payer's own wallet,
   - Every existing payment path (escrow, instant, requests) stays unchanged.
 - **The amount Aurora is asked to deliver** = the conversion quote's ceiling (`maxSellAmount`, 0.5% headroom) minus any USDC already in the account. Unused headroom stays in the account and counts first next time.
 
-## Money rules — defaults built, owner to confirm (AGENTS.md "money semantics")
+## Money rules — **confirmed by the owner 2026-10-06** (AGENTS.md "money semantics")
 
 | # | Question | Built default | Alternatives |
 |---|---|---|---|
@@ -46,7 +46,7 @@ payer's USDC on Base / Ethereum / Arbitrum / …        (the payer's own wallet,
 
 1. **Aurora API key** from Intents Studio (studio.aurora.dev) → host env `AURORA_API_KEY`; web `NEXT_PUBLIC_FUNDING=live`.
 2. **Agora approval:** EverpiecePay's mainnet address needs `APPROVED_SWAPPER` on the AUSD/USDC pair `0xf332…2470`. This is Agora's KYC; testnet self-whitelisting doesn't exist on mainnet.
-3. **Confirm M1–M8** (or choose alternatives).
+3. ~~Confirm M1–M8~~ — confirmed 2026-10-06.
 4. **Mainnet GO, then one small real top-up** (e.g. $5 from Base) checked end to end: the deposit, Aurora status SUCCESS, USDC arrival on Monad, the conversion receipt and the `Paid` event at finality.
 
 ## Test site
