@@ -15,6 +15,11 @@ export const AGORA_TESTNET = {
   whitelister: "0x7c10F56d6f04a51376393a1C3670e966863F6BD5",
   ausdFaucet: "0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C",
 } as const;
+/** USDC on Monad mainnet (Circle; docs/VERIFIED.md §7: name "USDC", version "2", 6 decimals, ERC-2612 domain checked). */
+export const USDC_MAINNET_ADDRESS = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603" as const;
+/** Agora Instant Settlement AUSD/USDC pair on Monad mainnet ("Protocol Deployments"; on-chain name "AUSD/USDC",
+ *  token0 AUSD, token1 USDC). Swappers need APPROVED_SWAPPER, granted by Agora (KYC) on mainnet. */
+export const AGORA_MAINNET = { factory: "0x8468587Af422ad440F58a57E955eCA6A970b5375", ausdUsdcPair: "0xf33286E3222D1c829dACeac48c0Ec651F6452470" } as const;
 /** CTK ("ConstantToken"), Agora's demo token, token0 of the testnet CTK/AUSD pair. ERC-2612 permit verified by simulation. */
 export const CTK_TESTNET_ADDRESS = "0x7BEb5D9DB0d85cBEa543C04f0dE8c23c2176cd9D" as const;
 
@@ -52,6 +57,11 @@ export const TOKENS: readonly TokenInfo[] = [
   {
     chainId: MONAD_MAINNET_CHAIN_ID, address: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a", symbol: "AUSD", name: "Agora Dollar", decimals: AUSD_DECIMALS,
     route: "DIRECT_AUSD", authorization: "ERC3009", eip712: { name: AUSD_EIP712_NAME, version: AUSD_EIP712_VERSION }, testnet: false, enabled: true,
+  },
+  {
+    chainId: MONAD_MAINNET_CHAIN_ID, address: USDC_MAINNET_ADDRESS, symbol: "USDC", name: "USD Coin", decimals: 6,
+    route: "AGORA_INSTANT_SETTLEMENT", authorization: "ERC2612", eip712: { name: "USDC", version: "2" },
+    pair: AGORA_MAINNET.ausdUsdcPair, testnet: false, enabled: true,
   },
 ];
 

@@ -27,7 +27,7 @@ abstract contract RelayerGasBase is Test {
     uint256 constant LIMIT_CANCEL = 205_000;
     uint256 constant LIMIT_REFUND = 155_000;
     uint256 constant LIMIT_PAY_AUSD = 280_000;
-    uint256 constant LIMIT_PAY_TOKEN = 490_000;
+    uint256 constant LIMIT_PAY_TOKEN = 550_000;
     /// Every limit must exceed the measured worst case by at least this much.
     uint256 constant HEADROOM_BPS = 500;
 
@@ -217,7 +217,51 @@ contract RelayerGasMainnetForkTest is RelayerGasBase {
     }
 
     function _pairs() internal pure override returns (address[] memory) {
-        return new address[](0); // no token routes on mainnet yet
+        return new address[](0);
+    }
+
+    address constant USDC = 0x754704Bc059F8C67012fEd69BC8A327a5aafb603;
+    address constant AUSD_USDC_PAIR = 0xf33286E3222D1c829dACeac48c0Ec651F6452470;
+    /// A wallet Agora already holds as APPROVED_SWAPPER on the pair (no code). EverpiecePay is placed there so the real
+    /// pair's role check passes unmodified; on mainnet, Agora must approve our deployed EverpiecePay the same way.
+    address constant APPROVED_EOA = 0xF28E1B06E00e8774C612e31aB3Ac35d5a720085f;
+
+    /// "Add Dollars from another chain": USDC that Aurora delivered becomes EXACTLY that many Dollars through the real
+    /// Agora AUSD/USDC pair, authorized by a USDC permit (name "USDC", version "2") — and its gas fits the limit.
+    function test_gas_payWithToken_usdcToAusd_exact() public {
+        assertTrue(IAgoraStableSwapPair(AUSD_USDC_PAIR).hasRole("APPROVED_SWAPPER", APPROVED_EOA));
+        assertEq(APPROVED_EOA.code.length, 0);
+        address[] memory pairs = new address[](1);
+        pairs[0] = AUSD_USDC_PAIR;
+        deployCodeTo("EverpiecePay.sol:EverpiecePay", abi.encode(IAUSD(ausd), pairs), APPROVED_EOA);
+        EverpiecePay usdcPay = EverpiecePay(APPROVED_EOA);
+
+        deal(USDC, sender, 100e6); // the USDC Aurora would have delivered (the pair's reserves stay untouched)
+        uint256 quoted = usdcPay.quote(USDC, 25e6);
+        (, address rcpt) = _fresh();
+        EverpiecePay.Payment memory p = EverpiecePay.Payment({
+            ref: keccak256("aurora"), sender: sender, recipient: rcpt, amount: 25e6, sourceToken: USDC,
+            maxSourceAmount: quoted + quoted / 200, deadline: block.timestamp + 10 minutes
+        });
+        bytes32 permitDigest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                IERC20Permit(USDC).DOMAIN_SEPARATOR(),
+                keccak256(abi.encode(PERMIT_TYPEHASH, sender, address(usdcPay), p.maxSourceAmount, IERC20Permit(USDC).nonces(sender), p.deadline))
+            )
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SENDER_PK, permitDigest);
+        bytes memory data = abi.encodeCall(usdcPay.payWithToken, (p, _sign(SENDER_PK, usdcPay.paymentIdOf(p)), p.deadline, v, r, s));
+        uint256 usdcBefore = IERC20(USDC).balanceOf(sender);
+        address[] memory accts = new address[](4);
+        accts[0] = sender;
+        accts[1] = rcpt;
+        accts[2] = USDC;
+        accts[3] = AUSD_USDC_PAIR;
+        _check("payWithToken(USDC, mainnet)", _txGas(address(usdcPay), data, accts), LIMIT_PAY_TOKEN);
+        assertEq(IERC20(ausd).balanceOf(rcpt), 25e6, "exactly 25.000000 AUSD");
+        assertEq(usdcBefore - IERC20(USDC).balanceOf(sender), quoted, "charged exactly the quote; headroom returned");
+        assertEq(IERC20(USDC).balanceOf(address(usdcPay)), 0);
     }
 }
 

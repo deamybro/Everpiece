@@ -96,7 +96,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       cancel: big(env, "GAS_LIMIT_CANCEL", 205_000n), // ≤ 189,469
       refundExpired: big(env, "GAS_LIMIT_REFUND", 155_000n), // ≤ 138,273
       payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 280_000n), // ≤ 255,331 (live testnet: 223,216)
-      payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 490_000n), // ≤ 449,716 (live testnet: 400,622)
+      payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 550_000n), // ≤ 520,398 USDC on mainnet; 449,716 CTK on testnet (live: 400,622)
     },
     maxFeePerGasWei: big(env, "MAX_FEE_PER_GAS_WEI", parseGwei("500")),
     priorityFeeWei: big(env, "PRIORITY_FEE_WEI", parseGwei("2")), // Monad RPC suggests 2 gwei (VERIFIED §1.14)
