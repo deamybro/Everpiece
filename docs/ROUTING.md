@@ -119,7 +119,7 @@ An asset may be the Monad intermediate only if **all** of these hold. Today only
 |---|---|
 | Funding code (shared `funding.ts`, relayer `/v1/funding/*`, web `/add`, `scripts/aurora-sim.mjs`) | Exists (session 24) |
 | Real Aurora (`NEXT_PUBLIC_FUNDING=live`, `AURORA_API_KEY`) | **Not enabled anywhere**: no API key configured; the relayer endpoints answer `FUNDING_UNAVAILABLE` |
-| Simulated Aurora on https://test.everpiece.xyz | See `docs/HANDOFF.md` for whether the demo is on (owner decision, 2026-10-06) |
+| Simulated Aurora on https://test.everpiece.xyz | **On** (owner, 2026-10-06: "keep simulated on testnet"). Labelled SIMULATED; test CTK only; nothing crosses a chain |
 | Agora mainnet USDC/AUSD | Fork-proven; needs Agora `APPROVED_SWAPPER` for EverpiecePay's mainnet address |
 | 0x | Verified facts only (mainnet support, exact-buy). No provider code |
 
