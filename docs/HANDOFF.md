@@ -4,6 +4,29 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 28 — 2026-10-06 — Naira payouts: a flow you can see on testnet, and a good UX
+
+- **Owner:** "build it on testnet so I can see the flow, also build a good UX".
+- **Deployed** to https://test.everpiece.xyz (SIMULATED Paycrest; real public bank list and live rate).
+- **Built:**
+  - `/bank`, "Send naira to a bank": my own (**cash out**) or an @username's; only to the account the recipient signed.
+    - Server: sender-initiated orders bound to the recipient's signed destination.
+  - **PayoutTimeline**: Paid → Sent to the bank → Delivered (or failed → refunded), with real times from the server's per-order history.
+  - **Home:** one primary action, a 2×2 tile grid (Request, Scan to pay, Send to a bank, Cash out to my bank), quiet links (Add money, How you receive money), and a **Bank payouts** list with live, provider-confirmed states.
+  - **/receive:** bank search, popular banks first (by name from the provider list), automatic account check at 10 digits.
+  - **Naira amounts:** a ₦ sign, separators, quick amounts (₦5k–50k), live "≈ $".
+- **Bug found by the live E2E:** open screens behind one IP (a carrier NAT) exhausted the payout server's single 60/min budget and a cash-out failed with "Too many requests".
+  - Fix: separate budgets (reads 240/min, writes 30/min); the client retries one 429; polling is gentler and stops when the tab is hidden or the payout is final.
+- **UX review:** phone-size screenshots via `web/e2e/shots.spec.ts` (`E2E_SHOTS=1`) on the host; checked by eye. Fixed: link buttons rendering as primary, cluttered actions, the underlined brand, bare amount input.
+- **Tests:** payout server 6/6; live `payout.spec` ✅ (request → delivered, refund, cash out → Home list) and `add` ✅.
+- **Try it (one phone):**
+  1. test.everpiece.xyz → create an account → Get 100 test Dollars.
+  2. "How you receive money" → Nigerian bank account → any bank → any 10 digits (`2222222222` = a failing payout).
+  3. Home → "Cash out to my bank".
+- **Next:** Paycrest KYB (owner); `EverpiecePayout` contract; the 2026-10-07 checks (expired refund; specs needing new usernames).
+
+---
+
 ## Session 27 — 2026-10-06 — The last mile: Dollars → a Nigerian bank account (SIMULATED Paycrest)
 
 - **Owner:** "Everpiece should solve" the last mile: stablecoin → local currency → bank. Decisions:

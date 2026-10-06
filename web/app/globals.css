@@ -108,7 +108,7 @@ audio { width: 100%; }
 .fit { width: auto; flex: 0 0 auto; }
 .pill.bad { background: #fdecea; color: var(--bad); }
 /* Home actions: one primary, an even grid of tiles, quiet text links */
-.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 10px; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; min-height: 76px;
   padding: 12px 14px; border-radius: 14px; background: #ece8fd; color: var(--brand); font-weight: 700; text-decoration: none; line-height: 1.2; }
 .tile:active { transform: scale(0.98); }
