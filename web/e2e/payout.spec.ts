@@ -29,7 +29,7 @@ async function addBank(page: Page, number: string) {
   await page.getByRole("link", { name: "How you receive money" }).click();
   await expect(page.getByText("Simulated bank payouts", { exact: false })).toBeVisible();
   await page.getByText("Nigerian bank account", { exact: true }).click();
-  await page.getByLabel("Bank").selectOption({ label: "Guaranty Trust Bank" }); // Paycrest's real NGN list
+  await page.getByLabel("Bank", { exact: true }).selectOption({ label: "Guaranty Trust Bank" }); // Paycrest's real NGN list
   await page.getByLabel("Account number").fill(number);
   await page.getByRole("button", { name: "Check account" }).click();
   const check = page.getByLabel("Account check");
