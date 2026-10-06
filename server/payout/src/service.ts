@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { getAddress, isAddress, isHex, recoverTypedDataAddress, type Address, type Hex } from "viem";
 import {
   NUBAN, PAYOUT_REQUEST_VERSION, bankAccountHash, fromBaseUnits, isFinalPayout, nextPayoutState, payoutAccountHashOf, payoutAccountProblem,
@@ -221,11 +221,50 @@ export class PayoutService {
     }
   }
 
+  /** "≈ $X" while someone types a naira amount (no request yet). Same maths as a real quote. */
+  async rate(koboText: string | null): Promise<Result> {
+    if (!koboText || !/^[1-9][0-9]{0,15}$/.test(koboText)) return err(400, "InvalidRequest");
+    const kobo = BigInt(koboText);
+    try {
+      const approx = (Number(kobo) / 100 / 1000).toFixed(0);
+      const rate = await this.provider.sellRate(this.cfg.sourceNetwork, this.cfg.sourceCurrency, approx === "0" ? "1" : approx, "NGN");
+      return { httpStatus: 200, body: { rate, stableAmount: stableNeededFor(kobo, rate, this.cfg.rateBufferBps).toString(), bufferBps: this.cfg.rateBufferBps } };
+    } catch (e) {
+      return this.fail(e);
+    }
+  }
+
+  /**
+   * "Send to their bank" / "cash out to my bank": the SENDER picks the amount; the destination is still only one the
+   * recipient signed (their PayoutAccount). Recorded as a direct request bound to that signed destination.
+   */
+  private async directRequest(o: Record<string, unknown>): Promise<Result | { row: NonNullable<ReturnType<PayoutStore["request"]>> }> {
+    if (typeof o.recipient !== "string" || !isAddress(o.recipient) || typeof o.fiatAmount !== "string" || !/^[1-9][0-9]{0,15}$/.test(o.fiatAmount)) return err(400, "InvalidRequest");
+    const a = this.store.account(o.recipient);
+    if (!a) return err(404, "NO_PAYOUT_ACCOUNT");
+    const nowSec = BigInt(Math.floor(this.now() / 1000));
+    const req: PayoutRequest = {
+      version: PAYOUT_REQUEST_VERSION, requestId: `0x${randomBytes(32).toString("hex")}`, recipient: getAddress(o.recipient), currency: "NGN",
+      fiatAmount: BigInt(o.fiatAmount), payoutAccountHash: payoutAccountHashOf(this.cfg.domainAddress, parseAccountRecord(JSON.parse(a.record)), this.cfg.expectedChainId),
+      expiresAt: nowSec + 3600n,
+    };
+    const problem = payoutRequestProblem(req, nowSec);
+    if (problem) return err(422, problem);
+    const row = { request_id: req.requestId, recipient: req.recipient.toLowerCase(), record: JSON.stringify(wire(req)), sig: "", created_at: this.now(), direct: 1 };
+    this.store.putRequest(row);
+    return { row };
+  }
+
   /** The provider order the sender will pay. One live order per request; refunds go to the sender's own address (P3). */
   async createOrder(body: unknown): Promise<Result> {
     const o = (body ?? {}) as Record<string, unknown>;
     if (typeof o.sender !== "string" || !isAddress(o.sender)) return err(400, "InvalidRequest");
-    const r = typeof o.requestId === "string" && /^0x[0-9a-fA-F]{64}$/.test(o.requestId) ? this.store.request(o.requestId) : undefined;
+    let r = typeof o.requestId === "string" && /^0x[0-9a-fA-F]{64}$/.test(o.requestId) ? this.store.request(o.requestId) : undefined;
+    if (!r && o.requestId === undefined) {
+      const d = await this.directRequest(o);
+      if ("httpStatus" in d) return d;
+      r = d.row;
+    }
     if (!r) return err(404, "UNKNOWN_REQUEST");
     const req = parseRequestRecord(JSON.parse(r.record));
     const now = this.now();
@@ -257,6 +296,7 @@ export class PayoutService {
       const row: OrderRow = {
         order_id: po.id, request_id: r.request_id, sender: o.sender.toLowerCase(), receive_address: po.receiveAddress, amount_to_transfer: po.amountToTransfer,
         currency: po.currency, valid_until: po.validUntil, state: payoutStateOf(po.status) ?? "AWAITING_PAYMENT", created_at: now, updated_at: now, checked_at: now,
+        history: JSON.stringify([{ state: payoutStateOf(po.status) ?? "AWAITING_PAYMENT", at: now }]),
       };
       this.store.putOrder(row);
       log("info", "payout.order_created", { order: po.id, amount: po.amountToTransfer, currency: po.currency });
@@ -310,9 +350,13 @@ export class PayoutService {
 
   private publicOrder(o: OrderRow) {
     const units = toBaseUnits(roundUp6(o.amount_to_transfer), STABLE_DECIMALS);
+    const fresh = this.store.order(o.order_id) ?? o;
+    const req = this.store.request(o.request_id);
+    const r = req ? (JSON.parse(req.record) as { recipient: string; fiatAmount: string }) : null;
     return {
       orderId: o.order_id, requestId: o.request_id, state: o.state, receiveAddress: o.receive_address, amountToTransfer: o.amount_to_transfer,
       amountToTransferUnits: units?.toString() ?? null, currency: o.currency, validUntil: o.valid_until, simulated: this.cfg.simulated,
+      recipient: r?.recipient ?? null, fiatAmount: r?.fiatAmount ?? null, history: JSON.parse(fresh.history ?? "[]") as { state: string; at: number }[],
     };
   }
 }
@@ -324,4 +368,4 @@ function roundUp6(v: string): string {
   const units = BigInt(i) * 1_000_000n + BigInt(f.slice(0, 6)) + (/[1-9]/.test(f.slice(6)) ? 1n : 0n);
   return `${units / 1_000_000n}.${(units % 1_000_000n).toString().padStart(6, "0")}`;
 }
-export { PAYOUT_REQUEST_VERSION };
+

@@ -161,3 +161,26 @@ test("requests: only the recipient may sign; bound to the exact signed destinati
   const real = await fetch(`${base}/v1/payout/webhooks/paycrest`, { method: "POST", headers: { "x-paycrest-signature": createHmac("sha256", SECRET).update(body).digest("hex") }, body });
   assert.equal(real.status, 200);
 });
+
+test("send to their bank / cash out: sender picks the amount, only to the recipient's signed destination; timeline recorded", async () => {
+  const est = await call("GET", "/v1/payout/rate?amount=300000");
+  assert.equal(est.body.rate, "1500");
+  assert.equal(est.body.stableAmount, stableNeededFor(300_000n, "1500", 100).toString());
+  assert.equal((await call("GET", "/v1/payout/rate?amount=abc")).status, 400);
+  // no signed destination → refused
+  const stranger = "0x2222222222222222222222222222222222222222";
+  assert.equal((await call("POST", "/v1/payout/orders", { recipient: stranger, fiatAmount: "300000", sender: SENDER })).body.error, "NO_PAYOUT_ACCOUNT");
+  // the same bounds as requests
+  await addBank(maris, "0123456789");
+  assert.equal((await call("POST", "/v1/payout/orders", { recipient: maris.address, fiatAmount: "100", sender: SENDER })).body.error, "INVALID_AMOUNT");
+  const o = await call("POST", "/v1/payout/orders", { recipient: maris.address, fiatAmount: "300000", sender: SENDER });
+  assert.equal(o.status, 201);
+  const order = o.body.order;
+  assert.equal(order.recipient.toLowerCase(), maris.address.toLowerCase());
+  assert.equal(order.fiatAmount, "300000");
+  balances.set(order.receiveAddress.toLowerCase(), BigInt(order.amountToTransferUnits));
+  const done = await waitFor(order.orderId, "DELIVERED");
+  const states = (done.history as { state: string; at: number }[]).map((h) => h.state);
+  assert.deepEqual(states, ["AWAITING_PAYMENT", "PAYOUT_FUNDED", "BANK_PROCESSING", "DELIVERED"]);
+  assert.ok((done.history as { at: number }[]).every((h, i, a) => i === 0 || h.at >= a[i - 1].at));
+});
