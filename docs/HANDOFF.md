@@ -4,6 +4,27 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 32 — 2026-10-06 — Real-phone feedback: instant @username, receipts, QR, Slush-style UI, pay from any chain
+
+- **Owner on a real phone:**
+  - "sent to a username, why is it waiting for claim, it's supposed to send asap";
+  - "request payment qr not showing";
+  - "no transaction receipts";
+  - "I want it similar to Slush but retain our colour";
+  - "pay from any chain … automatically settles on usdc or ausd, didn't see that feature".
+- **Deployed** `62952fc`.
+- **Built:**
+  - @username sends are **Instant by default** (EverpiecePay, final); Protected is one tap away; a message forces Protected.
+  - **Instant payments in history** (sent/received; conversions once; bank payouts labelled) and **receipts** for them (indexer + `settled(id)` on-chain).
+  - **QR fix:** Chrome's forced dark mode made the QR white-on-white. The app is now dark by design with `color-scheme: dark`; the QR keeps its white field (verified in a dark-mode screenshot).
+  - **Midnight UI (Slush-style):** a wallet card with Send/Request/Scan/Add tiles, hide-balance eye, holdings list; bank shortcuts; a bottom tab bar (Home, Bank, Scan, Activity, Receive) shown only on Home/Receive/Scan.
+  - **Pay from another chain inside a payment:** "From another chain" on a pay-a-request screen → Aurora (simulated on testnet) → back to the payment with that token selected → one prompt converts and pays exact Dollars.
+- **Not run yet:**
+  - the updated `username.spec` (adds an instant send; protected flows now choose Protected) and `history.spec`. Blocked by the per-IP username cap (frees ~00:17 UTC) and low testnet gas.
+  - **Owner:** refill the deployer `0xc90551F8abEEf31eD7a7C1DAAaF20E5eC2EA8eAe` (testnet faucet, CAPTCHA).
+
+---
+
 ## Session 31 — 2026-10-06 — Identity rewrite, relayer top-up, EverpiecePay adversarial review
 
 - **Owner:** "go"; then "no repo, I don't want any trace of" the previous GitHub identity; new identity **deamybro <deamybro@gmail.com>**; remove the text mentions; GitHub push later (the owner logs in first).
