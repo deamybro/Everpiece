@@ -4,6 +4,23 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 29 — 2026-10-06 — Visual redesign ("the ui is still wack")
+
+- **Deployed** `ab573b1` to https://test.everpiece.xyz.
+- **Design system** (`web/app/globals.css`, rewritten):
+  - Inter, self-hosted by next/font, so the CSP is unchanged; tabular figures only on amounts.
+  - A neutral canvas, one brand colour, borderless cards with soft depth; new buttons, inputs and radio cards.
+  - Test-money notices are compact chips; top-bar pills.
+- **Wallet-style Home:** a gradient balance card with Send money / Request; round icon actions (Scan to pay, To a bank, Cash out, Add money; full names kept as aria-labels); a "How you receive money" settings row.
+- **SVG icons:** `components/Icon.tsx`.
+- **Review rows shortened** so values fit on one line.
+- **Process:** `deploy/test-stack/shots.sh` takes phone-size screenshots on the host (`web/e2e/shots.spec.ts`); every screen was reviewed by eye across 3 iterations.
+  - Found and fixed: narrow word spacing (Plus Jakarta Sans → Inter), the settings row stacking (`a.card` specificity), "Send money" wrapping, wrapped review values.
+- **Tests:** live `payout` ✅ and `add` ✅ on the final build.
+  - The simulated payout provider's bank-lookup cap is raised to 500/IP/day (test site only; real lookups keep 20).
+
+---
+
 ## Session 28 — 2026-10-06 — Naira payouts: a flow you can see on testnet, and a good UX
 
 - **Owner:** "build it on testnet so I can see the flow, also build a good UX".
