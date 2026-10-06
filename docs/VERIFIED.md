@@ -479,6 +479,7 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Official source:** https://docs.monad.xyz/tooling-and-infra/privacy.md ; https://docs.taceo.io/docs/start-here/deployments-and-status/ ; https://docs.taceo.io/docs/finance-solutions/overview/
 - **Date checked:** 2026-10-02
 - **Checked by:** Everpiece team
+- **Re-checked 2026-10-06** (deployments-and-status page): unchanged. Mainnet "limited users, volume caps", SDK-only, USDC only; ANON group 1 USDC/tx, 35 txs/epoch, 100 members; compliance service required; testnet is still only the LayerZero OFT demo.
 - **Also (TACEO launch post, 2026-09-24, https://core.taceo.io/articles/merces-mainnet/):** live on **Monad and World Chain mainnet**. Testnets listed are Arc, Base, Ethereum, Plasma and Stable; **Monad testnet is not listed** there. Tapa is TACEO's internal payments app on Monad mainnet. No relayer or gas sponsorship is mentioned. Builders contact TACEO for integration.
 
 ### 4.12 Monad privacy landscape (re-checked 2026-10-02)
