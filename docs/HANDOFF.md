@@ -4,6 +4,33 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 26 — 2026-10-06 — Final testing before mainnet; private payments update
+
+- **Owner:**
+  - "final testing and make sure everpiece ticks all the box before mainnet"; what's new on private payments (Category's Monad Private Settlement).
+  - Confirmed: money rules M1–M8; the ~$5 real Aurora top-up (once there is an API key); mainnet deploy + relayer funding (no amounts given, and "final testing" first, so **nothing was sent on mainnet**).
+- **Deployed** `bab3613` to https://test.everpiece.xyz.
+- **Results: `docs/READINESS.md`** (new). Every §57 Definition-of-Done step and every §60 release-checklist item, with evidence.
+  - Contracts 260/260 (fork + CI profile). Relayer 40/40 with fork. Claims 22/22 with fork. Shared 36, directory 13, voice 9. Typecheck and build clean.
+  - Live E2E: request, add, history ✅. message/username passed earlier today; on the final run they were blocked by the directory's 30-new-usernames-per-IP-per-day cap (working as designed; not loosened).
+- **Fixed:** jargon in the pay-a-request flow ("AUSD", "token", "blockchain" → Dollars wording; master §60). README rewritten to current state.
+- **Expired refund (DoD #15), live:** $1 testnet payment `0xb1eb8e92d2fc3dd086b0530ba20a059c131046b0046a6bb3426610ffe133a5dc` with the minimum 1-day expiry. Created and CONFIRMED at finality; early refund correctly refused (`PaymentNotExpired`, no gas).
+  - **Next session after 2026-10-07 10:11 UTC:** `POST /svc/relayer/v1/payments/refund {paymentId}` → CONFIRMED; check the sender got exactly $1 back.
+  - The throwaway test key is in the session scratchpad only.
+- **Private payments:** Monad Private Settlement (revealed today; VERIFIED §4.12) is institutional, with no date, SDK or token list, so it's not usable now. Recommendation: Private mode stays DISABLED for the submission. Unlink is still blocked on its dashboard.
+- **Owner, open (READINESS.md):**
+  - F-01;
+  - policy engine (TEST-only);
+  - mainnet GO with amounts;
+  - production domain `everpiece.xyz` (passkey RP ID);
+  - Agora `APPROVED_SWAPPER`;
+  - Aurora API key;
+  - deadline time, repo push target, demo video, bounty text;
+  - manual checks: a link claim by email on the current escrow, the full flow on real Android + iPhone.
+- **Rerun after the cap window:** `deploy/test-stack/e2e.sh optiongenome request message username`.
+
+---
+
 ## Session 25 — 2026-10-06 — Routing design: Aurora as the future funding provider
 
 - **Owner:**
