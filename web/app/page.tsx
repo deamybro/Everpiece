@@ -20,6 +20,7 @@ import { friendlyError, type RelayStatus } from "../lib/api";
 import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
 import { payoutAvailable } from "../lib/payout";
 import { HomePayouts } from "../components/HomePayouts";
+import { Icon } from "../components/Icon";
 import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
 
 /** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
@@ -194,24 +195,36 @@ export default function Home() {
         <button className="ghost small" onClick={() => { forgetAccount(); setAccount(null); }}>Sign out</button>
       </div>
 
-      <div className="card">
-        <div className="muted">{account.name ? `Hi ${account.name}, your Dollars` : "Your Dollars"}</div>
-        {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
-        <div className="balance">{balance === null ? "…" : formatDollars(balance)}</div>
-        <Link className="button" href="/send">Send money</Link>
-        <div className="actions" role="group" aria-label="More ways to pay and get paid">
-          <Link className="tile" href="/request"><span className="tile-icon" aria-hidden="true">↙</span>Request</Link>
-          <Link className="tile" href="/scan"><span className="tile-icon" aria-hidden="true">⌗</span>Scan to pay</Link>
-          {payoutAvailable() && <Link className="tile" href="/bank?to=them"><span className="tile-icon" aria-hidden="true">₦</span>Send to a bank</Link>}
-          {payoutAvailable() && <Link className="tile" href="/bank"><span className="tile-icon" aria-hidden="true">⇩</span>Cash out to my bank</Link>}
+      <section className="hero" aria-label="Your balance">
+        <div className="hero-top">
+          <span className="muted">{account.name ? `Hi ${account.name}, your Dollars` : "Your Dollars"}</span>
+          {isDevStack && <span className="hero-tag">Test money</span>}
         </div>
-        {(fundingAvailable() || payoutAvailable()) && (
-          <div className="links">
-            {fundingAvailable() && <Link href="/add">Add money from another chain</Link>}
-            {payoutAvailable() && <Link href="/receive">How you receive money</Link>}
-          </div>
-        )}
-      </div>
+        <div className="balance">{balance === null ? "…" : formatDollars(balance)}</div>
+        {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
+        <div className="hero-actions">
+          <Link className="button" href="/send"><Icon name="send" size={20} />Send money</Link>
+          <Link className="button alt" href="/request"><Icon name="request" size={20} />Request</Link>
+        </div>
+      </section>
+
+      <nav className="quick" aria-label="More ways to pay and get paid">
+        <Link href="/scan"><span className="quick-icon"><Icon name="scan" /></span>Scan to pay</Link>
+        {payoutAvailable() && <Link href="/bank?to=them" aria-label="Send to a bank"><span className="quick-icon"><Icon name="bank" /></span>To a bank</Link>}
+        {payoutAvailable() && <Link href="/bank" aria-label="Cash out to my bank"><span className="quick-icon"><Icon name="cashout" /></span>Cash out</Link>}
+        {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="quick-icon"><Icon name="add" /></span>Add money</Link>}
+      </nav>
+
+      {payoutAvailable() && (
+        <Link href="/receive" className="card settings-row" aria-label="How you receive money">
+          <span className="settings-icon"><Icon name="bank" size={20} /></span>
+          <span className="grow">
+            <strong>How you receive money</strong>
+            <span className="muted small">In Dollars, or straight to your Nigerian bank</span>
+          </span>
+          <span className="chev"><Icon name="chevron" size={20} /></span>
+        </Link>
+      )}
 
       {payoutAvailable() && <HomePayouts />}
 
@@ -224,9 +237,8 @@ export default function Home() {
 
       {isDevStack && (
         <div className="dev stack">
-          <strong>{config.networkLabel}</strong>
-          <span>Test Dollars only — not real money.</span>
-          <button className="secondary" onClick={devFund}>Get 100 test Dollars</button>
+          <span>{config.networkLabel}: test Dollars only, not real money.</span>
+          <button className="secondary small" onClick={devFund}>Get 100 test Dollars</button>
         </div>
       )}
 
@@ -277,7 +289,7 @@ export default function Home() {
           <HowItWorks />
         </>
       )}
-      <ul className="list" aria-label="Activity">
+      <ul className={`list${history.length ? " card" : ""}`} aria-label="Activity">
         {history.map((r) => (
           <li key={`${r.direction}-${r.paymentId}`} className="stack" data-payment-id={r.paymentId}>
             <div className="row">

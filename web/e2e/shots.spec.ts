@@ -15,8 +15,11 @@ test("naira flow screenshots", async ({ page, context }) => {
     options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
   });
   await page.goto("/");
+  await expect(page.getByLabel("Your first name")).toBeVisible();
+  await shot(page, "00-welcome");
   await page.getByLabel("Your first name").fill("Ada");
   await page.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
+  await expect(page.getByText("Hi Ada, your Dollars")).toBeVisible();
   const address = await page.evaluate(() => JSON.parse(localStorage.getItem("everpiece.account.v1")!).address as string);
   await fetch(`${FAUCET}/faucet`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address }) });
   await page.goto("/");
@@ -52,6 +55,8 @@ test("naira flow screenshots", async ({ page, context }) => {
   await expect(page.getByLabel("Bank payouts")).toContainText("Delivered");
   await shot(page, "10-home-after");
 
+  await page.goto("/send");
+  await shot(page, "12-send");
   await page.goto("/request");
   await page.getByRole("button", { name: "Naira to my bank" }).click();
   await page.getByRole("button", { name: "₦20,000" }).click();
