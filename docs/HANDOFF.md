@@ -19,9 +19,12 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
   - **QR fix:** Chrome's forced dark mode made the QR white-on-white. The app is now dark by design with `color-scheme: dark`; the QR keeps its white field (verified in a dark-mode screenshot).
   - **Midnight UI (Slush-style):** a wallet card with Send/Request/Scan/Add tiles, hide-balance eye, holdings list; bank shortcuts; a bottom tab bar (Home, Bank, Scan, Activity, Receive) shown only on Home/Receive/Scan.
   - **Pay from another chain inside a payment:** "From another chain" on a pay-a-request screen → Aurora (simulated on testnet) → back to the payment with that token selected → one prompt converts and pays exact Dollars.
-- **Not run yet:**
-  - the updated `username.spec` (adds an instant send; protected flows now choose Protected) and `history.spec`. Blocked by the per-IP username cap (frees ~00:17 UTC) and low testnet gas.
-  - **Owner:** refill the deployer `0xc90551F8abEEf31eD7a7C1DAAaF20E5eC2EA8eAe` (testnet faucet, CAPTCHA).
+- **Owner refilled the deployer** (1.22 → 6.22 testnet MON). The auto top-up fired immediately (relayer 0.38 → 1.38 MON, tx `0xd585…3e63`).
+- **Live E2E on `62952fc`, all green:**
+  - `payout`, `add` (from the server);
+  - `username` (incl. the new instant send: $3 straight into the balance, final, "Received"/"Paid" in both histories), `history`, `request`, `message` ×2 (from the PC; the server's IP is at the username cap until ~00:17 UTC);
+  - **new** `request.spec` test: pay a request from another chain → simulated Aurora top-up → "Finish the payment" → Agora converts → recipient gets exactly $4.00; the receipt says "Paid instantly"; the tab bar shows on Home and never over a flow.
+- **Next:** after 10:11 UTC 2026-10-07, the expired-payment refund check (O12); push when the owner has logged in to GitHub.
 
 ---
 

@@ -142,3 +142,56 @@ test("request → pay in Dollars (instant) and in CTK via Agora (protected); pai
 
   expect(csp).toEqual([]);
 });
+
+test("pay a request from another chain (simulated Aurora): one link → top-up arrives → Agora converts → exactly the asked Dollars", async ({ browser }) => {
+  test.setTimeout(420_000);
+  const maris = await withPasskeys(await browser.newContext());
+  const payer = await withPasskeys(await browser.newContext());
+  const csp: string[] = [];
+  for (const p of [maris, payer]) p.on("console", (m) => m.type() === "error" && /Content Security Policy/.test(m.text()) && csp.push(m.text()));
+  const M = `maris_${Date.now().toString(36).slice(-5)}`;
+
+  await onboard(maris, "Maris", M);
+  // the tab bar sits on Home only, never over a flow
+  const tabs = maris.getByRole("navigation", { name: "Main" });
+  await expect(tabs.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
+  await expect(tabs.getByRole("link", { name: "Scan" })).toBeVisible();
+  const link = await requestMoney(maris, "4", "Instant");
+  await expect(maris.getByRole("navigation", { name: "Main" })).toHaveCount(0);
+
+  // the payer has nothing on Monad: no username, $0
+  await payer.goto("/");
+  await payer.getByLabel("Your first name").fill("Ada");
+  await payer.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
+  await expect(payer.locator(".balance")).toHaveText("$0.00");
+
+  await payer.goto(link);
+  await expect(payer.getByText(`Pay @${M}`)).toBeVisible();
+  await expect(payer.getByRole("navigation", { name: "Main" })).toHaveCount(0);
+  await payer.getByRole("link", { name: "Pay from another chain" }).click();
+  await expect(payer).toHaveURL(/\/add\?amount=4(\.0+)?&return=\/pay\/0x[0-9a-f]{64}&then=pay$/);
+  await expect(payer.getByLabel("Dollars to add")).toHaveValue(/^4(\.0+)?$/);
+  await payer.getByLabel(/Your wallet address on/).fill("0x2222222222222222222222222222222222222222");
+  await payer.getByRole("button", { name: "See the price" }).click();
+  await payer.getByRole("button", { name: "Show me where to send it" }).click();
+  await payer.getByRole("button", { name: "Simulate the deposit (test only)" }).click();
+
+  // it arrives as the intermediate asset; no separate conversion — the payment itself converts (one prompt)
+  await expect(payer.getByRole("heading", { name: "It's arrived ✓" })).toBeVisible({ timeout: 120_000 });
+  await payer.getByRole("link", { name: "Finish the payment" }).click();
+  await expect(payer).toHaveURL(new RegExp(`${link}[?]with=CTK$`));
+  await expect(payer.getByText("Converted to Dollars by Agora")).toBeVisible();
+  await expect(payer.getByText("Price valid for")).toBeVisible();
+  await payer.getByRole("button", { name: "Pay $4.00 with fingerprint or screen lock" }).click();
+  await expect(payer.getByText("received exactly $4.00", { exact: false })).toBeVisible({ timeout: 120_000 });
+  await expect(maris.getByText("Paid ✓ You received $4.00", { exact: false })).toBeVisible();
+
+  // the receipt says how it was paid
+  await payer.getByRole("link", { name: "View receipt" }).click();
+  await expect(payer.getByText("Paid instantly")).toBeVisible();
+  // Maris got exactly $4.00 in Dollars
+  await maris.goto("/");
+  await expect(maris.locator(".balance")).toHaveText("$4.00");
+
+  expect(csp).toEqual([]);
+});
