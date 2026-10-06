@@ -544,6 +544,10 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - `GET /v2/sender/orders/{id}`; `GET /v2/rates/{network}/{from}/{amount}/{to}` (public; `data.sell.rate`); `POST /v2/verify-account {institution, accountIdentifier}` → canonical account name (or "OK" when lookup is unavailable); `GET /institutions/{currency}`.
   - Statuses/events: `initiated`, `payment_order.deposited`, `pending`, **`payment_order.validated` = "fiat payout confirmed by provider" (the off-ramp completion point)**, `payment_order.settling`, `settled`, `payment_order.refunding`, `refunded`, `expired` (no deposit before `validUntil`).
   - Refunds go to `source.refundAddress`. Webhooks are signed: `X-Paycrest-Signature` = hex HMAC-SHA256(API Secret, raw body), compared timing-safe on the UTF-8 hex strings.
+  - **Response envelope:** `{status, message, data}` (API introduction). Webhook body example: `{"event":"payment_order.settled","webhookVersion":"2","data":{"id":…,"direction":"offramp","status":"settled"}}`.
+  - **Live, no key (2026-10-06):**
+    - `GET /v2/rates/base/USDC/100/NGN` → `{"data":{"sell":{"rate":"1354.88","providerIds":[…],"orderType":"regular","refundTimeoutMinutes":2}}}`;
+    - `GET /v2/institutions/NGN` → `{"data":[{"name":"Access Bank","code":"ABNGNGLA","type":"bank"}, … {"name":"Guaranty Trust Bank","code":"GTBINGLA","type":"bank"}, …]}`.
   - **Monad is not a Paycrest network.**
   - TODO(VERIFY): whether the NGN rate is locked at order creation (affects "exactly ₦X"), and the refund window length.
 - **Circle CCTP V2** (https://developers.circle.com/cctp/cctp-supported-blockchains, /evm-smart-contracts; launch post dated 2025-11-24, https://www.circle.com/blog/now-available-usdc-cctp-wallets-and-contracts-on-monad):
