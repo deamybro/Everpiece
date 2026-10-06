@@ -530,6 +530,30 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - `APPROVED_SWAPPER` is required (77 members, granted by Agora; `WHITELISTER_ROLE` holder `0x4B95a6990ec8B7dE1fAB83dF36f4f63FDE464fFC`). **EverpiecePay must be approved by Agora before mainnet USDC conversions.**
   - Fork-proven (`contracts/test/fork/RelayerGas.t.sol`): EverpiecePay placed at an already-approved wallet converts USDC → exactly 25.000000 AUSD with a USDC permit; worst-case gas 520,398.
 
+### 4.15 Last-mile payout: Paycrest (stablecoin → NGN bank) and Circle CCTP V2 on Monad (checked 2026-10-06)
+
+- **Paycrest Sender API v2** (https://docs.paycrest.io/implementation-guides/sender-api-integration):
+  - Base `https://api.paycrest.io`; header `API-Key`; credentials (API Key + API Secret) after sign-up at app.paycrest.io **and KYB**.
+  - **Mainnet only:** "Paycrest runs on mainnet only. Test with the minimum order size: $0.50 on any supported chain."
+  - Off-ramp order: `POST /v2/sender/orders` with
+    - `amount`;
+    - `source {type:"crypto", currency (USDT|USDC), network (base|starknet|tron|solana), refundAddress}`;
+    - `destination {type:"fiat", currency:"NGN", recipient {institution (e.g. "GTBINGLA"), accountIdentifier, accountName, memo}}`;
+    - `reference`; optional `senderFee`/`senderFeePercent` (+ `senderFeeAddress`); optional `destination.providerIds` (≤ 3).
+  - The response's `providerAccount {receiveAddress, validUntil, amountToTransfer, currency}`: send exactly `amountToTransfer` (= amount + senderFee + transactionFee) before `validUntil`.
+  - `GET /v2/sender/orders/{id}`; `GET /v2/rates/{network}/{from}/{amount}/{to}` (public; `data.sell.rate`); `POST /v2/verify-account {institution, accountIdentifier}` → canonical account name (or "OK" when lookup is unavailable); `GET /institutions/{currency}`.
+  - Statuses/events: `initiated`, `payment_order.deposited`, `pending`, **`payment_order.validated` = "fiat payout confirmed by provider" (the off-ramp completion point)**, `payment_order.settling`, `settled`, `payment_order.refunding`, `refunded`, `expired` (no deposit before `validUntil`).
+  - Refunds go to `source.refundAddress`. Webhooks are signed: `X-Paycrest-Signature` = hex HMAC-SHA256(API Secret, raw body), compared timing-safe on the UTF-8 hex strings.
+  - **Monad is not a Paycrest network.**
+  - TODO(VERIFY): whether the NGN rate is locked at order creation (affects "exactly ₦X"), and the refund window length.
+- **Circle CCTP V2** (https://developers.circle.com/cctp/cctp-supported-blockchains, /evm-smart-contracts; launch post dated 2025-11-24, https://www.circle.com/blog/now-available-usdc-cctp-wallets-and-contracts-on-monad):
+  - Monad = **domain 15** (mainnet and testnet); Base = domain 6. Standard Transfer on Monad ✅; Fast Transfer "N/A" (standard attestation is already fast). "Upfront fees aren't supported on Monad Testnet".
+  - Mainnet: TokenMessengerV2 `0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d`, MessageTransmitterV2 `0x81D40F21F12A8F0E3252Bccb954D722d4c464B64`, TokenMinterV2 `0xfd78EE919681417d192449715b2594ab58f5D002`.
+  - Testnet: TokenMessengerV2 `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA`, MessageTransmitterV2 `0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275`, TokenMinterV2 `0xb43db544E2c27092c107639Ad201b3dEfAbcF192`.
+  - **On-chain 2026-10-06:** code present at all six addresses; MessageTransmitterV2 `localDomain()` = 15 on both networks.
+  - `depositForBurn(amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold)`; minFinalityThreshold 1000 = fast, 2000 = standard.
+- **Yellow Card** (backup payout provider, bank + mobile money, partner sandbox): not verified yet. TODO(VERIFY) from its API docs before any use.
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**
