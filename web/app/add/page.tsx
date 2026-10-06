@@ -11,7 +11,7 @@ import { Progress, progressText } from "../../components/status";
 import { formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
-import { PayError } from "../../lib/pay";
+import { PayError, balanceOfToken } from "../../lib/pay";
 import {
   activeTopUps, convertToDollars, fundingAvailable, fundingMode, loadSources, plan, quoteTopUp, reportDeposit, saveTopUp,
   simulatedDepositHash, topUpStatus, type TopUp, type TopUpQuote,
@@ -49,6 +49,8 @@ export default function AddPage() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  /** Aurora delivered but Agora settlement failed: the intermediate asset sitting safely in this account (never reversed). */
+  const [heldAfterFailure, setHeldAfterFailure] = useState<bigint | null>(null);
   const simulated = fundingMode() === "simulated";
 
   useEffect(() => {
@@ -147,9 +149,12 @@ export default function AddPage() {
     try {
       await convertToDollars(account, BigInt(topUp.dollars), destination, (s) => setProgress(progressText(s, "Converting to Dollars with Agora")));
       saveTopUp({ ...topUp, done: true });
+      setHeldAfterFailure(null);
       setStep("done");
     } catch (e) {
+      // docs/ROUTING.md §5: the delivered asset stays in the payer's own account; nothing is sent back automatically.
       setError(errText(e));
+      setHeldAfterFailure(await balanceOfToken(destination.address, account.address).catch(() => null));
     } finally {
       setBusy(false);
       setProgress("");
@@ -197,6 +202,13 @@ export default function AddPage() {
         <p className="muted">One fingerprint converts it to exactly <strong>{formatDollars(BigInt(topUp.dollars))}</strong> through Agora. If anything goes wrong, it simply stays in your account and you can try again.</p>
         <Progress text={progress} />
         {error && <div className="status bad">{error}</div>}
+        {error && (
+          <div className="status warn" aria-label="Where your money is">
+            The conversion to Dollars didn&apos;t go through, but your money is safe:{" "}
+            {heldAfterFailure !== null ? <strong>{fromBaseUnits(heldAfterFailure, destination!.decimals)} {destination!.symbol}</strong> : `your ${destination?.symbol ?? "funds"}`}{" "}
+            is in your own Everpiece account. Nothing is sent back automatically. Try converting again later; it also counts toward your next top-up.
+          </div>
+        )}
         <button disabled={busy} onClick={convert}>Convert to {formatDollars(BigInt(topUp.dollars))} with fingerprint or screen lock</button>
       </div>
     );

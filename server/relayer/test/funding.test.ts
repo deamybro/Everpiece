@@ -159,6 +159,13 @@ test("config: off without a key; USDC on mainnet; an explicit destination elsewh
   assert.equal(loadConfig({ ...base, AURORA_API_KEY: "abcdefgh12" }).funding?.destinationToken, USDC_MAINNET_ADDRESS);
   assert.throws(() => loadConfig({ ...base, AURORA_API_KEY: "abcdefgh12", EXPECTED_CHAIN_ID: "10143" }), /AURORA_DESTINATION_TOKEN/);
   assert.throws(() => loadConfig({ ...base, AURORA_API_KEY: "bad key/../" }), /unexpected characters/);
+  // ROUTING.md §3.2: Aurora never delivers AUSD directly, and only Agora-routed intermediates are accepted
+  assert.throws(() => loadConfig({ ...base, AURORA_API_KEY: "abcdefgh12", AURORA_DESTINATION_TOKEN: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a" }), /must not deliver AUSD/);
+  assert.throws(() => loadConfig({ ...base, AURORA_API_KEY: "abcdefgh12", AURORA_DESTINATION_TOKEN: "0x" + "33".repeat(20) }), /Agora route/);
+  assert.equal(
+    loadConfig({ ...base, EXPECTED_CHAIN_ID: "10143", AUSD_ADDRESS: "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC", AURORA_API_KEY: "abcdefgh12", AURORA_DESTINATION_TOKEN: "0x7BEb5D9DB0d85cBEa543C04f0dE8c23c2176cd9D" }).funding?.destinationToken,
+    "0x7BEb5D9DB0d85cBEa543C04f0dE8c23c2176cd9D",
+  );
 });
 
 test("the test site's SIMULATED Aurora (scripts/aurora-sim.mjs) drives the real adapter end to end", async () => {

@@ -1,5 +1,5 @@
 import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
-import { AURORA_API_URL, AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID, USDC_MAINNET_ADDRESS } from "@everpiece/shared";
+import { AURORA_API_URL, AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID, USDC_MAINNET_ADDRESS, tokenFor } from "@everpiece/shared";
 import type { FundingConfig } from "./funding.ts";
 
 /** The only methods this relayer will ever submit (master §26.2 — no arbitrary calldata): escrow + EverpiecePay. */
@@ -135,6 +135,12 @@ function fundingConfig(env: NodeJS.ProcessEnv): FundingConfig | undefined {
     ? address(env, "AURORA_DESTINATION_TOKEN")
     : chainId === MONAD_MAINNET_CHAIN_ID ? USDC_MAINNET_ADDRESS : undefined;
   if (!destination) throw new Error("config: AURORA_DESTINATION_TOKEN is required off mainnet");
+  // Aurora is a FUNDING provider, never AUSD settlement (docs/ROUTING.md §3.2): it delivers a verified intermediate
+  // asset that Agora then settles into exact AUSD. AUSD itself, or a token without an Agora route, is refused.
+  const ausd = env.AUSD_ADDRESS ? address(env, "AUSD_ADDRESS") : AUSD_ADDRESS;
+  if (destination.toLowerCase() === ausd.toLowerCase()) throw new Error("config: Aurora must not deliver AUSD directly (docs/ROUTING.md §3.2)");
+  const t = tokenFor(chainId, destination);
+  if (!t || t.route !== "AGORA_INSTANT_SETTLEMENT") throw new Error("config: AURORA_DESTINATION_TOKEN needs a verified Agora route to AUSD (docs/ROUTING.md §3.1)");
   return {
     apiUrl: (env.AURORA_API_URL || AURORA_API_URL).replace(/\/$/, ""),
     apiKey: env.AURORA_API_KEY,

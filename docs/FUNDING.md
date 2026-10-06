@@ -1,6 +1,10 @@
 # FUNDING.md — Add Dollars from another chain (Aurora Intents + USDC)
 
-Owner direction (2026-10-06): "build it, its part of our main build, use usdc".
+Owner direction (2026-10-06):
+
+- First: "build it, its part of our main build, use usdc".
+- Then: Aurora Intents is the **preferred future multi-chain funding provider**, not an AUSD settlement provider. **Not enabled for real money yet.**
+- The routing design (providers, order of checks, failure matrix) is `docs/ROUTING.md`; this file covers the money rules.
 Facts and sources: `docs/VERIFIED.md` §4.14. Status: `docs/INTEGRATION_LEDGER.md` (Aurora Intents row).
 
 ## How it works
@@ -32,7 +36,7 @@ payer's USDC on Base / Ethereum / Arbitrum / …        (the payer's own wallet,
 | M1 | Who pays Aurora's fee? | The payer. It's inside the amount they send, and shown before they send anything ("about $x (Aurora; Everpiece adds nothing)") | Everpiece subsidises it; or Everpiece adds an integrator fee (`appFees`, 60% to Everpiece) |
 | M2 | Everpiece fee | None | An integrator fee in bps (Aurora's floor on stables is max(2 bps, 40% of ours)) |
 | M3 | Refunds if the cross-chain step fails, is too small or is late | Aurora refunds to the payer's own address on the origin chain (`refundType: ORIGIN_CHAIN`), which they enter and see on the price screen | Refund to an Intents account (needs NEAR-side handling) |
-| M4 | USDC arrived but the conversion fails (price moved, Agora paused, not approved) | It stays in the payer's Everpiece account as USDC. "Convert" can be retried; it counts toward the next top-up | Auto-retry; or let the payer pay in USDC directly where routes allow |
+| M4 | Aurora completed but Agora settlement fails (price moved, pair paused, not approved, relayer down) | It stays in the payer's own Everpiece/Mera account as the delivered USDC. The app shows the exact amount held; "Convert" can be retried later; it counts toward the next top-up. **Never an automatic reverse route** (owner rule, ROUTING.md §5) | A payer-initiated "send it back" with its own quote (not built) |
 | M5 | Limits | ≤ 600 whole USDC per top-up (above the $500 payment ceiling); per-IP rate limits; $1 minimum | Per-account daily caps; KYC-tier limits |
 | M6 | Input buffer | 0.5% (`FUNDING_SLIPPAGE_BPS=50`); Aurora refunds the unused part | Lower (risk of underfunding) or higher |
 | M7 | Deadline | 30 minutes; deposits after it are refunded | Longer for slow chains |

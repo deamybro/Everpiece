@@ -56,6 +56,20 @@ test("add $5 from Base (simulated): price → deposit → arrives → one prompt
   await page.getByRole("button", { name: "Simulate the deposit (test only)" }).click();
 
   await expect(page.getByRole("heading", { name: "Turn it into Dollars" })).toBeVisible({ timeout: 120_000 });
+
+  // docs/ROUTING.md §5: Aurora delivered, but Agora settlement fails → the delivered asset stays in my account,
+  // shown with its real balance; nothing is reversed; converting again later works.
+  await page.route("**/svc/relayer/v1/pay/token", (r) => r.fulfill({ status: 503, contentType: "application/json", body: '{"error":"PROVIDER_UNAVAILABLE"}' }));
+  await page.getByRole("button", { name: "Convert to $5.00 with fingerprint or screen lock" }).click();
+  const held = page.getByLabel("Where your money is");
+  await expect(held).toContainText("your money is safe");
+  await expect(held).toContainText(/[0-9.]+ CTK/);
+  await expect(held).toContainText("Nothing is sent back automatically");
+  await page.unroute("**/svc/relayer/v1/pay/token");
+  await page.goto("/");
+  await expect(page.getByLabel("Top-up in progress")).toContainText("It's arrived");
+  await page.getByLabel("Top-up in progress").click();
+
   await page.getByRole("button", { name: "Convert to $5.00 with fingerprint or screen lock" }).click();
   await expect(page.getByText("Added $5.00 ✓", { exact: false })).toBeVisible({ timeout: 120_000 });
   await page.getByRole("link", { name: "Back to Everpiece" }).click();
