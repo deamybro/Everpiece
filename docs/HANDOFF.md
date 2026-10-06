@@ -4,6 +4,35 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 30 — 2026-10-06 — Full audit
+
+- **Report:** `docs/AUDIT-2026-10-06.md`. Deployed `d4b1086`.
+- **Fixed:**
+  - **A1 HIGH:** the payout amount is now capped by the quote (`payoutWithinQuote`, refused before signing);
+  - A2: rate limit on relayer quotes;
+  - A3: payout order budget + rate cache;
+  - A4: HSTS;
+  - A5: source-map-js;
+  - A6: segmented controls and `$` sign.
+- **Verified sound:**
+  - all suites (contracts 260/260 incl. forks + CI fuzz; workspaces 132);
+  - no secrets in git history;
+  - forged X-Forwarded-For not trusted;
+  - localhost-only ports;
+  - TLS 1.3, headers, CORS;
+  - live `payout` + `add` E2E on the final build.
+- **Open, by priority:**
+  - **O1 CRITICAL** — the repo has never been pushed (owner: where?);
+  - **O2 HIGH** — no adversarial review of EverpiecePay yet;
+  - O3 policy engine; O4 F-01;
+  - **O5** bank-name enumeration by address (privacy decision);
+  - O6 the testnet relayer at 0.64 MON;
+  - O7 production RP ID;
+  - O8 a manual link-claim test;
+  - O12 tomorrow's checks.
+
+---
+
 ## Session 29 — 2026-10-06 — Visual redesign ("the ui is still wack")
 
 - **Deployed** `ab573b1` to https://test.everpiece.xyz.
