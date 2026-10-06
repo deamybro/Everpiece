@@ -49,8 +49,12 @@ async function requestMoney(page: Page, amount: string, mode: "Instant" | "Prote
  */
 async function scanQr(payer: Page, qrSvg: string) {
   await payer.addInitScript((svg) => {
+    // one scan only: init scripts run on every later navigation too, and a still-attached fake camera would re-scan
+    // this QR on the next /scan visit
+    if (sessionStorage.getItem("e2e.fakeCameraUsed")) return;
     delete (window as unknown as { BarcodeDetector?: unknown }).BarcodeDetector;
     navigator.mediaDevices.getUserMedia = async () => {
+      sessionStorage.setItem("e2e.fakeCameraUsed", "1");
       const canvas = Object.assign(document.createElement("canvas"), { width: 480, height: 480 });
       const ctx = canvas.getContext("2d")!;
       const img = new Image();
