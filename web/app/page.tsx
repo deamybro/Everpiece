@@ -47,7 +47,7 @@ export default function Home() {
     if (a) retryMessageBinds().catch(() => {}); // once per visit: messages sent while offline
   }, []);
 
-  const refresh = useCallback(async (a: Account) => {
+  const refresh = useCallback(async (a: Account, inboxToo = true) => {
     setBalance(await dollarsOf(a.address).catch(() => null));
     const now = await chainTime().catch(() => BigInt(Math.floor(Date.now() / 1000)));
     // History from the indexer (source of truth); this browser's sent list only adds labels / not-yet-indexed sends.
@@ -70,6 +70,7 @@ export default function Home() {
       }
     }
 
+    if (!inboxToo) return;
     const inbox = await readInbox(a);
     const waiting = await Promise.all(
       inbox.map(async (i) => {
@@ -98,9 +99,22 @@ export default function Home() {
 
   useEffect(() => {
     if (!account) return;
+    // Every 5 s for balance and history; the directory inbox every 10 s (its per-IP limit is shared by everyone behind
+    // one address, e.g. a phone carrier's NAT). Nothing while the tab is hidden; at once when it's shown again.
     refresh(account);
-    const t = setInterval(() => refresh(account), 5000);
-    return () => clearInterval(t);
+    let tick = 0;
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      void refresh(account, ++tick % 2 === 0);
+    }, 5000);
+    const onShow = () => {
+      if (!document.hidden) void refresh(account);
+    };
+    document.addEventListener("visibilitychange", onShow);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onShow);
+    };
   }, [account, refresh]);
 
   async function onCancel(r: HistoryItem) {

@@ -43,7 +43,7 @@ export function ReceiptView({ paymentId }: { paymentId: Hex }) {
   pending.current = Boolean(receipt?.pending);
 
   useEffect(() => {
-    const load = () => loadReceipt(paymentId, loadAccount()?.address).then(setReceipt, () => setFailed(true));
+    const load = () => loadReceipt(paymentId, loadAccount() ?? undefined).then(setReceipt, () => setFailed(true));
     load();
     // the indexer can be a few seconds behind the chain right after a payment changes: refresh until it has caught up
     const t = setInterval(() => pending.current && load(), 4000);

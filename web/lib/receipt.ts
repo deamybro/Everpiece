@@ -49,7 +49,8 @@ const STATUS: Record<number, ReceiptState> = {
 };
 
 /** null: no such payment (or not on-chain yet). Throws only if neither the indexer nor the chain can be reached. */
-export async function loadReceipt(paymentId: Hex, viewer?: Address): Promise<Receipt | null> {
+/** `viewer` is the signed-in account on this device; its own @username needs no directory lookup. */
+export async function loadReceipt(paymentId: Hex, viewer?: { address: Address; username?: string }): Promise<Receipt | null> {
   const id = paymentId.toLowerCase() as Hex;
   const [indexed, onchain, now] = await Promise.all([
     config.indexerUrl
@@ -71,11 +72,10 @@ export async function loadReceipt(paymentId: Hex, viewer?: Address): Promise<Rec
   const recipientRaw = indexed?.p[0]?.recipient ?? null;
   const recipient = recipientRaw ? getAddress(recipientRaw) : null;
   const sender = getAddress(onchain.sender);
-  const [senderName, recipientName] = await Promise.all([
-    usernameOf(sender).catch(() => null),
-    recipient ? usernameOf(recipient).catch(() => null) : Promise.resolve(null),
-  ]);
-  const mine = viewer && getAddress(viewer) === sender ? loadSent().find((s) => s.paymentId.toLowerCase() === id) : undefined;
+  const own = (a: Address) => (viewer?.username && getAddress(viewer.address) === a ? viewer.username : null);
+  const nameOf = (a: Address) => own(a) ?? usernameOf(a).catch(() => null);
+  const [senderName, recipientName] = await Promise.all([nameOf(sender), recipient ? nameOf(recipient) : Promise.resolve(null)]);
+  const mine = viewer && getAddress(viewer.address) === sender ? loadSent().find((s) => s.paymentId.toLowerCase() === id) : undefined;
   return {
     paymentId: id,
     amount: onchain.amount,
