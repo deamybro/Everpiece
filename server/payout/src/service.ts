@@ -62,6 +62,7 @@ export class PayoutService {
   private readonly provider: Paycrest;
   private readonly vault: BankVault;
   private readonly limiter: Limiter;
+  private readonly readLimiter: Limiter;
   private readonly now: () => number;
   private institutionsCache: { at: number; list: Institution[] } | null = null;
 
@@ -71,11 +72,13 @@ export class PayoutService {
     this.provider = new Paycrest(cfg.paycrestUrl, cfg.paycrestApiKey, cfg.paycrestApiSecret, opts.fetch);
     this.vault = new BankVault(cfg.bankEncKey);
     this.limiter = new Limiter(cfg.perIpPerMinute);
+    this.readLimiter = new Limiter(cfg.readsPerIpPerMinute);
     this.now = opts.now ?? Date.now;
   }
 
-  limited(ip: string): Result | null {
-    return this.limiter.allow(ip, this.now()) ? null : err(429, "RateLimited");
+  /** Writes (anything that creates or changes data) and reads (status polling) have separate per-IP budgets. */
+  limited(ip: string, read = false): Result | null {
+    return (read ? this.readLimiter : this.limiter).allow(ip, this.now()) ? null : err(429, "RateLimited");
   }
   private fail(e: unknown): Result {
     if (e instanceof ProviderError) return err(e.httpStatus, e.code);

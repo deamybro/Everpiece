@@ -60,7 +60,7 @@ export default function BankPage() {
   // follow the payout to the end
   useEffect(() => {
     if (!order || isFinalPayout(order.state)) return;
-    const t = setInterval(() => payoutOrder(order.orderId).then(setOrder).catch(() => {}), 2500);
+    const t = setInterval(() => !document.hidden && payoutOrder(order.orderId).then(setOrder).catch(() => {}), 3000);
     return () => clearInterval(t);
   }, [order]);
 

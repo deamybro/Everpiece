@@ -49,7 +49,7 @@ export function createPayoutServer(svc: PayoutService): Server {
         return send(res, await svc.webhook(await readRaw(req), Array.isArray(sig) ? sig[0] : sig));
       }
       const ip = process.env.TRUST_PROXY === "1" ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || "unknown" : req.socket.remoteAddress ?? "unknown";
-      const limited = svc.limited(ip);
+      const limited = svc.limited(ip, req.method === "GET");
       if (limited) return send(res, limited, origin);
       let m: RegExpExecArray | null;
       if (req.method === "GET" && p === "/v1/payout/institutions") return send(res, await svc.institutions(url.searchParams.get("currency") ?? "NGN"), origin);

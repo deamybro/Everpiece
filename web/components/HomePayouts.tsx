@@ -18,18 +18,23 @@ export function HomePayouts() {
   useEffect(() => {
     const all = loadLocalPayouts().slice(0, 6);
     setItems(all);
+    const final: Record<string, boolean> = {};
     const check = () =>
+      !document.hidden &&
       all.forEach(async (p) => {
-        if (states[p.key] && isFinalPayout(states[p.key])) return;
+        if (final[p.key]) return;
         const s = p.orderId
           ? (await payoutOrder(p.orderId).catch(() => null))?.state
           : p.requestId
             ? (await loadPayoutRequest(p.requestId).catch(() => null))?.order?.state
             : undefined;
-        if (s) setStates((x) => ({ ...x, [p.key]: s }));
+        if (s) {
+          if (isFinalPayout(s)) final[p.key] = true; // finished payouts aren't asked about again
+          setStates((x) => ({ ...x, [p.key]: s }));
+        }
       });
     check();
-    const t = setInterval(check, 5000);
+    const t = setInterval(check, 8000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

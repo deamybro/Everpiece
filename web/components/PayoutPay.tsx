@@ -59,7 +59,7 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
   // follow the payout until the provider confirms (or refunds)
   useEffect(() => {
     if (!orderId || (state && isFinalPayout(state)) || state === "AWAITING_PAYMENT") return;
-    const t = setInterval(() => payoutOrder(orderId).then((o) => { setState(o.state); setHistory(o.history ?? []); }).catch(() => {}), 2500);
+    const t = setInterval(() => !document.hidden && payoutOrder(orderId).then((o) => { setState(o.state); setHistory(o.history ?? []); }).catch(() => {}), 3000);
     return () => clearInterval(t);
   }, [orderId, state]);
 

@@ -42,6 +42,7 @@ export function NairaRequest({ account }: { account: Account }) {
   useEffect(() => {
     if (!requestId) return;
     const tick = () =>
+      !document.hidden &&
       loadPayoutRequest(requestId)
         .then((r) => {
           setState(r.order?.state ?? null);
@@ -49,9 +50,12 @@ export function NairaRequest({ account }: { account: Account }) {
         })
         .catch(() => {});
     tick();
-    const t = setInterval(tick, 4000);
+    const t = setInterval(() => {
+      if (state === "DELIVERED" || state === "REFUNDED" || state === "EXPIRED") return;
+      tick();
+    }, 5000);
     return () => clearInterval(t);
-  }, [requestId]);
+  }, [requestId, state]);
 
   const kobo = parseNaira(amountText);
   useEffect(() => {

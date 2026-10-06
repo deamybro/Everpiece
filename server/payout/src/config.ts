@@ -22,6 +22,8 @@ export type PayoutConfig = {
   dbPath: string;
   allowedOrigin?: string;
   perIpPerMinute: number;
+  /** Status reads (GET) per IP per minute: cheap, and polled by open screens; everyone behind one NAT shares it. */
+  readsPerIpPerMinute: number;
   /** Bank-account verifications per IP per day (each one is a real name lookup at the provider). */
   verificationsPerIpPerDay: number;
   /** Label shown to users when the provider is simulated (test site). */
@@ -62,7 +64,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PayoutConfig {
     host: env.HOST ?? "127.0.0.1",
     dbPath: env.PAYOUT_DB_PATH ?? "payout.sqlite",
     allowedOrigin,
-    perIpPerMinute: int(env, "PER_IP_PER_MINUTE", 60),
+    perIpPerMinute: int(env, "PER_IP_PER_MINUTE", 30),
+    readsPerIpPerMinute: int(env, "READS_PER_IP_PER_MINUTE", 240),
     verificationsPerIpPerDay: int(env, "VERIFICATIONS_PER_IP_PER_DAY", 20),
     simulated: env.PAYOUT_SIMULATED === "1",
   };

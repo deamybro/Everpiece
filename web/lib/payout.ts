@@ -28,13 +28,18 @@ export type PublicOrder = {
 };
 export type LoadedPayoutRequest = { request: PayoutRequest; sig: Hex; account: SignedAccount; order: PublicOrder | null };
 
-async function api(method: "GET" | "POST", path: string, body?: unknown): Promise<Record<string, any>> {
+async function api(method: "GET" | "POST", path: string, body?: unknown, retried = false): Promise<Record<string, any>> {
   const r = await fetch(`${config.payoutUrl}${path}`, {
     method, headers: body ? { "content-type": "application/json" } : undefined,
     body: body ? JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v)) : undefined,
   }).catch(() => null);
   if (!r) throw new PayError("NETWORK_UNAVAILABLE");
   const j = (await r.json().catch(() => ({}))) as Record<string, any>;
+  // a 429 is refused before anything happens: safe to retry once
+  if (r.status === 429 && !retried) {
+    await new Promise((res) => setTimeout(res, 1500));
+    return api(method, path, body, true);
+  }
   if (r.status >= 300) throw new PayError(String(j.error ?? "PROVIDER_UNAVAILABLE"));
   return j;
 }
