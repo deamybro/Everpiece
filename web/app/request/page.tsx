@@ -120,7 +120,10 @@ export default function RequestPage() {
       )}
       {currency === "NGN" ? <NairaRequest account={account} /> : <>
       {!account.username && <div className="status warn">Pick your @username on Home first, so people can see who they&apos;re paying.</div>}
-      <input className="big" inputMode="decimal" placeholder="$0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount to request" />
+      <div className="money">
+        <span className="sign" aria-hidden="true">$</span>
+        <input className="big" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount to request" />
+      </div>
       <div className="row" role="group" aria-label="How it arrives">
         {instantAvailable() && (
           <button className={mode === RequestMode.INSTANT ? "" : "secondary"} aria-pressed={mode === RequestMode.INSTANT} onClick={() => setMode(RequestMode.INSTANT)}>Instant</button>

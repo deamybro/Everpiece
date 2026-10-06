@@ -63,3 +63,36 @@ test("naira flow screenshots", async ({ page, context }) => {
   await expect(page.getByText(/They'll pay about/)).toBeVisible();
   await shot(page, "11-request-naira");
 });
+
+test("other screens after the redesign", async ({ page, context }) => {
+  test.setTimeout(240_000);
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true },
+  });
+  await page.goto("/");
+  await page.getByLabel("Your first name").fill("Bo");
+  await page.getByRole("button", { name: "Create my account with fingerprint or screen lock" }).click();
+  await expect(page.getByText("Hi Bo, your Dollars")).toBeVisible();
+  const address = await page.evaluate(() => JSON.parse(localStorage.getItem("everpiece.account.v1")!).address as string);
+  await fetch(`${FAUCET}/faucet`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address }) });
+  await page.goto("/send");
+  await page.getByLabel("Amount in Dollars").fill("12.50");
+  await shot(page, "20-send-amount");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await shot(page, "21-send-who");
+  await page.getByRole("button", { name: "Email" }).click().catch(() => {});
+  await shot(page, "22-send-email");
+  await page.goto("/request");
+  await page.getByLabel("Amount to request").fill("25");
+  await shot(page, "23-request-dollars");
+  await page.goto("/add");
+  await page.getByLabel("Dollars to add").fill("20");
+  await shot(page, "24-add");
+  await page.goto("/scan");
+  await shot(page, "25-scan");
+  await page.goto("/proof");
+  await page.waitForTimeout(3000);
+  await shot(page, "26-proof");
+});

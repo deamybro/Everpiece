@@ -231,3 +231,8 @@ audio { width: 100%; }
   .receipt a { color: inherit; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* segmented controls: toggle rows (buttons with aria-pressed) read as a choice, not as calls to action */
+.row[role="group"]:has(> button[aria-pressed]) { background: #e9e8ef; padding: 4px; border-radius: 16px; gap: 4px; }
+.row[role="group"] > button[aria-pressed] { min-height: 44px; border-radius: 12px; background: transparent; color: var(--ink-2); box-shadow: none; font-size: 0.95rem; font-weight: 600; }
+.row[role="group"] > button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(18, 16, 40, 0.12); }

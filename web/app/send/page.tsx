@@ -132,7 +132,10 @@ export default function Send() {
         <div className="stack">
           <StepHint step={1} of={3} />
           <h1>How much?</h1>
-          <input className="big" inputMode="decimal" placeholder="$0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount in Dollars" />
+          <div className="money">
+            <span className="sign" aria-hidden="true">$</span>
+            <input className="big" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount in Dollars" />
+          </div>
           {balance !== null && <p className="muted center">You have {formatDollars(balance)}</p>}
           {amount !== null && balance !== null && amount > balance && (
             <div className="status bad">

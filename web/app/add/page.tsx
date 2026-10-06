@@ -290,7 +290,10 @@ export default function AddPage() {
       <StepHint step={1} of={3} />
       <h1>Add Dollars from another chain</h1>
       <p className="muted">Pay with USDC you hold on another network. It arrives as Dollars in your Everpiece account.</p>
-      <input className="big" inputMode="decimal" placeholder="$0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Dollars to add" />
+      <div className="money">
+        <span className="sign" aria-hidden="true">$</span>
+        <input className="big" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Dollars to add" />
+      </div>
       <h2>Pay from</h2>
       <div className="stack" role="radiogroup" aria-label="Pay from">
         {sources.map((s) => (
