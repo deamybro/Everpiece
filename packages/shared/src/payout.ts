@@ -97,8 +97,8 @@ export function payoutRequestProblem(r: PayoutRequest, nowSec: bigint): string |
   if (r.version !== PAYOUT_REQUEST_VERSION) return "UNKNOWN_VERSION";
   if (!/^0x[0-9a-f]{64}$/i.test(r.requestId)) return "INVALID_REQUEST";
   if (!(PAYOUT_CURRENCIES as readonly string[]).includes(r.currency)) return "UNSUPPORTED_CURRENCY";
-  // ₦100 to ₦5,000,000 per request (V1 bounds; the provider's own limits apply too)
-  if (r.fiatAmount < 100n * MINOR_UNITS.NGN || r.fiatAmount > 5_000_000n * MINOR_UNITS.NGN) return "INVALID_AMOUNT";
+  // ₦2,000 (above the relayer's $1 minimum payment) to ₦5,000,000 per request (V1 bounds; the provider's apply too)
+  if (r.fiatAmount < 2_000n * MINOR_UNITS.NGN || r.fiatAmount > 5_000_000n * MINOR_UNITS.NGN) return "INVALID_AMOUNT";
   if (nowSec >= r.expiresAt) return "REQUEST_EXPIRED";
   return null;
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { requestIdFromScan } from "../../lib/scan";
+import { requestPathFromScan } from "../../lib/scan";
 
 type Detector = { detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]> };
 
@@ -64,10 +64,10 @@ export default function ScanPage() {
       while (!stopped) {
         const codes = await detector.detect(video.current).catch(() => []);
         for (const c of codes) {
-          const id = requestIdFromScan(c.rawValue, window.location.origin);
+          const id = requestPathFromScan(c.rawValue, window.location.origin);
           if (id) {
             stopped = true;
-            router.push(`/pay/${id}`);
+            router.push(id);
             return;
           }
           setProblem("That QR code isn't an Everpiece payment request.");
@@ -82,8 +82,8 @@ export default function ScanPage() {
   }, [router]);
 
   function openPasted() {
-    const id = requestIdFromScan(pasted, window.location.origin);
-    if (id) router.push(`/pay/${id}`);
+    const id = requestPathFromScan(pasted, window.location.origin);
+    if (id) router.push(id);
     else setProblem("That isn't an Everpiece payment link.");
   }
 

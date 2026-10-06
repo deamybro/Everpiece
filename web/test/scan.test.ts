@@ -18,3 +18,10 @@ test("refuses other sites, schemes, extra data, malformed ids and oversized payl
     `${O}/pay/${ID}${"a".repeat(600)}`,
   ]) assert.equal(requestIdFromScan(bad, O), null, bad);
 });
+
+test("bank-payout links open /payout/<id>; Dollar links /pay/<id>; nothing else", async () => {
+  const { requestPathFromScan } = await import("../lib/scan.ts");
+  assert.equal(requestPathFromScan(`${O}/payout/${ID}`, O), `/payout/${ID}`);
+  assert.equal(requestPathFromScan(`${O}/pay/${ID}`, O), `/pay/${ID}`);
+  for (const bad of [`https://evil.example/payout/${ID}`, `${O}/payout/${ID}?bank=1`, `${O}/payout/0x12`, `${O}/payouts/${ID}`]) assert.equal(requestPathFromScan(bad, O), null, bad);
+});

@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // Last-mile payouts (docs/PAYOUT.md): the payout server is reached through the app's own origin on stacks that run
+  // it next to the web (PAYOUT_INTERNAL_URL at build time), so no extra public route is needed on the host.
+  async rewrites() {
+    const target = process.env.PAYOUT_INTERNAL_URL;
+    return target ? [{ source: "/payout-api/:path*", destination: `${target}/:path*` }] : [];
+  },
   async headers() {
     return [
       {

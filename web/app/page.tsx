@@ -18,6 +18,7 @@ import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type 
 import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
 import { friendlyError, type RelayStatus } from "../lib/api";
 import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
+import { payoutAvailable } from "../lib/payout";
 import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
 
 /** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
@@ -202,6 +203,7 @@ export default function Home() {
           <Link className="button secondary" href="/scan">Scan to pay</Link>
         </div>
         {fundingAvailable() && <Link className="button ghost" href="/add">Add money from another chain</Link>}
+        {payoutAvailable() && <Link className="button ghost" href="/receive">How you receive money</Link>}
       </div>
 
       {openTopUps.map((t) => (

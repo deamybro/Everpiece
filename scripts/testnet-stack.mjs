@@ -6,6 +6,8 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { startAuroraSimulator } from "./aurora-sim.mjs";
+import { startPaycrestSimulator } from "./paycrest-sim.mjs";
+import { randomBytes } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +40,10 @@ const DIRECTORY_DOMAIN = process.env.TESTNET_DIRECTORY_DOMAIN ? getAddress(proce
 const DATA = env("STACK_DATA_DIR", "/data");
 const BIND = env("STACK_BIND_HOST", "0.0.0.0");
 const INFO_FILE = process.env.STACK_INFO_FILE;
-const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, aurora: 8792, web: 3000 };
+const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, aurora: 8792, payout: 8793, paycrest: 8794, web: 3000 };
+// Last mile (docs/PAYOUT.md): the payout server + a SIMULATED Paycrest (scripts/paycrest-sim.mjs; Paycrest is mainnet-only).
+const PAYOUT = Boolean(PAY && process.env.TESTNET_PAYOUT_ENC_KEY);
+const SIM_PAYCREST = { key: randomBytes(16).toString("hex"), secret: randomBytes(32).toString("hex") };
 // "Add Dollars from another chain": Aurora is mainnet-only, so the test site runs a SIMULATED Aurora (scripts/aurora-sim.mjs)
 // that delivers test CTK, the token this deployment converts to AUSD. Needs EverpiecePay for the conversion.
 const svc = (name) => `${ORIGIN}/svc/${name}`;
@@ -105,6 +110,8 @@ writeFileSync(
     `NEXT_PUBLIC_INDEXER_URL=${svc("indexer")}/v1/graphql`,
     `NEXT_PUBLIC_VOICE_URL=${svc("voice")}`,
     `NEXT_PUBLIC_FUNDING=${PAY ? "simulated" : "off"}`,
+    `NEXT_PUBLIC_PAYOUT_URL=${PAYOUT ? `${ORIGIN}/payout-api` : ""}`,
+    `NEXT_PUBLIC_PAYOUT_SIMULATED=${PAYOUT ? "1" : ""}`,
     "NEXT_PUBLIC_NETWORK_LABEL=Monad testnet",
     "NEXT_PUBLIC_EXPLORER_URL=https://testnet.monadscan.com", // VERIFIED §4.9
     "",
@@ -112,7 +119,7 @@ writeFileSync(
 );
 const nextBin = join(root, "node_modules/next/dist/bin/next");
 say("building the web app (next build)…");
-const b = spawnSync(process.execPath, [nextBin, "build", "--webpack"], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" } });
+const b = spawnSync(process.execPath, [nextBin, "build", "--webpack"], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", ...(PAYOUT ? { PAYOUT_INTERNAL_URL: `http://127.0.0.1:${P.payout}` } : {}) } });
 if (b.status !== 0) throw new Error("next build failed");
 
 // 2. services, with persistent keys and databases
@@ -136,6 +143,15 @@ run("directory", ["server/directory/src/main.ts"], {
 });
 
 run("voice", ["server/voice/src/main.ts"], { ...common, VOICE_DB_PATH: join(DATA, "voice.sqlite"), PORT: String(P.voice) });
+if (PAYOUT) {
+  run("payout", ["server/payout/src/main.ts"], {
+    EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_ID), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN, PORT: String(P.payout), HOST: "127.0.0.1",
+    PAYOUT_DB_PATH: join(DATA, "payout.sqlite"), PAYOUT_BANK_ENC_KEY: process.env.TESTNET_PAYOUT_ENC_KEY, TRUST_PROXY: "1", LOG_LEVEL: "info",
+    PAYCREST_API_URL: `http://127.0.0.1:${P.paycrest}`, PAYCREST_API_KEY: SIM_PAYCREST.key, PAYCREST_API_SECRET: SIM_PAYCREST.secret,
+    // the simulated provider takes test AUSD on Monad testnet (mainnet: USDC on Base via CCTP, docs/PAYOUT.md §5)
+    PAYOUT_SOURCE_NETWORK: "sim-monad-testnet", PAYOUT_SOURCE_CURRENCY: "AUSD", PAYOUT_SIMULATED: "1",
+  });
+}
 
 // 3. faucet: mints TestDollar with the deployer (= TestDollar.minter). One mint at a time (nonce order);
 //    per-address cooldown and per-IP daily cap, so the minter's MON lasts.
@@ -257,11 +273,27 @@ if (PAY) {
   startAuroraSimulator({ port: P.aurora, destinationToken: CTK_TESTNET_ADDRESS, destinationDecimals: 18, deliver, say });
   say(`aurora: SIMULATED on 127.0.0.1:${P.aurora} (delivers test CTK)`);
 }
+if (PAYOUT) {
+  startPaycrestSimulator({
+    port: P.paycrest, apiKey: SIM_PAYCREST.key, apiSecret: SIM_PAYCREST.secret, webhookUrl: `http://127.0.0.1:${P.payout}/v1/payout/webhooks/paycrest`,
+    decimals: 6, say,
+    // a deposit = test AUSD arriving at the order's deposit address on Monad testnet
+    balanceOf: (a) => pub.readContract({ address: DOLLAR, abi: erc20Abi, functionName: "balanceOf", args: [a] }),
+    // a failed simulated payout is "refunded" from the stack's test float to the sender's own address
+    refund: (to, amount) =>
+      (queue = queue.then(async () => {
+        await ensureAusd(amount);
+        return sent(await wallet.writeContract({ address: DOLLAR, abi: erc20Abi, functionName: "transfer", args: [to, amount], chain: null }));
+      })),
+  });
+  say(`payout: SIMULATED Paycrest on 127.0.0.1:${P.paycrest}; payout server on 127.0.0.1:${P.payout}`);
+}
 
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);
 await waitFor(`http://127.0.0.1:${P.directory}/healthz`);
 await waitFor(`http://127.0.0.1:${P.voice}/healthz`);
+if (PAYOUT) await waitFor(`http://127.0.0.1:${P.payout}/healthz`);
 
 // 4. web, then tell the indexer what to index (stable content: it only re-indexes when the escrow changes)
 run("web", [nextBin, "start", "--port", String(P.web), "--hostname", BIND], {}, join(root, "web"));

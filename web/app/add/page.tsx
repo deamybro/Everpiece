@@ -60,7 +60,7 @@ export default function AddPage() {
     const a = q.get("amount");
     if (a && parseDollars(a) !== null) setAmountText(a);
     const r = q.get("return");
-    if (r && /^\/pay\/0x[0-9a-f]{64}$|^\/send$/.test(r)) setReturnTo(r); // only our own pages
+    if (r && /^\/(pay|payout)\/0x[0-9a-f]{64}$|^\/send$/.test(r)) setReturnTo(r); // only our own pages
     if (!fundingAvailable()) return;
     loadSources()
       .then((s) => {

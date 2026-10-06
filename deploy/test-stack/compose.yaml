@@ -55,6 +55,8 @@ services:
       TESTNET_PAY_ADDRESS: ${TESTNET_PAY_ADDRESS:-}
       TESTNET_PAY_BLOCK: ${TESTNET_PAY_BLOCK:-}
       TESTNET_DIRECTORY_DOMAIN: ${TESTNET_DIRECTORY_DOMAIN:-}
+      # Last-mile payouts: AES key for bank account numbers at rest (generated once on the host by push.sh).
+      TESTNET_PAYOUT_ENC_KEY: ${TESTNET_PAYOUT_ENC_KEY:-}
     volumes:
       - stack-info:/shared
       - stack-data:/data # persistent relayer/claims/directory databases (testnet)

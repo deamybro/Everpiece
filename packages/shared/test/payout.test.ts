@@ -75,7 +75,7 @@ test("signed destination: only the account owner's signature, and requests bind 
   assert.notEqual(payoutAccountHashOf(DOMAIN, { ...a, last4: "0000" }, 10143), r.payoutAccountHash);
   const rs = await maris.signTypedData(payoutRequestTyped(DOMAIN, r, 10143));
   assert.equal(await recoverTypedDataAddress({ ...payoutRequestTyped(DOMAIN, r, 10143), signature: rs }), maris.address);
-  assert.equal(payoutRequestProblem({ ...r, fiatAmount: 9_999n }, 1_800_000_000n), "INVALID_AMOUNT");
+  assert.equal(payoutRequestProblem({ ...r, fiatAmount: 199_999n }, 1_800_000_000n), "INVALID_AMOUNT"); // < ₦2,000
   assert.equal(payoutRequestProblem({ ...r, expiresAt: 1n }, 1_800_000_000n), "REQUEST_EXPIRED");
   assert.equal(payoutAccountProblem({ ...a, institution: "x" }, 1n), "INVALID_INSTITUTION");
   assert.ok(PAYOUT_REQUEST_LINK.test(`/payout/0x${"ab".repeat(32)}`));

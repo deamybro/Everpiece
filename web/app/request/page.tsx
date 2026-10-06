@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Hex } from "viem";
 import { Welcome } from "../../components/Welcome";
+import { NairaRequest } from "../../components/NairaRequest";
+import { payoutAvailable } from "../../lib/payout";
 import { QrCode } from "../../components/QrCode";
 import { StepHint } from "../../components/HowItWorks";
 import { Progress } from "../../components/status";
@@ -19,6 +21,7 @@ export default function RequestPage() {
   const [loaded, setLoaded] = useState(false);
   const [amountText, setAmountText] = useState("");
   const [mode, setMode] = useState<RequestMode>(RequestMode.INSTANT);
+  const [currency, setCurrency] = useState<"USD" | "NGN">("USD");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState<Hex | null>(null);
@@ -109,6 +112,13 @@ export default function RequestPage() {
       </div>
       <StepHint step={1} of={2} />
       <h1>Request money</h1>
+      {payoutAvailable() && (
+        <div className="row" role="group" aria-label="Receive as">
+          <button className={currency === "USD" ? "" : "secondary"} aria-pressed={currency === "USD"} onClick={() => setCurrency("USD")}>Dollars</button>
+          <button className={currency === "NGN" ? "" : "secondary"} aria-pressed={currency === "NGN"} onClick={() => setCurrency("NGN")}>Naira to my bank</button>
+        </div>
+      )}
+      {currency === "NGN" ? <NairaRequest account={account} /> : <>
       {!account.username && <div className="status warn">Pick your @username on Home first, so people can see who they&apos;re paying.</div>}
       <input className="big" inputMode="decimal" placeholder="$0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount to request" />
       <div className="row" role="group" aria-label="How it arrives">
@@ -127,6 +137,7 @@ export default function RequestPage() {
         Create request with fingerprint or screen lock
       </button>
       {amount !== null && amount < 1_000_000n && <p className="muted small center">The minimum is $1.00.</p>}
+      </>}
     </div>
   );
 }
