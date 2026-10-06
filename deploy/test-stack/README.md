@@ -48,6 +48,7 @@ With `STACK_PUBLIC_ORIGIN=https://test.everpiece.xyz` in the host's `.env`, the 
 - **Rate limits:** the services see the visitor's address via `TRUST_PROXY=1`, so limits are per visitor.
 - **Passkeys** belong to `test.everpiece.xyz` (rpId = hostname). They are separate from the future production domain.
 - **E2E:** run `E2E_BASE_URL=https://test.everpiece.xyz E2E_FAUCET_URL=https://test.everpiece.xyz/svc/faucet E2E_CLAIMS_URL=https://test.everpiece.xyz/svc/claims npx playwright test`.
+- **E2E from the host** (when the local machine is short on memory; each spec opens 2–4 browsers): `deploy/test-stack/e2e.sh <ssh-host> [spec ...]` runs them one after another in a throwaway Playwright container capped at 1.5 GB / 1 CPU (`/opt/everpiece/e2e-runner`, container `everpiece-e2e`). `flow` and `email` skip themselves here (real SMS and email).
 - **Anyone with the link can use it.** Test Dollars only, but claim-code emails are real, so abuse is capped only by the per-address and per-IP limits and Resend's 100 a day.
 
 ## Real claim-code emails (Resend)
