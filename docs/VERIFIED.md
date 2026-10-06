@@ -508,6 +508,22 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Checked by:** Everpiece team
 - **Notes:** No formally audited JavaScript HPKE was found. Risk accepted and mitigated (THREAT_MODEL K.1 #4).
 
+### 4.14 Cross-chain funding: Aurora Intents, USDC on Monad, Agora AUSD/USDC (checked 2026-10-06)
+
+- **Aurora Intents** (docs.intents.aurora.dev):
+  - Supported chains include **Monad**, "✅ Supported" as both source and destination (Intents Connect and Intents Deposits pages). Mainnet only: no testnet is listed.
+  - API base `https://intents-api.aurora.dev/api`; the API key is a path segment: `GET /tokens/{apiKey}`, `POST /quote/{apiKey}`, `POST /deposit/submit/{apiKey}` (`txHash`, `depositAddress`), `GET /status/{apiKey}?depositAddress=`.
+  - `swapType` ∈ EXACT_INPUT, EXACT_OUTPUT, FLEX_INPUT, ANY_INPUT. EXACT_OUTPUT: `amountOut` fixed; slippage applies to the input; less than `minAmountIn` is refunded by the deadline; excess is refunded to `refundTo` after the swap.
+  - `refundType`/`depositType` ORIGIN_CHAIN | INTENTS | CONFIDENTIAL_INTENTS; `recipientType` DESTINATION_CHAIN | INTENTS | CONFIDENTIAL_INTENTS.
+  - Statuses: KNOWN_DEPOSIT_TX, PENDING_DEPOSIT, INCOMPLETE_DEPOSIT, PROCESSING, SUCCESS, REFUNDED, FAILED.
+  - Fees: "split 60/40 between the Integrator (60%) and Aurora (40%)"; floor on stables "max(2 bps, 40% of the Integrator fee)"; maximum 500 bps. Keys come from Intents Studio (studio.aurora.dev) and are "not sensitive".
+  - Field types: the same names and enums as NEAR Intents 1Click's published OpenAPI (`1click.chaindefuser.com/docs/v0/openapi.yaml`), used as the type reference. TODO(VERIFY): Aurora's own token list with a real key (the public 1Click list has Monad MON, USDC and USDT0 only; **no AUSD**).
+- **USDC on Monad mainnet** `0x754704Bc059F8C67012fEd69BC8A327a5aafb603`: on-chain `name()` "USDC", `symbol()` "USDC", `decimals()` 6, `version()` "2"; `DOMAIN_SEPARATOR()` equals EIP-712(name "USDC", version "2", chainId 143, this address), so ERC-2612 permits are signed in that domain. The 1Click token list maps Monad USDC (`nep245:v2_1.omni.hot.tg:143_2dmLwYWkCQKyTjeUPAsGJuiVLbFx`) to this contract.
+- **Agora AUSD/USDC pair, Monad mainnet** `0xf33286E3222D1c829dACeac48c0Ec651F6452470` (Agora "Instant Settlement → Protocol Deployments"; factory `0x8468587Af422ad440F58a57E955eCA6A970b5375`).
+  - On-chain: `name()` "AUSD/USDC", `token0()` AUSD, `token1()` USDC; `getAmountsIn(25 AUSD, [USDC, AUSD])` = 25 USDC (2026-10-06).
+  - `APPROVED_SWAPPER` is required (77 members, granted by Agora; `WHITELISTER_ROLE` holder `0x4B95a6990ec8B7dE1fAB83dF36f4f63FDE464fFC`). **EverpiecePay must be approved by Agora before mainnet USDC conversions.**
+  - Fork-proven (`contracts/test/fork/RelayerGas.t.sol`): EverpiecePay placed at an already-approved wallet converts USDC → exactly 25.000000 AUSD with a USDC permit; worst-case gas 520,398.
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**

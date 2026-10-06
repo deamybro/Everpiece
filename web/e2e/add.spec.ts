@@ -48,7 +48,7 @@ test("add $5 from Base (simulated): price → deposit → arrives → one prompt
   await expect(summary).toContainText("0x2222222222222222222222222222222222222222");
   await page.getByRole("button", { name: "Show me where to send it" }).click();
 
-  await expect(page.getByLabel("Deposit address")).toHaveText(/^0x[0-9a-fA-F]{40}$/);
+  await expect(page.getByLabel("Deposit address", { exact: true })).toHaveText(/^0x[0-9a-fA-F]{40}$/);
   await expect(page.getByText("Waiting for your deposit…")).toBeVisible();
   // the top-up survives a reload
   await page.reload();

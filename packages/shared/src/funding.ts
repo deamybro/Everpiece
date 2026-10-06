@@ -3,7 +3,7 @@ import { getAddress, isAddress, type Address } from "viem";
 /**
  * "Add Dollars from another chain": Aurora Intents moves USDC the payer holds on another chain to the payer's OWN
  * Everpiece account on Monad (EXACT_OUTPUT: exactly the USDC Agora needs), then one passkey prompt converts it to
- * exactly that many Dollars (EverpiecePay.payWithToken through the Agora AUSD/USDC pair). Facts: docs/VERIFIED.md §7.
+ * exactly that many Dollars (EverpiecePay.payWithToken through the Agora AUSD/USDC pair). Facts: docs/VERIFIED.md §4.14.
  *
  * Money rules (owner-confirmable, docs/FUNDING.md): the payer pays Aurora's fee (shown first, no Everpiece fee);
  * a failed cross-chain step is refunded by Aurora to the payer's own address on the origin chain; USDC that arrived

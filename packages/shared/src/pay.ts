@@ -15,7 +15,7 @@ export const AGORA_TESTNET = {
   whitelister: "0x7c10F56d6f04a51376393a1C3670e966863F6BD5",
   ausdFaucet: "0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C",
 } as const;
-/** USDC on Monad mainnet (Circle; docs/VERIFIED.md §7: name "USDC", version "2", 6 decimals, ERC-2612 domain checked). */
+/** USDC on Monad mainnet (Circle; docs/VERIFIED.md §4.14: name "USDC", version "2", 6 decimals, ERC-2612 domain checked). */
 export const USDC_MAINNET_ADDRESS = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603" as const;
 /** Agora Instant Settlement AUSD/USDC pair on Monad mainnet ("Protocol Deployments"; on-chain name "AUSD/USDC",
  *  token0 AUSD, token1 USDC). Swappers need APPROVED_SWAPPER, granted by Agora (KYC) on mainnet. */
