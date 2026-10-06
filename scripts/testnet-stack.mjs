@@ -266,6 +266,29 @@ const faucetServer = createServer((req, res) => {
 faucetServer.on("clientError", (_e, socket) => socket.destroy());
 faucetServer.listen(P.faucet, BIND);
 
+// Relayer gas on the TEST site (owner GO 2026-10-06; test MON only): every 5 min, if the relayer is below 1 MON, the
+// deployer sends it 1 MON (at most 5 a day); alerts in the log when either runs low. Monad charges the full gas limit,
+// so heavy E2E days drain it (it hit its 0.2 MON floor once and refused sends).
+{
+  const relayerAddress = privateKeyToAccount(env("TESTNET_RELAYER_KEY")).address;
+  const ONE = 10n ** 18n;
+  const topUps = new Map();
+  const checkGas = () =>
+    (queue = queue.then(async () => {
+      const [rel, dep] = await Promise.all([pub.getBalance({ address: relayerAddress }), pub.getBalance({ address: minter.address })]);
+      if (rel >= ONE) return;
+      const day = new Date().toISOString().slice(0, 10);
+      if ((topUps.get(day) ?? 0) >= 5) return say(`ALERT relayer gas low (${Number(rel) / 1e18} MON) and today's 5 top-ups are used`);
+      if (dep < 3n * ONE) return say(`ALERT relayer gas low (${Number(rel) / 1e18} MON) but the deployer has only ${Number(dep) / 1e18} MON: refill it from the Monad testnet faucet`);
+      const hash = await wallet.sendTransaction({ to: relayerAddress, value: ONE, chain: null });
+      await sent(hash);
+      topUps.set(day, (topUps.get(day) ?? 0) + 1);
+      say(`relayer gas topped up with 1 test MON (${hash}); was ${Number(rel) / 1e18} MON`);
+    })).catch((e) => say(`relayer gas check failed: ${String(e?.shortMessage ?? e).slice(0, 100)}`));
+  setTimeout(checkGas, 60_000);
+  setInterval(checkGas, 5 * 60_000);
+}
+
 if (PAY) {
   const deliver = (to, amount) =>
     (queue = queue.then(async () => {
