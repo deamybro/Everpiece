@@ -180,10 +180,14 @@ export default function BankPage() {
         <StepHint step={2} of={3} />
         <h1>How much should arrive?</h1>
         {bankCard}
-        <input className="big" inputMode="decimal" placeholder="₦0" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Naira to send" />
+        <div className="money">
+          <span className="sign" aria-hidden="true">₦</span>
+          <input className="big" inputMode="decimal" placeholder="0" value={amountText} onChange={(e) => setAmountText(e.target.value)}
+            onBlur={() => setAmountText((t) => { const k = parseNaira(t); return k === null ? t : formatNaira(k).slice(1); })} aria-label="Naira to send" />
+        </div>
         <div className="chips" role="group" aria-label="Quick amounts">
           {CHIPS.map((n) => (
-            <button key={n} className="secondary" onClick={() => setAmountText(String(n))}>{formatNaira(BigInt(n) * 100n)}</button>
+            <button key={n} className="secondary" onClick={() => setAmountText(n.toLocaleString("en-NG"))}>{formatNaira(BigInt(n) * 100n)}</button>
           ))}
         </div>
         <div className="estimate" aria-live="polite">

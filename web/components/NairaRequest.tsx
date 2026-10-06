@@ -125,10 +125,14 @@ export function NairaRequest({ account }: { account: Account }) {
   return (
     <div className="stack">
       {payoutSimulated() && <div className="dev">Simulated bank payout: no real bank is paid on this test site.</div>}
-      <input className="big" inputMode="decimal" placeholder="₦0" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Naira to receive" />
+      <div className="money">
+        <span className="sign" aria-hidden="true">₦</span>
+        <input className="big" inputMode="decimal" placeholder="0" value={amountText} onChange={(e) => setAmountText(e.target.value)}
+          onBlur={() => setAmountText((t) => { const k = parseNaira(t); return k === null ? t : formatNaira(k).slice(1); })} aria-label="Naira to receive" />
+      </div>
       <div className="chips" role="group" aria-label="Quick amounts">
         {[5_000, 10_000, 20_000, 50_000].map((n) => (
-          <button key={n} className="secondary" onClick={() => setAmountText(String(n))}>{formatNaira(BigInt(n) * 100n)}</button>
+          <button key={n} className="secondary" onClick={() => setAmountText(n.toLocaleString("en-NG"))}>{formatNaira(BigInt(n) * 100n)}</button>
         ))}
       </div>
       <div className="estimate" aria-live="polite">{estimate !== null ? `They'll pay about ${formatDollars(estimate)}` : ""}</div>

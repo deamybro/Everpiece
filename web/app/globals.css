@@ -107,3 +107,20 @@ audio { width: 100%; }
 .estimate { font-size: 0.95rem; color: var(--muted); text-align: center; min-height: 1.4em; }
 .fit { width: auto; flex: 0 0 auto; }
 .pill.bad { background: #fdecea; color: var(--bad); }
+/* Home actions: one primary, an even grid of tiles, quiet text links */
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; min-height: 76px;
+  padding: 12px 14px; border-radius: 14px; background: #ece8fd; color: var(--brand); font-weight: 700; text-decoration: none; line-height: 1.2; }
+.tile:active { transform: scale(0.98); }
+.tile-icon { font-size: 1.15rem; width: 28px; height: 28px; border-radius: 8px; background: #fff; display: grid; place-items: center; }
+.links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 0.95rem; }
+.links a { color: var(--brand); font-weight: 600; text-decoration: none; }
+.links a:hover, .links a:focus-visible { text-decoration: underline; }
+/* header: brand isn't a blue underlined link; ghost actions are quiet; "Sign out" hugs the right edge */
+a.brand { text-decoration: none; }
+.button.ghost { background: transparent; color: var(--brand); }
+.row > button.ghost, .row > .fit { width: auto; flex: 0 0 auto; }
+/* money input with a currency sign */
+.money { position: relative; }
+.money .sign { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 2rem; font-weight: 800; color: var(--muted); pointer-events: none; }
+.money input.big { padding-left: 48px; }

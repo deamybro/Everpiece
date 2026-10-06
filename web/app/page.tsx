@@ -199,18 +199,18 @@ export default function Home() {
         {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
         <div className="balance">{balance === null ? "…" : formatDollars(balance)}</div>
         <Link className="button" href="/send">Send money</Link>
-        <div className="row" role="group">
-          <Link className="button secondary" href="/request">Request</Link>
-          <Link className="button secondary" href="/scan">Scan to pay</Link>
+        <div className="actions" role="group" aria-label="More ways to pay and get paid">
+          <Link className="tile" href="/request"><span className="tile-icon" aria-hidden="true">↙</span>Request</Link>
+          <Link className="tile" href="/scan"><span className="tile-icon" aria-hidden="true">⌗</span>Scan to pay</Link>
+          {payoutAvailable() && <Link className="tile" href="/bank?to=them"><span className="tile-icon" aria-hidden="true">₦</span>Send to a bank</Link>}
+          {payoutAvailable() && <Link className="tile" href="/bank"><span className="tile-icon" aria-hidden="true">⇩</span>Cash out to my bank</Link>}
         </div>
-        {payoutAvailable() && (
-          <div className="row" role="group" aria-label="Bank">
-            <Link className="button secondary" href="/bank?to=them">Send to a bank</Link>
-            <Link className="button secondary" href="/bank">Cash out to my bank</Link>
+        {(fundingAvailable() || payoutAvailable()) && (
+          <div className="links">
+            {fundingAvailable() && <Link href="/add">Add money from another chain</Link>}
+            {payoutAvailable() && <Link href="/receive">How you receive money</Link>}
           </div>
         )}
-        {fundingAvailable() && <Link className="button ghost" href="/add">Add money from another chain</Link>}
-        {payoutAvailable() && <Link className="button ghost" href="/receive">How you receive money</Link>}
       </div>
 
       {payoutAvailable() && <HomePayouts />}
