@@ -94,7 +94,7 @@ Webhooks are accepted only with a valid `X-Paycrest-Signature` (HMAC-SHA256 of t
 | Piece | State |
 |---|---|
 | Design, decisions P1–P4 | ✅ this file |
-| Provider layer (`PayoutProvider`: Paycrest, Simulated) + payout server + signed bank destinations + web flow | In progress (testnet, SIMULATED) |
+| Payout server (`server/payout`: Paycrest client, signed bank destinations, ₦ requests, orders, HMAC webhooks) + SIMULATED Paycrest (`scripts/paycrest-sim.mjs`) + web (`/receive`, ₦ on `/request`, `/payout/<id>`) | ✅ on testnet (SIMULATED; real public bank list + live rate). Tests: payout 5/5, shared 40/40, live `payout.spec` ✅ |
 | Paycrest live | ❌ 👤 Owner: sign up at app.paycrest.io and complete **KYB** → API Key + API Secret |
 | `EverpiecePayout` contract | ❌ design only (§5) |
 | First real payout | ❌ 👤 after KYB + contract + GO: one $0.50–$1 order to a real NG account, with the provider's confirmation as evidence |

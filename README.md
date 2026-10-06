@@ -12,6 +12,7 @@ Everpiece is a mobile-first web app (installable PWA) on Monad for person-to-per
 - **Payment requests:** "Pay @maris $25" as a signed QR code or link; scan to pay (Android and iPhone); a "paid" mark only after an on-chain proof.
 - **Encrypted voice and text notes** with a payment. Only the recipient can open them, and a message outage never blocks the money.
 - **History and receipts** from an Envio indexer, with explorer proof for every step.
+- **Get paid in naira, to your bank:** recipients add a verified Nigerian bank account; "pay me at least ₦50,000" becomes a QR code; the payer pays in Dollars; "Delivered" only when the payout provider confirms the bank transfer. *Paycrest; SIMULATED on the test site* (`docs/PAYOUT.md`).
 - **Add Dollars from another chain:** USDC elsewhere → Aurora Intents → USDC in your own account on Monad → exact Dollars via Agora. *SIMULATED on the test site; not enabled for real money* (`docs/ROUTING.md`).
 
 **Try it:** https://test.everpiece.xyz (Monad testnet, real Agora AUSD, **test money only**).

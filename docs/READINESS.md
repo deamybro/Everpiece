@@ -22,6 +22,7 @@ These run from the server in a capped container (`deploy/test-stack/e2e.sh`).
 | Spec | Result today |
 |---|---|
 | `request`: request → scan the real QR (iPhone-style decoder) → pay in Dollars (instant) and in CTK via Agora (protected); paid, unknown and foreign links refused | ✅ |
+| `payout`: verified Nigerian bank account → ₦3,000 request → one-prompt payment → "Delivered" only on the provider's confirmation; a failing account refunded (SIMULATED Paycrest) | ✅ |
 | `add`: add Dollars from another chain (SIMULATED Aurora); forced settlement failure shows the held balance; retry converts exactly $5.00 | ✅ |
 | `history`: indexer history, refresh, new device, sign-out/in, second browser, cancel, receipts | ✅ |
 | `message`: encrypted voice/note by link and by @username | ✅ 2/2 earlier today. On the final run, 1 passed and 1 was blocked by the anti-squatting cap (below) |

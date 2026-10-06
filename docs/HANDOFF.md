@@ -4,6 +4,35 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 27 — 2026-10-06 — The last mile: Dollars → a Nigerian bank account (SIMULATED Paycrest)
+
+- **Owner:** "Everpiece should solve" the last mile: stablecoin → local currency → bank. Decisions:
+  - **P1** nobody custodies the money (one contract on mainnet);
+  - **P2** promise "at least ₦X";
+  - **P3** refunds go to the sender's own address;
+  - **P4** bank details are encrypted on the server.
+- **Deployed** `6f84727` to https://test.everpiece.xyz.
+- **Verified (VERIFIED §4.15):**
+  - Paycrest Sender API v2: endpoints, envelope, `validated` = the bank payout is confirmed, HMAC webhooks, **mainnet-only**, KYB required, **no Monad**, so money goes via Base.
+  - Live public NGN bank list and rate (₦1,354.88 per USDC).
+  - Circle CCTP V2 on Monad: domain 15, mainnet + testnet contracts with code on-chain.
+- **Built:**
+  - Design `docs/PAYOUT.md`.
+  - Shared `payout.ts`: signed `PayoutAccount` + `PayoutRequest`, "at least ₦X" maths rounded up, forward-only states. Shared 40/40.
+  - `server/payout` (new workspace): Paycrest client; bank accounts verified, salted hash + AES-GCM; saved only with the owner's signature; requests bound to that destination; one live order per request; DELIVERED only on validated; HMAC webhooks re-checked with the provider. 5/5.
+  - `scripts/paycrest-sim.mjs`: Paycrest's shapes; the real public bank list and rate; simulated names, orders, deposits (test AUSD on Monad testnet), payouts and refunds.
+  - Web: `/receive`, ₦ on `/request`, `/payout/<id>` (both signatures checked on the payer's device), scan + `/add` support.
+  - Test stack: payout reached via `/payout-api` (no host Caddy change); the bank key generated once in the host .env.
+  - THREAT_MODEL §M; ledger rows; README.
+- **Tests:** live `payout.spec` ✅ (delivered + refunded paths), `add` ✅. Specs that need new usernames wait for the per-IP cap to free (from 00:17 UTC 2026-10-07).
+- **Owner next:**
+  1. Paycrest sign-up + **KYB** → API key + secret.
+  2. Then I build `EverpiecePayout` (AUSD → Agora USDC → CCTP V2 → Paycrest on Base; PAYOUT.md §5) + its fork tests + review.
+  3. GO for a first $0.50–$1 real payout to a real NG account.
+- **Still due 2026-10-07:** the expired-refund check (payment `0xb1eb…a5dc` after 10:11 UTC); rerun request/history/message/username.
+
+---
+
 ## Session 26 — 2026-10-06 — Final testing before mainnet; private payments update
 
 - **Owner:**

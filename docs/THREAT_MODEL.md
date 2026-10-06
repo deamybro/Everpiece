@@ -268,6 +268,18 @@ Test IDs (T..) refer to ESCROW_SPEC §19; Codex's permanent attack tests live in
 9. **Low: sender-supplied media is decoded by the recipient's browser.** The type is limited to webm/mp4/ogg, played from a blob: URL (CSP `media-src 'self' blob:`). The note is rendered as text, never HTML.
 - Honest claim wording: master §24.7. No claim of immunity to XSS, a compromised device or a supply-chain attack.
 
+## M. Last-mile bank payouts (docs/PAYOUT.md, 2026-10-06)
+
+| # | Threat | Mitigation | Residual |
+|---|---|---|---|
+| M1 | Someone redirects a recipient's payouts to their own bank account | The destination is an EIP-712 `PayoutAccount` signed by the recipient's passkey; every ₦ request signs that record's hash; the payer's app verifies both before paying | The **payout server** makes the off-chain order call, so it's trusted to forward the signed account. It re-checks the decrypted number against the signed salted hash before each order (`DESTINATION_MISMATCH`), but a fully compromised server could still lie to the provider. Logged, alerting |
+| M2 | Leak of bank account numbers | AES-256-GCM at rest (HKDF subkey of `PAYOUT_BANK_ENC_KEY`); the public record has only the bank, last 4 and the verified name; the hash is salted (a 10-digit NUBAN can't be brute-forced from it); numbers never in logs (tested) | The server process can decrypt (it must, to pay out) |
+| M3 | Forged provider webhooks mark a payout "Delivered" | HMAC-SHA256 over the raw body with the API secret, timing-safe compare; a valid webhook only *triggers* a re-fetch of the order from the provider, whose status is what counts; states only move forward | Trust in the provider's own status |
+| M4 | "Delivered" shown because the chain leg succeeded | DELIVERED only on `payment_order.validated`/`settled`; the UI says so | — |
+| M5 | Recipient gets less than asked (rate moves) | "At least ₦X" (owner P2): quoted with a 1% buffer over the live rate, rounded up | Exact-₦ wording waits for Paycrest's rate-lock answer (TODO(VERIFY)) |
+| M6 | Account-name lookups abused (enumeration) | 20 verifications per IP per day; per-IP rate limits; names are only shown to the person who typed the number | NAT'd users share the cap |
+| M7 | Money stuck in custody | Nobody custodies it (owner P1): mainnet uses one `EverpiecePayout` transaction (design, §5 of PAYOUT.md); refunds go to the sender's own address (P3) | `EverpiecePayout` isn't written yet; the test site is SIMULATED and its deposits sit at the simulator's address (test money) |
+
 ## L. Known limitations (summary)
 
 1. An attacker with the recipient's phone plus the link can claim (C3).
