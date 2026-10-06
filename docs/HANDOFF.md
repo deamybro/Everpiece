@@ -4,6 +4,42 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 24 — 2026-10-06 — Aurora Intents: "Add Dollars from another chain" with USDC
+
+- **Owner:** "build it, its part of our main build, use usdc". Also GO to fund the testnet relayer with 2 testnet MON.
+- **Branch:** `feat/payment-intents-agora` (local only, not pushed). **Deployed** `03a089a` (+ docs) to https://test.everpiece.xyz.
+- **Flow (docs/FUNDING.md):**
+  1. USDC on Base/Ethereum/Arbitrum/… → Aurora, EXACT_OUTPUT to the payer's OWN Everpiece account on Monad.
+  2. One passkey prompt converts it to exactly the requested Dollars: `payWithToken` to self through the Agora AUSD/USDC pair.
+  3. From there, every existing flow works.
+- **Verified (VERIFIED §4.14):**
+  - Aurora supports Monad as source and destination (mainnet only). API paths, enums, statuses and fees come from Aurora's docs.
+  - Monad has no AUSD in the intents token list, hence USDC.
+  - Mainnet USDC `0x7547…f603` (permit domain "USDC" v2, checked on-chain).
+  - Agora mainnet AUSD/USDC pair `0xf332…2470` (on-chain: AUSD/USDC, 1:1 at check time; APPROVED_SWAPPER required).
+- **Built:**
+  - Shared `funding.ts`: a quote is accepted only if it matches what was asked: assets, recipient, refund address, ≥ exact amount, a deposit address, no memo, a future deadline. Mainnet USDC added to the registry.
+  - Relayer `/v1/funding/{sources,quote,deposit,status}`: the key stays server-side and never reaches logs or responses; per-IP limits; top-ups ≤ 600.
+  - `scripts/aurora-sim.mjs`: the test site's SIMULATED Aurora, with the same API, delivering test CTK.
+  - Web `/add`: price → deposit (QR, tracked, resumes after reload) → one-prompt conversion. Entry points: Home, Send shortfall, pay-request shortfall (returns to the payment).
+- **Mainnet fork:** USDC → exactly 25 AUSD through the real pair with a USDC permit. EverpiecePay was placed at a wallet Agora already approved, so the pair is unmodified.
+  - Its worst-case gas, **520,398**, exceeded the 490k limit set in session 23, so `payWithToken` is now 550k (`gasLimits.test.ts` keeps the relayer and the fork test in sync).
+- **Ops:** the testnet relayer fell below its 0.2 MON floor (0.193) after today's test runs, so every send failed. With the owner's GO: 2 testnet MON from the deployer, tx `0x10145ec1…65c8`, status success, finalized; relayer 2.19 MON, healthy.
+- **Tests run:**
+  - Shared 36/36. Relayer 22/22: fake Aurora, plus an end-to-end run against the simulator.
+  - Contracts gas fork suite 12/12 (mainnet + testnet).
+  - Web typecheck and build.
+  - Live E2E on the host: **add 1/1**, request 1/1, history 1/1, message 2/2, username 1/1. flow/email skip on testnet.
+- **Open (owner, docs/FUNDING.md):**
+  - an Intents Studio API key;
+  - Agora `APPROVED_SWAPPER` for EverpiecePay on mainnet;
+  - confirm money rules M1–M8;
+  - mainnet GO, then one small real top-up.
+  - Unchanged: policy engine (TEST-only), F-01, deadline, Private mode, submission package.
+- **Suggestion:** the testnet relayer will run dry again under heavy testing; consider a low-balance alert or an auto top-up from the deployer (needs a GO).
+
+---
+
 ## Session 23 — 2026-10-06 — "Fix the problems, make sure everything is perfect"
 
 - **Branch:** `feat/payment-intents-agora` (local only, not pushed). **Deployed** `d908d7e` to https://test.everpiece.xyz.
