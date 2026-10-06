@@ -4,6 +4,21 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 31 — 2026-10-06 — Identity rewrite, relayer top-up, EverpiecePay adversarial review
+
+- **Owner:** "go"; then "no repo, I don't want any trace of" the previous GitHub identity; new identity **deamybro <deamybro@gmail.com>**; remove the text mentions; GitHub push later (the owner logs in first).
+- **Identity:**
+  - All 140 commits on all branches rewritten (author + committer); the two text mentions replaced across history.
+  - `refs/original` and reflog dropped, `gc --prune=now`: **0 objects** contain the old name or email.
+  - The safety bundle was deleted after verification. Repo git config set to deamybro.
+  - The server copy was redeployed clean and `src.old` removed; the running container is clean.
+  - Not touched: the PC's **global** git config (still the old identity, used by other repos) and Docker's internal build cache on the host.
+- **Relayer gas (O6):** auto top-up + alerts in the testnet stack (`181eaa4`). It works, but the deployer has only 1.24 testnet MON, so the owner refills from the faucet.
+- **O2 resolved:** `contracts/test/adversarial/PayAttack.t.sol`, P01–P12, 12/12 (CI fuzz 10k). No contract bug; FINDINGS.md F-06/F-07 INFO. Contracts offline 229 passed + 5 fork-skipped; with forks 272.
+- **Not pushed:** waiting for the owner's GitHub login.
+
+---
+
 ## Session 30 — 2026-10-06 — Full audit
 
 - **Report:** `docs/AUDIT-2026-10-06.md`. Deployed `d4b1086`.

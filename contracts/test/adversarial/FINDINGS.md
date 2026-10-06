@@ -115,3 +115,53 @@ Expected behavior: As implemented.
 Recommended fix: Web: hide or warn on claims within a few minutes of expiry (follow-up).
 Regression test: test_A10b_…, test_A38_…
 ```
+
+---
+
+# Adversarial review: EverpiecePay (audit 2026-10-06, finding O2)
+
+Suite: `test/adversarial/PayAttack.t.sol`. **12/12 passed**, both fuzz properties at 10,000 runs (CI profile). **No CRITICAL, HIGH or MEDIUM findings.** The contract was not changed.
+
+| # | Attack | Result |
+|---|---|---|
+| P01 | Send an AUSD payment through the token path, or a token payment through the AUSD path | Refused (`UnsupportedToken` / `WrongSourceToken`) |
+| P02 | Fund an instant payment with an escrow ERC-3009 authorization | Refused; the escrow authorization stays usable for the escrow |
+| P03 | Replay a signature on another EverpiecePay deployment | Refused (domain separator; `InvalidPayerSignature`) |
+| P04 | Change any signed field: ref, recipient, amount up/down, ceiling, deadline (fuzzed) | Always refused; nothing moves |
+| P05 | Tokens/AUSD already in the contract | Never paid out; the payer is charged and refunded exactly their own amounts |
+| P06 | A pair that takes more input than it reports | `SettlementMismatch`; nothing charged |
+| P07 | A hostile source token re-entering with a second signed payment to an attacker | Blocked by the reentrancy guard; the attacker gets nothing; the outer payment completes correctly |
+| P08 | Recipient = the contract itself / the pair | Refused (`InvalidRecipient` / `SettlementMismatch`) |
+| P09 | Allowances left behind | None (payer → contract and contract → pair both 0) |
+| P10 | Deadline boundary | Exclusive: at `deadline` it's refused, one second earlier it settles |
+| P11 | Front-running with a bad permit to burn the payment | Reverts without settling; the real submission still works |
+| P12 | The contract keeps value (fuzzed amount × fee) | Never: its balances are unchanged; the recipient gets exactly `amount`, the payer pays exactly the quote |
+
+### F-06: value sent to EverpiecePay directly is unrecoverable
+
+```text
+Severity: INFO
+Component: EverpiecePay (no owner/admin by design)
+Finding: Tokens or AUSD transferred straight to the contract (not through a payment) can never be moved.
+Impact: Only someone who sends funds outside the app loses them; payments are unaffected (P05).
+Reproduction: test_P05_strandedTokensStayPut_payerGetsOnlyTheirOwnLeftover
+Expected behavior: As designed (no admin can touch funds); same trade-off as F-02 for the escrow.
+Recommended fix: None in the contract. The app never sends to the contract address.
+Regression test: test_P05_…
+```
+
+### F-07: trust boundaries that the contract can't enforce
+
+```text
+Severity: INFO
+Component: EverpiecePay deployment and pairs
+Finding: (1) Pairs are fixed at deploy and trusted for price; the payer's signed ceiling (maxSourceAmount) bounds the
+  cost, and the exact-delivery and input-accounting checks catch a dishonest pair (P06). (2) Payers must be EOAs
+  (ECDSA only; no ERC-1271), which holds for Everpiece accounts. (3) On the AUSD path, maxSourceAmount is signed but
+  unused (always charged exactly `amount`).
+Impact: None for Everpiece accounts.
+Reproduction: P06; review.
+Expected behavior: As designed.
+Recommended fix: Deploy only with Agora's verified pairs (VERIFIED §4.14/§4.15) and record the pair list.
+Regression test: test_P06_…
+```

@@ -21,7 +21,7 @@ Everpiece is a mobile-first web app (installable PWA) on Monad for person-to-per
 
 | Component | State |
 |---|---|
-| `contracts/`: EverpieceEscrow v1, EverpiecePay | 260/260 tests (unit, boundary, fuzz 10k, invariants, adversarial A01–A40, mainnet + testnet forks, relayer gas limits). Deployed on **Monad testnet** over real Agora AUSD. **Not on mainnet** (owner GO pending) |
+| `contracts/`: EverpieceEscrow v1, EverpiecePay | 272 tests (unit, boundary, fuzz 10k, invariants, adversarial A01–A40 on the escrow and P01–P12 on EverpiecePay, mainnet + testnet forks, relayer gas limits). Deployed on **Monad testnet** over real Agora AUSD. **Not on mainnet** (owner GO pending) |
 | `server/relayer` | Gasless, allow-listed, simulation-gated, finality-confirmed; fork-proven gas limits; payment policy engine (TEST rules); Aurora funding proxy. 40/40 incl. fork |
 | `server/claims` | Link-mode recipient verification (Twilio Verify SMS, Resend email) + short-lived claim approvals. 22/22 incl. fork |
 | `server/directory`, `server/voice` | @usernames, inbox, message keys, signed payment requests · ciphertext-only message store. 13/13 · 9/9 |
