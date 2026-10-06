@@ -4,6 +4,37 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 23 — 2026-10-06 — "Fix the problems, make sure everything is perfect"
+
+- **Branch:** `feat/payment-intents-agora` (local only, not pushed). **Deployed** `d908d7e` to https://test.everpiece.xyz.
+- **Relayer gas limits, all proven** (`722701c`): `contracts/test/fork/RelayerGas.t.sol` runs every relayer action on mainnet AND testnet AUSD forks (Monad rules), cold state (`vm.cool`), fresh recipient, intrinsic + calldata (or the EIP-7623 floor), and requires ≥ 5% headroom. Three limits were BELOW the worst case:
+
+  | method | old | worst case | new |
+  |---|---|---|---|
+  | createPayment | 350k | 318,483 | 350k |
+  | claimUsernamePayment | 215k | 208,121 | 230k |
+  | claimLinkPayment | 240k | **250,278** | 270k |
+  | cancel | 195k | 189,469 | 205k |
+  | refundExpired | 145k | 138,273 | 155k |
+  | payWithAusd | 240k | **255,331** | 280k |
+  | payWithToken | 420k | **449,716** | 490k |
+
+  The measurement is an upper bound (live testnet: payWithAusd 223,216; payWithToken 400,622). `server/relayer/test/gasLimits.test.ts` fails if the relayer defaults and the fork-tested constants drift.
+- **iPhone QR scanning** (`3634ed9`): `/scan` falls back to jsQR 1.4.0 (Apache-2.0, loaded only when needed) where there's no BarcodeDetector (iPhone Safari). `request.spec` now pays by scanning Maris's real on-screen QR through a fake camera with the detector removed.
+- **Rate limits** (`3634ed9`, `d908d7e`): the directory allows 60 req/min per IP, shared by everyone behind one address (carrier NAT).
+  - `directory()` retries a 429 twice (it is refused before processing).
+  - The username check said nothing when it failed; now it says so and retries.
+  - Home polls the inbox every 10 s instead of 5 s, and nothing from hidden tabs (refresh on show).
+  - Receipts use the viewer's own @username from the device.
+- **E2E on the host** (`deploy/test-stack/e2e.sh`): this PC ran out of memory (16.3/17.9 GB committed) and browsers crashed. Specs now run on the VPS in a throwaway Playwright 1.63.0 container capped at 1.5 GB / 1 CPU (owner: "is the vps not better?"). The image (~1.5 GB) stays on the host for reuse.
+- **Tests run:**
+  - Testnet E2E on `d908d7e` (from the host): request 1/1 (incl. the jsQR scan), history 1/1, message 2/2, username 1/1. flow/email skip on testnet (real SMS/email).
+  - Contracts 217 offline and 259/259 with fork. Relayer 33/33 with fork (15 offline). Directory 13/13. Web typecheck, `next build`, scan unit test 2/2.
+- **Not verified:** `flow.spec`/`email.spec` (link claims with a code) need the local dev stack (`npm run dev:stack`), which needs memory this PC didn't have. Link-claim gas is covered by the fork test; the web link-claim code didn't change this session.
+- **Open (owner):** the relayer policy engine is TEST-only (no sanctions/identity screening); F-01; mainnet GO and funding; the deadline; Private mode after 6 Oct; the submission package; a real-iPhone scan check.
+
+---
+
 ## Session 22 — 2026-10-05/06 — Payment requests + scan-to-pay, deployed; four testnet bugs fixed
 
 - **Branch:** `feat/payment-intents-agora` (local only, not pushed). **Deployed** `2c7b2f2` to https://test.everpiece.xyz (owner: "yes" / "can't u do this urself?").
