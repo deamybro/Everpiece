@@ -49,6 +49,8 @@ export default function AddPage() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  /** Paying a request from another chain: no separate conversion; the payment itself converts (one prompt). */
+  const [thenPay, setThenPay] = useState(false);
   /** Aurora delivered but Agora settlement failed: the intermediate asset sitting safely in this account (never reversed). */
   const [heldAfterFailure, setHeldAfterFailure] = useState<bigint | null>(null);
   const simulated = fundingMode() === "simulated";
@@ -61,6 +63,7 @@ export default function AddPage() {
     if (a && parseDollars(a) !== null) setAmountText(a);
     const r = q.get("return");
     if (r && /^\/(pay|payout)\/0x[0-9a-f]{64}$|^\/send$/.test(r)) setReturnTo(r); // only our own pages
+    if (q.get("then") === "pay" && r && /^\/pay\/0x[0-9a-f]{64}$/.test(r)) setThenPay(true);
     if (!fundingAvailable()) return;
     loadSources()
       .then((s) => {
@@ -187,6 +190,21 @@ export default function AddPage() {
         ) : (
           <Link className="button" href="/">Back to Everpiece</Link>
         )}
+      </div>
+    );
+  }
+
+  if (step === "convert" && topUp && (thenPay || topUp.returnTo?.startsWith("/pay/")) && destination) {
+    const back = `${topUp.returnTo}?with=${encodeURIComponent(destination.symbol)}`;
+    return (
+      <div className="stack">
+        {header}
+        {simBanner}
+        <StepHint step={3} of={3} />
+        <h1>It&apos;s arrived ✓</h1>
+        <div className="status ok">{PHASE_TEXT.ARRIVED}</div>
+        <p className="muted">Finish the payment: one fingerprint turns it into exactly the Dollars they asked for, through Agora, and pays them.</p>
+        <Link className="button" href={back} onClick={() => saveTopUp({ ...topUp, done: true })}>Finish the payment</Link>
       </div>
     );
   }

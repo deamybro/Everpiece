@@ -3,28 +3,33 @@
    bold numbers, quiet labels. Every class name below is used by the app; keep them.
    ──────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
 :root {
-  --ink: #12101c;
-  --ink-2: #3b3850;
-  --muted: #6f6c80;
-  --faint: #a19fb0;
-  --line: #ebeaf0;
-  --bg: #f5f5f8;
-  --card: #ffffff;
-  --brand: #4b2cf0;
-  --brand-2: #7a3cf5;
+  /* Midnight: dark by design (like Slush), in Everpiece violet. The page declares color-scheme: dark, so browsers never
+     auto-darken it (Chrome's forced dark had blanked the request QR). */
+  color-scheme: dark;
+  --ink: #f3f2ff;
+  --ink-2: #cfcbe8;
+  --muted: #9a96bd;
+  --faint: #6c6890;
+  --line: #2a2650;
+  --bg: #0b0a1c;
+  --card: #15132c;
+  --card-2: #1d1a3c;
+  --card-3: #262250;
+  --brand: #7b5cff;
+  --brand-2: #a37bff;
   --brand-ink: #ffffff;
-  --brand-soft: #f0edfe;
-  --ok: #0c8a5c;
-  --ok-soft: #e7f6ef;
-  --warn: #a15c00;
-  --warn-soft: #fff6e5;
-  --bad: #d0302a;
-  --bad-soft: #fdeceb;
+  --brand-soft: rgba(123, 92, 255, 0.16);
+  --ok: #3ddc97;
+  --ok-soft: rgba(61, 220, 151, 0.14);
+  --warn: #ffb547;
+  --warn-soft: rgba(255, 181, 71, 0.13);
+  --bad: #ff6b6b;
+  --bad-soft: rgba(255, 107, 107, 0.14);
   --r-lg: 22px;
   --r-md: 16px;
   --r-sm: 12px;
-  --shadow: 0 1px 2px rgba(18, 16, 40, 0.04), 0 6px 20px rgba(18, 16, 40, 0.06);
-  --shadow-lg: 0 10px 30px rgba(75, 44, 240, 0.28);
+  --shadow: 0 0 0 1px var(--line);
+  --shadow-lg: 0 14px 40px rgba(91, 61, 255, 0.35);
   font-family: var(--font, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
   background: var(--bg);
@@ -76,8 +81,8 @@ a.card.settings-row { display: flex; }
 button, .button {
   display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px;
   border: 0; border-radius: var(--r-md); padding: 14px 18px; font: inherit; font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em;
-  background: linear-gradient(180deg, #5a3cf7, var(--brand)); color: var(--brand-ink); cursor: pointer; text-align: center; text-decoration: none;
-  box-shadow: 0 6px 16px rgba(75, 44, 240, 0.22); transition: transform 0.08s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  background: linear-gradient(180deg, #8a6cff, #6a48f5); color: var(--brand-ink); cursor: pointer; text-align: center; text-decoration: none;
+  box-shadow: 0 8px 22px rgba(106, 72, 245, 0.35); transition: transform 0.08s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 button:active, .button:active { transform: scale(0.985); }
 button:focus-visible, .button:focus-visible, a:focus-visible { outline: 3px solid rgba(75, 44, 240, 0.35); outline-offset: 2px; }
@@ -115,7 +120,7 @@ label input[type="checkbox"] { width: auto; min-height: 0; margin: 0 8px 0 0; ve
   display: flex; gap: 12px; align-items: center; padding: 16px; border-radius: var(--r-md); background: var(--card);
   box-shadow: inset 0 0 0 1.5px var(--line); cursor: pointer; transition: box-shadow 0.15s ease, background 0.15s ease; margin: 0; font-weight: 500;
 }
-.choice.selected { box-shadow: inset 0 0 0 2px var(--brand), 0 6px 18px rgba(75, 44, 240, 0.10); background: #fcfbff; }
+.choice.selected { box-shadow: inset 0 0 0 2px var(--brand); background: var(--card-2); }
 .choice input { width: 20px; height: 20px; min-height: 0; margin: 0; padding: 0; flex: 0 0 auto; accent-color: var(--brand); appearance: auto; }
 .choice strong { color: var(--ink); }
 
@@ -134,7 +139,7 @@ label input[type="checkbox"] { width: auto; min-height: 0; margin: 0 8px 0 0; ve
 .pill { display: inline-flex; align-items: center; white-space: nowrap; padding: 4px 10px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; background: var(--brand-soft); color: var(--brand); }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
-.pill.muted { background: #efeef3; color: var(--muted); }
+.pill.muted { background: var(--card-2); color: var(--muted); }
 .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .chips button { min-height: 42px; padding: 8px 6px; font-size: 0.9rem; border-radius: 999px; }
 .estimate { font-size: 0.95rem; color: var(--muted); text-align: center; min-height: 1.4em; font-weight: 600; }
@@ -176,7 +181,7 @@ audio { width: 100%; }
 .hero-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; position: relative; z-index: 1; }
 .hero-tag { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); color: #fff; white-space: nowrap; }
 .hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; position: relative; z-index: 1; }
-.hero-actions .button { min-height: 50px; padding: 12px; font-size: 0.98rem; white-space: nowrap; background: #fff; color: var(--brand); box-shadow: none; }
+.hero-actions .button { min-height: 50px; padding: 12px; font-size: 0.98rem; white-space: nowrap; background: #fff; color: #4b2cf0; box-shadow: none; }
 .hero-actions .button.alt { background: rgba(255, 255, 255, 0.16); color: #fff; }
 
 .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 2px; }
@@ -195,7 +200,7 @@ audio { width: 100%; }
 /* the old tile grid (kept for compatibility) */
 .actions { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 10px; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; min-height: 76px; padding: 12px 14px; border-radius: 14px; background: var(--brand-soft); color: var(--brand); font-weight: 700; text-decoration: none; line-height: 1.2; }
-.tile-icon { font-size: 1.15rem; width: 28px; height: 28px; border-radius: 8px; background: #fff; display: grid; place-items: center; }
+.tile-icon { font-size: 1.15rem; width: 28px; height: 28px; border-radius: 8px; background: var(--card); display: grid; place-items: center; }
 .links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 0.95rem; }
 .links a { color: var(--brand); font-weight: 600; text-decoration: none; }
 
@@ -214,7 +219,7 @@ audio { width: 100%; }
 .timeline li:last-child { padding-bottom: 0; }
 .timeline li:not(:last-child)::after { content: ""; position: absolute; left: 14px; top: 32px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--line); }
 .timeline li.done:not(:last-child)::after { background: var(--ok); }
-.timeline .dot { flex: 0 0 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.85rem; background: #fff; color: #fff; box-shadow: inset 0 0 0 2px var(--line); }
+.timeline .dot { flex: 0 0 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.85rem; background: var(--card); color: #fff; box-shadow: inset 0 0 0 2px var(--line); }
 .timeline li.done .dot { background: var(--ok); box-shadow: none; }
 .timeline li.failed.done .dot { background: var(--bad); }
 .timeline li.active .dot { box-shadow: inset 0 0 0 2px var(--brand); animation: pulse 1.2s ease-in-out infinite; }
@@ -233,6 +238,46 @@ audio { width: 100%; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* segmented controls: toggle rows (buttons with aria-pressed) read as a choice, not as calls to action */
-.row[role="group"]:has(> button[aria-pressed]) { background: #e9e8ef; padding: 4px; border-radius: 16px; gap: 4px; }
+.row[role="group"]:has(> button[aria-pressed]) { background: var(--card); padding: 4px; border-radius: 16px; gap: 4px; }
 .row[role="group"] > button[aria-pressed] { min-height: 44px; border-radius: 12px; background: transparent; color: var(--ink-2); box-shadow: none; font-size: 0.95rem; font-weight: 600; }
-.row[role="group"] > button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(18, 16, 40, 0.12); }
+.row[role="group"] > button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: none; background: var(--card-3); }
+
+/* ── Midnight layout (Slush-style): top bar, wallet card with actions + holdings, bottom tabs ─────────────────── */
+.app { padding-bottom: 112px; }
+.topbar .who { display: inline-flex; align-items: center; gap: 10px; }
+.topbar .brand::before { display: none; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff;
+  background: radial-gradient(circle at 30% 25%, #b49bff, transparent 60%), linear-gradient(135deg, #6a48f5, #a37bff); box-shadow: 0 6px 16px rgba(106, 72, 245, 0.4); }
+.topbar .ghost.small { color: var(--ink-2); background: var(--card); box-shadow: inset 0 0 0 1px var(--line); border-radius: 999px; min-height: 38px; padding: 8px 14px; }
+
+.wallet { position: relative; overflow: hidden; border-radius: 26px; padding: 20px 18px 8px; background: linear-gradient(180deg, #17143a, #110f27); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg); }
+.wallet::before { content: ""; position: absolute; inset: -40% -30% auto auto; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(circle, rgba(123, 92, 255, 0.45), transparent 70%); pointer-events: none; }
+.wallet > * { position: relative; }
+.wallet-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.wallet-top .muted { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.74rem; font-weight: 700; color: var(--muted); }
+.wallet-tools { display: inline-flex; align-items: center; gap: 8px; }
+.wallet .balance { font-size: 2.7rem; margin: 6px 0 4px; }
+.eye { width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; background: var(--card-2); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+.wallet-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 16px 0 10px; }
+.wallet-actions a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 76px; border-radius: 16px;
+  background: linear-gradient(180deg, #2b2470, #211c55); color: #fff; text-decoration: none; font-size: 0.85rem; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.wallet-actions a:active { transform: scale(0.97); }
+.wa-icon { color: #c9b8ff; display: grid; place-items: center; }
+.assets { list-style: none; margin: 0 -4px; padding: 0; }
+.assets li { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-top: 1px solid var(--line); }
+.assets .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.asset-icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--card-3); color: var(--ink); }
+.asset-icon.dollar { background: linear-gradient(135deg, #3ddc97, #1fa26a); color: #06281a; }
+
+.bank-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bank-actions .settings-row { padding: 12px; gap: 10px; }
+.settings-icon { background: var(--brand-soft); color: #c9b8ff; }
+
+.tabbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 50; width: min(440px, calc(100% - 24px));
+  display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; gap: 2px; padding: 8px 6px; border-radius: 26px;
+  background: rgba(21, 19, 44, 0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: inset 0 0 0 1px var(--line), 0 12px 30px rgba(0, 0, 0, 0.45); }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; border-radius: 18px; color: var(--muted); text-decoration: none; font-size: 0.7rem; font-weight: 600; }
+.tab.active { color: #fff; }
+.tab.active .tab-icon { background: var(--card-3); }
+.tab-icon { width: 40px; height: 32px; border-radius: 12px; display: grid; place-items: center; }
+.tab.primary .tab-icon { width: 52px; height: 52px; margin-top: -26px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, #8a6cff, #6a48f5); box-shadow: 0 10px 22px rgba(106, 72, 245, 0.5); }

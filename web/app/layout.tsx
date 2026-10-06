@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "../components/ServiceWorker";
+import { BottomNav } from "../components/BottomNav";
 
 // Self-hosted at build time by next/font (no runtime request to Google; the CSP stays font-src 'self').
 const font = Inter({ subsets: ["latin"], display: "swap", variable: "--font" });
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   applicationName: "Everpiece",
 };
 
-export const viewport: Viewport = { themeColor: "#f5f5f7", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#0b0a1c", colorScheme: "dark", width: "device-width", initialScale: 1 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Reading request headers makes every page dynamic, which the per-request CSP nonce requires (proxy.ts).
@@ -22,6 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={font.variable}>
       <body>
         <main className="app">{children}</main>
+        <BottomNav />
         <ServiceWorker />
       </body>
     </html>

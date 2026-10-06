@@ -17,6 +17,7 @@ const STEP: Record<ReceiptStep["kind"], string> = {
   CLAIMED: "Claimed by the recipient",
   CANCELLED: "Cancelled, money returned to the sender",
   REFUNDED: "Not claimed in time, money returned to the sender",
+  PAID: "Paid instantly",
 };
 
 function headline(r: Receipt): string {
@@ -30,6 +31,8 @@ function headline(r: Receipt): string {
       return `Returned to the sender${last ? ` on ${when(last.at)}` : ""}. It wasn't claimed in time.`;
     case "expired":
       return "Not claimed in time. The sender can get it back now.";
+    case "paid":
+      return `Paid to ${r.recipient ? who(r.recipientName, r.recipient) : "the recipient"}${last ? ` on ${when(last.at)}` : ""}. Instant payments are final.`;
     default:
       return `Protected, waiting to be claimed. If it isn't claimed by ${when(r.expiresAt)}, it goes back to the sender.`;
   }
@@ -72,7 +75,7 @@ export function ReceiptView({ paymentId }: { paymentId: Hex }) {
           <div className="card center stack">
             <div className="muted">{isDevStack ? "Test Dollars" : "Dollars"}</div>
             <div className="amount">{formatDollars(receipt.amount)}</div>
-            <div className={`status ${receipt.state === "claimed" ? "ok" : receipt.state === "protected" ? "" : "warn"}`} aria-label="Receipt status">
+            <div className={`status ${receipt.state === "claimed" || receipt.state === "paid" ? "ok" : receipt.state === "protected" ? "" : "warn"}`} aria-label="Receipt status">
               {headline(receipt)}
             </div>
           </div>
@@ -95,8 +98,17 @@ export function ReceiptView({ paymentId }: { paymentId: Hex }) {
               </dd>
               <dt>How</dt>
               <dd>{kindLabel(receipt.mode)}</dd>
-              <dt>Expires</dt>
-              <dd>{when(receipt.expiresAt)}</dd>
+              {receipt.instant ? (
+                <>
+                  <dt>Paid in</dt>
+                  <dd>{receipt.instant.viaAgora ? "Another currency, converted by Agora" : "Dollars"}</dd>
+                </>
+              ) : (
+                <>
+                  <dt>Expires</dt>
+                  <dd>{when(receipt.expiresAt)}</dd>
+                </>
+              )}
             </dl>
           </div>
 
@@ -119,8 +131,8 @@ export function ReceiptView({ paymentId }: { paymentId: Hex }) {
               Reference <span className="mono">{receipt.paymentId}</span>
             </div>
             <div>
-              Held by the Everpiece contract{" "}
-              <a className="mono" href={`${config.explorerUrl}/address/${config.escrow}`} target="_blank" rel="noopener noreferrer">{config.escrow}</a>{" "}
+              {receipt.instant ? "Settled by the Everpiece Pay contract" : "Held by the Everpiece contract"}{" "}
+              <a className="mono" href={`${config.explorerUrl}/address/${receipt.instant ? config.pay : config.escrow}`} target="_blank" rel="noopener noreferrer">{receipt.instant ? config.pay : config.escrow}</a>{" "}
               on {isDevStack ? config.networkLabel : "Monad"}.
             </div>
             <div>

@@ -16,7 +16,8 @@ import { friendlyError } from "../../lib/api";
 import { claimLink } from "../../lib/link";
 import { FlowError, sendByLink, sendToUsername } from "../../lib/flows";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
-import { UsernameError, findRecipient, type Pinning, type Recipient } from "../../lib/username";
+import { UsernameError, findRecipient, pin, type Pinning, type Recipient } from "../../lib/username";
+import { PayError, instantAvailable, payInstant, payTokens } from "../../lib/pay";
 
 type Step = "amount" | "who" | "review" | "sending" | "done" | "protectedNoInvite";
 type Method = "phone" | "email" | "username";
@@ -42,6 +43,9 @@ export default function Send() {
   const [copied, setCopied] = useState(false);
   const [draft, setDraft] = useState<Draft>({ note: "", voice: null });
   const [sentId, setSentId] = useState<Hex | null>(null);
+  /** @username sends: instant by default (owner, 2026-10-06: "it's supposed to send asap"); protected on request. */
+  const [speed, setSpeed] = useState<"instant" | "protected">("instant");
+  const [sentInstant, setSentInstant] = useState(false);
 
   useEffect(() => {
     const a = loadAccount();
@@ -61,6 +65,8 @@ export default function Send() {
   // @username recipients can get messages once they've published a (self-signed) message key.
   const canMessage = messagesAvailable() && (method !== "username" || !!found?.recipient.messageKey);
   const withMessage = canMessage && (note !== "" || draft.voice !== null);
+  // a message travels with the escrow's on-chain commitment, so a payment with one is always protected
+  const isInstant = method === "username" && speed === "instant" && instantAvailable() && !withMessage;
 
   async function lookUp() {
     setLooking(true);
@@ -85,6 +91,23 @@ export default function Send() {
       : undefined;
     if (method === "username") {
       if (!found) return;
+      if (isInstant) {
+        try {
+          const dollars = payTokens().find((t) => t.route === "DIRECT_AUSD");
+          if (!dollars) throw new PayError("InstantPaymentsUnavailable");
+          const r = await payInstant(account, { recipient: found.recipient.account, amount, token: dollars }, (s) => setProgress(progressText(s, "Sending")));
+          pin(found.recipient); // same "you've paid them before" protection as protected sends
+          setSentId(r.paymentId);
+          setSentInstant(true);
+          setStep("done");
+        } catch (e) {
+          setError(e instanceof PayError || e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e));
+          setStep("review");
+        } finally {
+          setProgress("");
+        }
+        return;
+      }
       try {
         const r = await sendToUsername(account, amount, found.recipient, (s) => setProgress(progressText(s, "Sending")), message);
         setDelivered(r.delivered);
@@ -229,6 +252,21 @@ export default function Send() {
         <div className="stack">
           <StepHint step={3} of={3} />
           <h1>Check and send</h1>
+          {method === "username" && found && instantAvailable() && (
+            <>
+              <div className="row" role="group" aria-label="How it arrives">
+                <button className={speed === "instant" ? "" : "secondary"} aria-pressed={speed === "instant"} onClick={() => setSpeed("instant")} disabled={step === "sending"}>Instant</button>
+                <button className={speed === "protected" ? "" : "secondary"} aria-pressed={speed === "protected"} onClick={() => setSpeed("protected")} disabled={step === "sending"}>Protected</button>
+              </div>
+              <p className="muted small">
+                {withMessage && speed === "instant"
+                  ? "Payments with a message are protected: they claim it, and you can cancel until then."
+                  : speed === "instant"
+                    ? "Instant: it's in their balance straight away. Final, like handing over cash."
+                    : "Protected: they claim it with their fingerprint, and you can cancel until then."}
+              </p>
+            </>
+          )}
           <div className="card review">
             <dl>
               <dt>You send</dt>
@@ -241,8 +279,17 @@ export default function Send() {
               <dd>{formatDollars(amount)}</dd>
               <dt>Recipient</dt>
               <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : method === "email" ? email : cleanPhone}</dd>
-              <dt>Expires</dt>
-              <dd>in 30 days ({day(Math.floor(Date.now() / 1000) + 30 * 86_400)})</dd>
+              {isInstant ? (
+                <>
+                  <dt>Arrives</dt>
+                  <dd>Instantly · final</dd>
+                </>
+              ) : (
+                <>
+                  <dt>Expires</dt>
+                  <dd>in 30 days ({day(Math.floor(Date.now() / 1000) + 30 * 86_400)})</dd>
+                </>
+              )}
               {withMessage && (
                 <>
                   <dt>Message</dt>
@@ -262,6 +309,12 @@ export default function Send() {
           )}
           <div className="card stack" aria-label="What happens next">
             <strong>What happens next</strong>
+            {isInstant && found ? (
+              <ol className="steps">
+                <li>The money goes straight into @{found.recipient.username}&apos;s balance. Only their account receives it.</li>
+                <li>It&apos;s final: you can&apos;t cancel an instant payment, so check the name above.</li>
+              </ol>
+            ) : (
             <ol className="steps">
               <li>The money leaves your balance and is held safely. It isn&apos;t theirs yet.</li>
               {method === "username" && found ? (
@@ -274,6 +327,7 @@ export default function Send() {
               )}
               <li>Until they claim it, you can cancel from Home and get every cent back. If it isn&apos;t claimed in 30 days, it comes back by itself.</li>
             </ol>
+            )}
           </div>
           <Progress text={progress} />
           {error && <div className="status bad">{error}</div>}
@@ -293,7 +347,16 @@ export default function Send() {
         </div>
       )}
 
-      {step === "done" && amount !== null && method === "username" && found && (
+      {step === "done" && amount !== null && method === "username" && found && sentInstant && (
+        <div className="stack">
+          <div className="status ok">Sent to @{found.recipient.username} ✓</div>
+          <p className="muted">{formatDollars(amount)} is in {found.recipient.displayName}&apos;s balance now. Instant payments are final.</p>
+          <Link className="button" href="/">Done</Link>
+          {sentId && <Link className="button ghost" href={receiptPath(sentId)}>View receipt</Link>}
+        </div>
+      )}
+
+      {step === "done" && amount !== null && method === "username" && found && !sentInstant && (
         <div className="stack">
           <div className="status ok">Sent to @{found.recipient.username} ✓</div>
           <p className="muted">

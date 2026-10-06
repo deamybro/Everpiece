@@ -68,6 +68,7 @@ test("history comes from the indexer: sent + received, refresh, new device, sign
   await stella.getByRole("button", { name: "Find" }).click();
   await stella.getByLabel(/This is the person I mean/).check();
   await stella.getByRole("button", { name: "Continue" }).click();
+  await stella.getByRole("button", { name: "Protected", exact: true }).click(); // @username sends are instant by default
   await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible();
   await stella.getByRole("link", { name: "Done" }).click();

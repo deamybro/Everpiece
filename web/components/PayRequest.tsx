@@ -55,6 +55,10 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
     Promise.all(tokens.map(async (t) => [t.address, await balanceOfToken(t.address, account.address).catch(() => 0n)] as const)).then((pairs) =>
       setBalances(Object.fromEntries(pairs)),
     );
+    // back from "pay from another chain": the token that arrived is ready, so pre-select it (one prompt pays)
+    const withSym = new URLSearchParams(window.location.search).get("with");
+    const arrived = withSym ? tokens.find((t) => t.symbol === withSym && t.route !== "DIRECT_AUSD") : undefined;
+    if (arrived) setToken(arrived);
   }, [account, tokens]);
 
   const refreshQuote = useCallback(async (t: TokenInfo) => {
@@ -185,6 +189,15 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
             </span>
           </label>
         ))}
+        {fundingAvailable() && (
+          <Link className={`choice`} href={`/add?amount=${fromBaseUnits(request.amount, 6)}&return=/pay/${requestId}&then=pay`} aria-label="Pay from another chain">
+            <span className="settings-icon" aria-hidden="true">⇄</span>
+            <span>
+              <strong>From another chain</strong>
+              <span className="muted small"> · USDC on Base, Ethereum, Arbitrum…; settles in Dollars</span>
+            </span>
+          </Link>
+        )}
       </div>
 
       {token && (

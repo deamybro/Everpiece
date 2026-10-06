@@ -27,6 +27,8 @@ async function onboard(page: Page, first: string, username: string) {
   await expect(page.getByText(`Your username: @${username}`)).toBeVisible();
 }
 
+const row = (page: Page, text: string) => page.getByRole("list", { name: "Activity" }).locator("li", { hasText: text });
+
 async function toUsername(page: Page, amount: string, username: string) {
   await page.getByRole("link", { name: "Send money" }).click();
   await page.getByLabel("Amount in Dollars").fill(amount);
@@ -64,6 +66,7 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   await stella.getByLabel(/This is the person I mean/).check();
   await cont.click();
   await expect(stella.getByText(`@${M} (Mama)`)).toBeVisible();
+  await stella.getByRole("button", { name: "Protected", exact: true }).click(); // this flow tests claim + cancel
   await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible();
   await stella.getByRole("link", { name: "Done" }).click();
@@ -82,6 +85,7 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   await toUsername(stella, "5", M);
   await expect(stella.getByText("You've paid them before ✓")).toBeVisible();
   await stella.getByRole("button", { name: "Continue" }).click();
+  await stella.getByRole("button", { name: "Protected", exact: true }).click();
   await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
   await expect(stella.getByText(`Sent to @${M} ✓`)).toBeVisible();
   await stella.getByRole("link", { name: "Done" }).click();
@@ -89,6 +93,20 @@ test("send to @username → recipient claims from Home; pinned recipient; change
   await stella.getByRole("button", { name: "Cancel and get my money back" }).click();
   await expect(stella.getByText("Money returned: $5.00.")).toBeVisible();
   await expect(stella.locator(".balance")).toHaveText("$80.00");
+
+  // --- the default: INSTANT — straight into Mama's balance, no claim, final; both sides see it with a receipt
+  await toUsername(stella, "3", M);
+  await stella.getByRole("button", { name: "Continue" }).click();
+  await expect(stella.getByRole("button", { name: "Instant", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(stella.getByText("Instantly · final")).toBeVisible();
+  await stella.getByRole("button", { name: "Confirm with fingerprint or screen lock" }).click();
+  await expect(stella.getByText("is in Mama's balance now", { exact: false })).toBeVisible();
+  await stella.getByRole("link", { name: "Done" }).click();
+  await expect(stella.locator(".balance")).toHaveText("$77.00");
+  await mama.reload();
+  await expect(mama.locator(".balance")).toHaveText("$23.00");
+  await expect(row(mama, "+$3.00")).toContainText("Received");
+  await expect(row(stella, "$3.00")).toContainText("Paid");
 
   // --- the directory "changes" @mama's account (simulated by a different local pin) → sending is blocked
   await stella.evaluate((m) => {

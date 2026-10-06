@@ -4,6 +4,7 @@ import { config } from "./config";
 import { chainTime, paymentOf } from "./chain";
 import { loadSent, type SentPayment } from "./flows";
 import { usernameOf } from "./username";
+import { loadLocalPayouts } from "./payout";
 
 /**
  * Payment history (master §29, §30). The SOURCE OF TRUTH is the Envio indexer over executed escrow events, queried by
@@ -13,7 +14,9 @@ import { usernameOf } from "./username";
  * the current account before it is shown, so a cache can never invent history or leak another account's.
  */
 
-export type HistoryState = "protected" | "expired" | "claimed" | "cancelled" | "refunded";
+export type HistoryState = "protected" | "expired" | "claimed" | "cancelled" | "refunded" | "paid";
+/** mode of an instant payment (EverpiecePay), not an escrow mode */
+export const INSTANT = -1;
 export type HistoryItem = {
   paymentId: Hex;
   direction: "sent" | "received";
@@ -51,7 +54,10 @@ type IndexedPayment = {
 const QUERY = `query History($me: String!, $limit: Int!) {
   sent: Payment(where: { sender: { _eq: $me } }, order_by: { createdBlock: desc }, limit: $limit) { ...P }
   received: Payment(where: { recipient: { _eq: $me } }, order_by: { settledBlock: desc }, limit: $limit) { ...P }
+  isent: InstantPayment(where: { sender: { _eq: $me } }, order_by: { block: desc }, limit: $limit) { ...I }
+  ireceived: InstantPayment(where: { recipient: { _eq: $me } }, order_by: { block: desc }, limit: $limit) { ...I }
 }
+fragment I on InstantPayment { id ref sender recipient amount sourceToken pair timestamp txHash }
 fragment P on Payment { id sender recipient mode amount expiresAt status createdAt settledAt createdTx settledTx }`;
 
 const LIMIT = 100;
@@ -72,14 +78,17 @@ function stateOf(status: IndexedPayment["status"] | number, expiresAt: bigint, n
   return now >= expiresAt ? "expired" : "protected";
 }
 
-async function fromIndexer(me: Address): Promise<{ sent: IndexedPayment[]; received: IndexedPayment[] }> {
+type IndexedInstant = { id: string; ref: string; sender: string; recipient: string; amount: string; sourceToken: string; pair: string; timestamp: number; txHash: string };
+type Indexed = { sent: IndexedPayment[]; received: IndexedPayment[]; isent?: IndexedInstant[]; ireceived?: IndexedInstant[] };
+
+async function fromIndexer(me: Address): Promise<Indexed> {
   const r = await fetch(config.indexerUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: QUERY, variables: { me, limit: LIMIT } }),
   });
   if (!r.ok) throw new Error(`indexer HTTP ${r.status}`);
-  const j = (await r.json()) as { data?: { sent: IndexedPayment[]; received: IndexedPayment[] }; errors?: unknown };
+  const j = (await r.json()) as { data?: Indexed; errors?: unknown };
   if (!j.data) throw new Error("indexer: no data");
   return j.data;
 }
@@ -115,7 +124,7 @@ export async function loadHistory(account: { address: Address }): Promise<Histor
   const cache = new Map(loadSent().map((s) => [s.paymentId.toLowerCase(), s]));
 
   if (!config.indexerUrl) return { items: sortItems(await verifiedLocal(me, new Set(), now)), source: "device" };
-  let indexed: { sent: IndexedPayment[]; received: IndexedPayment[] };
+  let indexed: Indexed;
   try {
     indexed = await fromIndexer(me);
   } catch {
@@ -164,9 +173,35 @@ export async function loadHistory(account: { address: Address }): Promise<Histor
       };
     }),
   );
+  // Instant payments (EverpiecePay): final at once. A conversion to yourself (adding money) shows once; a payment to a
+  // bank payout's deposit address is labelled with the bank (this device's payout records, matched by request ref).
+  const payouts = new Map(loadLocalPayouts().filter((x) => x.requestId).map((x) => [x.requestId!.toLowerCase(), x]));
+  const instantSent = await Promise.all(
+    (indexed.isent ?? []).map(async (p): Promise<HistoryItem> => {
+      const self = getAddress(p.recipient) === me;
+      const bank = payouts.get(p.ref.toLowerCase());
+      const n = self || bank ? null : await nameOf(p.recipient);
+      return {
+        paymentId: p.id as Hex, direction: "sent", amount: BigInt(p.amount), mode: INSTANT, state: "paid",
+        counterparty: self ? "yourself (converted to Dollars)" : bank ? `${bank.to} (bank)` : n ? `@${n}` : short(p.recipient),
+        at: p.timestamp, expiresAt: 0n, tx: p.txHash as Hex,
+      };
+    }),
+  );
+  const instantReceived = await Promise.all(
+    (indexed.ireceived ?? [])
+      .filter((p) => getAddress(p.sender) !== me) // a conversion to yourself is already listed once
+      .map(async (p): Promise<HistoryItem> => {
+        const n = await nameOf(p.sender);
+        return {
+          paymentId: p.id as Hex, direction: "received", amount: BigInt(p.amount), mode: INSTANT, state: "paid",
+          counterparty: n ? `@${n}` : short(p.sender), at: p.timestamp, expiresAt: 0n, tx: p.txHash as Hex,
+        };
+      }),
+  );
   const seen = new Set([...sent, ...received].map((i) => i.paymentId.toLowerCase()));
   const pending = await verifiedLocal(me, seen, now);
-  return { items: sortItems([...pending, ...sent, ...received]), source: "indexer" };
+  return { items: sortItems([...pending, ...sent, ...received, ...instantSent, ...instantReceived]), source: "indexer" };
 }
 
 function sortItems(items: HistoryItem[]): HistoryItem[] {

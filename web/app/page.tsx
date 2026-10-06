@@ -21,6 +21,8 @@ import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
 import { payoutAvailable } from "../lib/payout";
 import { HomePayouts } from "../components/HomePayouts";
 import { Icon } from "../components/Icon";
+import { balanceOfToken, payTokens } from "../lib/pay";
+import { fromBaseUnits } from "@everpiece/shared";
 import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
 
 /** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
@@ -34,6 +36,24 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [openTopUps, setOpenTopUps] = useState<TopUp[]>([]);
+  const [hideBalance, setHideBalance] = useState(false);
+  const [holdings, setHoldings] = useState<{ symbol: string; label: string; note: string; amount: string }[]>([]);
+  useEffect(() => {
+    try {
+      setHideBalance(localStorage.getItem("everpiece.hideBalance.v1") === "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleHide = () =>
+    setHideBalance((h) => {
+      try {
+        localStorage.setItem("everpiece.hideBalance.v1", h ? "0" : "1");
+      } catch {
+        /* storage unavailable */
+      }
+      return !h;
+    });
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historySource, setHistorySource] = useState<"indexer" | "device" | null>(null);
   const [incoming, setIncoming] = useState<Incoming[]>([]);
@@ -55,6 +75,19 @@ export default function Home() {
   const refresh = useCallback(async (a: Account, inboxToo = true) => {
     setBalance(await dollarsOf(a.address).catch(() => null));
     setOpenTopUps(activeTopUps());
+    // other tokens this account holds (e.g. USDC that arrived from another chain, waiting to become Dollars)
+    void Promise.all(
+      payTokens()
+        .filter((t) => t.route !== "DIRECT_AUSD")
+        .map(async (t) => ({ t, v: await balanceOfToken(t.address, a.address).catch(() => 0n) })),
+    ).then((r) =>
+      setHoldings(
+        r.filter((x) => x.v > 0n).map(({ t, v }) => ({
+          symbol: t.symbol, label: t.testnet ? `Test ${t.symbol}` : t.symbol, note: "Turns into Dollars when you pay or add money",
+          amount: `${fromBaseUnits(v, t.decimals, 2).replace(/(\.\d{2})\d+$/, "$1")} ${t.symbol}`,
+        })),
+      ),
+    );
     const now = await chainTime().catch(() => BigInt(Math.floor(Date.now() / 1000)));
     // History from the indexer (source of truth); this browser's sent list only adds labels / not-yet-indexed sends.
     const h = await loadHistory(a).catch(() => null);
@@ -190,34 +223,63 @@ export default function Home() {
 
   return (
     <div className="stack">
-      <div className="row">
-        <div className="brand">Everpiece</div>
+      <div className="row topbar">
+        <span className="who">
+          <span className="avatar" aria-hidden="true">{(account.name || account.username || "E").slice(0, 1).toUpperCase()}</span>
+          <span className="brand">Everpiece</span>
+        </span>
         <button className="ghost small" onClick={() => { forgetAccount(); setAccount(null); }}>Sign out</button>
       </div>
 
-      <section className="hero" aria-label="Your balance">
-        <div className="hero-top">
+      <section className="wallet" aria-label="Your balance">
+        <div className="wallet-top">
           <span className="muted">{account.name ? `Hi ${account.name}, your Dollars` : "Your Dollars"}</span>
-          {isDevStack && <span className="hero-tag">Test money</span>}
+          <span className="wallet-tools">
+            {isDevStack && <span className="hero-tag">Test money</span>}
+            <button className="eye" aria-label={hideBalance ? "Show balance" : "Hide balance"} aria-pressed={hideBalance} onClick={toggleHide}>
+              <Icon name={hideBalance ? "eyeOff" : "eye"} size={18} />
+            </button>
+          </span>
         </div>
-        <div className="balance">{balance === null ? "…" : formatDollars(balance)}</div>
+        <div className="balance" aria-label={hideBalance ? "Balance hidden" : undefined}>{balance === null ? "…" : hideBalance ? "$••••" : formatDollars(balance)}</div>
         {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
-        <div className="hero-actions">
-          <Link className="button" href="/send"><Icon name="send" size={20} />Send money</Link>
-          <Link className="button alt" href="/request"><Icon name="request" size={20} />Request</Link>
-        </div>
+        <nav className="wallet-actions" aria-label="Pay and get paid">
+          <Link href="/send" aria-label="Send money"><span className="wa-icon"><Icon name="send" /></span>Send</Link>
+          <Link href="/request" aria-label="Request"><span className="wa-icon"><Icon name="request" /></span>Request</Link>
+          <Link href="/scan" aria-label="Scan to pay"><span className="wa-icon"><Icon name="scan" /></span>Scan</Link>
+          {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="wa-icon"><Icon name="add" /></span>Add</Link>}
+        </nav>
+        <ul className="assets" aria-label="What you hold">
+          <li>
+            <span className="asset-icon dollar" aria-hidden="true">$</span>
+            <span className="grow"><strong>Dollars</strong><span className="muted small">AUSD · Agora</span></span>
+            <strong>{balance === null ? "…" : hideBalance ? "••••" : formatDollars(balance)}</strong>
+          </li>
+          {holdings.map((h) => (
+            <li key={h.symbol}>
+              <span className="asset-icon" aria-hidden="true">{h.symbol.slice(0, 1)}</span>
+              <span className="grow"><strong>{h.label}</strong><span className="muted small">{h.note}</span></span>
+              <strong>{hideBalance ? "••••" : h.amount}</strong>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <nav className="quick" aria-label="More ways to pay and get paid">
-        <Link href="/scan"><span className="quick-icon"><Icon name="scan" /></span>Scan to pay</Link>
-        {payoutAvailable() && <Link href="/bank?to=them" aria-label="Send to a bank"><span className="quick-icon"><Icon name="bank" /></span>To a bank</Link>}
-        {payoutAvailable() && <Link href="/bank" aria-label="Cash out to my bank"><span className="quick-icon"><Icon name="cashout" /></span>Cash out</Link>}
-        {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="quick-icon"><Icon name="add" /></span>Add money</Link>}
-      </nav>
-
+      {payoutAvailable() && (
+        <div className="bank-actions" role="group" aria-label="Bank">
+          <Link href="/bank" className="card settings-row" aria-label="Cash out to my bank">
+            <span className="settings-icon"><Icon name="cashout" size={20} /></span>
+            <span className="grow"><strong>Cash out</strong><span className="muted small">to your bank</span></span>
+          </Link>
+          <Link href="/bank?to=them" className="card settings-row" aria-label="Send to a bank">
+            <span className="settings-icon"><Icon name="bank" size={20} /></span>
+            <span className="grow"><strong>To a bank</strong><span className="muted small">naira, by @username</span></span>
+          </Link>
+        </div>
+      )}
       {payoutAvailable() && (
         <Link href="/receive" className="card settings-row" aria-label="How you receive money">
-          <span className="settings-icon"><Icon name="bank" size={20} /></span>
+          <span className="settings-icon"><Icon name="user" size={20} /></span>
           <span className="grow">
             <strong>How you receive money</strong>
             <span className="muted small">In Dollars, or straight to your Nigerian bank</span>
@@ -279,7 +341,7 @@ export default function Home() {
         </>
       )}
 
-      <h2>Activity</h2>
+      <h2 id="activity">Activity</h2>
       {historySource === "device" && config.indexerUrl && (
         <p className="muted small">Payment history is temporarily unavailable. Showing payments sent from this device.</p>
       )}
@@ -324,7 +386,8 @@ export default function Home() {
 
 /** One plain sentence: where the money is now and what happens next. (Avoids the status words used in the pills.) */
 function explain(r: HistoryItem): string {
-  if (r.direction === "received") return "It's in your balance.";
+  if (r.direction === "received") return r.state === "paid" ? "Instant payment. It's in your balance." : "It's in your balance.";
+  if (r.state === "paid") return "Instant payment. It arrived at once and is final.";
   switch (r.state) {
     case "claimed":
       return `It's in their account now.`;
@@ -343,6 +406,7 @@ const when = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, {
 
 function StatusPill({ item }: { item: HistoryItem }) {
   if (item.direction === "received") return <span className="pill ok">Received</span>;
+  if (item.state === "paid") return <span className="pill ok">Paid</span>;
   if (item.state === "claimed") return <span className="pill ok">Claimed</span>;
   if (item.state === "cancelled") return <span className="pill muted">Cancelled</span>;
   if (item.state === "refunded") return <span className="pill muted">Refunded</span>;
