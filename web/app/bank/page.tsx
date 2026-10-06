@@ -93,7 +93,7 @@ export default function BankPage() {
     try {
       if (!estimate) return;
       const o = await sendToBank(account, dest.record.account, kobo, estimate.stableAmount, (s) => setProgress(s === "ORDERING" ? "Getting the bank transfer ready…" : progressText(s, "Paying")));
-      rememberPayout({ key: o.orderId, role: target === "me" ? "cashout" : "sent", orderId: o.orderId, kobo: kobo.toString(), to: bankLine(dest), who: target === "me" ? undefined : destName, at: Date.now() });
+      rememberPayout({ key: o.orderId, role: target === "me" ? "cashout" : "sent", orderId: o.orderId, ref: o.requestId, kobo: kobo.toString(), to: bankLine(dest), who: target === "me" ? undefined : destName, at: Date.now() });
       setOrder({ ...o, state: "PAYOUT_FUNDED", history: [...(o.history ?? []), { state: "PAYOUT_FUNDED" as PayoutState, at: Date.now() }] });
       setStep("done");
     } catch (e) {

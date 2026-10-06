@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const FAUCET = process.env.E2E_FAUCET_URL ?? "http://127.0.0.1:8790";
 test.skip(process.env.E2E_SHOTS !== "1", "screenshots only on request");
-test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: "dark" }); // like the owner's phone
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `shots/${name}.png`, fullPage: true });
 
@@ -62,6 +62,9 @@ test("naira flow screenshots", async ({ page, context }) => {
   await page.getByRole("button", { name: "₦20,000" }).click();
   await expect(page.getByText(/They'll pay about/)).toBeVisible();
   await shot(page, "11-request-naira");
+  await page.getByRole("button", { name: "Create request with fingerprint or screen lock" }).click();
+  await expect(page.getByRole("img", { name: "Payment request QR code" })).toBeVisible();
+  await shot(page, "13-request-qr");
 });
 
 test("other screens after the redesign", async ({ page, context }) => {

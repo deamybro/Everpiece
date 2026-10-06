@@ -15,7 +15,8 @@ const TABS = [
 
 export function BottomNav() {
   const path = usePathname() ?? "/";
-  if (/^\/(c|r|pay|payout|proof)(\/|$)/.test(path)) return null;
+  // only on the app's "places" (like Slush): never over a flow, a claim link, a receipt or a payment screen
+  if (path !== "/" && path !== "/receive" && path !== "/scan") return null;
   return (
     <nav className="tabbar" aria-label="Main">
       {TABS.map((t) => {

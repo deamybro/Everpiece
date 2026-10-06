@@ -118,7 +118,11 @@ export async function sendToBank(account: Account, recipient: Address, kobo: big
 }
 
 // ── payouts this device knows about, for Home (sent, cashed out, or received in naira) ─────────────────────────
-export type LocalPayout = { key: string; role: "sent" | "received" | "cashout"; orderId?: string; requestId?: Hex; kobo: string; to: string; who?: string; at: number };
+export type LocalPayout = {
+  key: string; role: "sent" | "received" | "cashout"; orderId?: string; requestId?: Hex; kobo: string; to: string; who?: string; at: number;
+  /** The on-chain payment ref (= the provider order's request id), so history can label the payment with the bank. */
+  ref?: Hex;
+};
 const PKEY = "everpiece.payouts.v1";
 export function loadLocalPayouts(): LocalPayout[] {
   try {

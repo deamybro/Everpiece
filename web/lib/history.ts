@@ -175,7 +175,7 @@ export async function loadHistory(account: { address: Address }): Promise<Histor
   );
   // Instant payments (EverpiecePay): final at once. A conversion to yourself (adding money) shows once; a payment to a
   // bank payout's deposit address is labelled with the bank (this device's payout records, matched by request ref).
-  const payouts = new Map(loadLocalPayouts().filter((x) => x.requestId).map((x) => [x.requestId!.toLowerCase(), x]));
+  const payouts = new Map(loadLocalPayouts().filter((x) => x.ref || x.requestId).map((x) => [(x.ref ?? x.requestId)!.toLowerCase(), x]));
   const instantSent = await Promise.all(
     (indexed.isent ?? []).map(async (p): Promise<HistoryItem> => {
       const self = getAddress(p.recipient) === me;
