@@ -9,6 +9,8 @@ import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera"
 import { PayError } from "../../lib/pay";
 import { checkBankAccount, institutions, myBankAccount, payoutAvailable, payoutSimulated, saveBankAccount, type Institution, type SignedAccount } from "../../lib/payout";
 
+// Shown first: matched by NAME in the provider's own list (no hard-coded bank codes).
+const POPULAR = /guaranty|access|zenith|first bank|united bank|opay|kuda|moniepoint|palmpay|fidelity|stanbic/i;
 const errText = (e: unknown) => (e instanceof PayError ? friendlyError(e.code) : friendlyPasskeyError(e));
 
 /** "How do you want to receive money?" — Dollars in Everpiece, or a verified Nigerian bank account (docs/PAYOUT.md). */
@@ -24,6 +26,7 @@ export default function ReceivePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const a = loadAccount();
@@ -38,6 +41,12 @@ export default function ReceivePage() {
       })
       .catch(() => {});
   }, []);
+
+  // check automatically once a bank is chosen and all 10 digits are typed
+  useEffect(() => {
+    if (account && bank && number.length === 10 && !checked && !busy && !error) void check();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bank, number]);
 
   if (!loaded) return null;
   if (!account) return <Welcome onReady={setAccount} title="Create your account first." />;
@@ -109,18 +118,22 @@ export default function ReceivePage() {
             <div className="stack">
               <div>
                 <label htmlFor="bank">Bank</label>
-                <select id="bank" value={bank} onChange={(e) => { setBank(e.target.value); setChecked(null); }}>
+                <input aria-label="Search banks" placeholder="Search banks" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <select id="bank" value={bank} onChange={(e) => { setBank(e.target.value); setChecked(null); setError(""); }}>
                   <option value="">Choose your bank</option>
-                  {banks.map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
+                  {[...banks]
+                    .filter((b) => b.name.toLowerCase().includes(search.trim().toLowerCase()) || b.code === bank)
+                    .sort((a, b) => Number(POPULAR.test(b.name)) - Number(POPULAR.test(a.name)) || a.name.localeCompare(b.name))
+                    .map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="acct">Account number</label>
                 <input id="acct" inputMode="numeric" maxLength={10} placeholder="10 digits" value={number}
-                  onChange={(e) => { setNumber(e.target.value.replace(/\D/g, "")); setChecked(null); }} />
+                  onChange={(e) => { setNumber(e.target.value.replace(/\D/g, "")); setChecked(null); setError(""); }} />
               </div>
               {!checked && (
-                <button className="secondary" disabled={busy || !bank || number.length !== 10} onClick={check}>{busy ? "Checking…" : "Check account"}</button>
+                <button className="secondary" disabled={busy || !bank || number.length !== 10} onClick={check}>{busy ? "Checking with your bank…" : "Check account"}</button>
               )}
               {checked && (
                 <div className="card stack" aria-label="Account check">

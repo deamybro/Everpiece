@@ -22,6 +22,9 @@ export type SignedAccount = { record: PayoutAccount; sig: Hex; institutionName: 
 export type PublicOrder = {
   orderId: string; requestId: Hex; state: PayoutState; receiveAddress: Address; amountToTransfer: string; amountToTransferUnits: string | null;
   currency: string; validUntil: string; simulated: boolean;
+  recipient?: Address | null; fiatAmount?: string | null;
+  /** Every state with the time it was first seen: the progress timeline. */
+  history?: { state: PayoutState; at: number }[];
 };
 export type LoadedPayoutRequest = { request: PayoutRequest; sig: Hex; account: SignedAccount; order: PublicOrder | null };
 
@@ -66,12 +69,54 @@ async function verifiedAccount(w: Record<string, any> | null | undefined, expect
   if (payoutAccountProblem({ ...record, deadline: 2n ** 64n }, 0n)) throw new PayError("REQUEST_TAMPERED");
   return { record, sig: w.sig, institutionName: w.institutionName ?? null };
 }
-export async function myBankAccount(account: Account): Promise<SignedAccount | null> {
+/** Anyone's payout destination, verified here (it must be signed by that account itself); null if they have none. */
+export async function bankAccountOf(address: Address): Promise<SignedAccount | null> {
   try {
-    return await verifiedAccount(await api("GET", `/v1/payout/accounts/${account.address}`), account.address);
+    return await verifiedAccount(await api("GET", `/v1/payout/accounts/${address}`), address);
   } catch (e) {
     if (e instanceof PayError && e.code === "NO_PAYOUT_ACCOUNT") return null;
     throw e;
+  }
+}
+export const myBankAccount = (account: Account) => bankAccountOf(account.address);
+export const bankLine = (b: SignedAccount) => `${b.institutionName ?? b.record.institution} ••${b.record.last4}`;
+
+/** "≈ $X" for a naira amount (live provider rate + the at-least buffer). */
+export async function nairaEstimate(kobo: bigint): Promise<{ rate: string; stableAmount: bigint }> {
+  const r = await api("GET", `/v1/payout/rate?amount=${kobo}`);
+  return { rate: String(r.rate), stableAmount: BigInt(r.stableAmount) };
+}
+
+/**
+ * "Send to their bank" / "cash out to my bank": the sender picks the amount; the destination is only ever the one the
+ * recipient signed (checked by the caller with bankAccountOf). One prompt pays the provider order's exact amount.
+ */
+export async function sendToBank(account: Account, recipient: Address, kobo: bigint, onStatus: (s: RelayStatus | "SIGNING" | "ORDERING") => void): Promise<PublicOrder> {
+  onStatus("ORDERING");
+  const { order } = (await api("POST", "/v1/payout/orders", { recipient, fiatAmount: kobo.toString(), sender: account.address })) as { order: PublicOrder };
+  if (!order.amountToTransferUnits) throw new PayError("BAD_QUOTE");
+  const dollars = payTokens().find((t) => t.route === "DIRECT_AUSD");
+  if (!dollars) throw new PayError("PROVIDER_UNAVAILABLE");
+  await payInstant(account, { recipient: order.receiveAddress, amount: BigInt(order.amountToTransferUnits), token: dollars, ref: order.requestId }, onStatus);
+  return order;
+}
+
+// ── payouts this device knows about, for Home (sent, cashed out, or received in naira) ─────────────────────────
+export type LocalPayout = { key: string; role: "sent" | "received" | "cashout"; orderId?: string; requestId?: Hex; kobo: string; to: string; who?: string; at: number };
+const PKEY = "everpiece.payouts.v1";
+export function loadLocalPayouts(): LocalPayout[] {
+  try {
+    return JSON.parse(localStorage.getItem(PKEY) ?? "[]") as LocalPayout[];
+  } catch {
+    return [];
+  }
+}
+export function rememberPayout(p: LocalPayout) {
+  try {
+    const all = loadLocalPayouts().filter((x) => x.key !== p.key);
+    localStorage.setItem(PKEY, JSON.stringify([p, ...all].slice(0, 30)));
+  } catch {
+    /* storage unavailable */
   }
 }
 

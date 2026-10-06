@@ -14,7 +14,8 @@ import { fundingAvailable } from "../lib/funding";
 import { friendlyPasskeyError, loadAccount, type Account } from "../lib/mera";
 import { PayError } from "../lib/pay";
 import { usernameOf } from "../lib/username";
-import { loadPayoutRequest, payPayout, payoutOrder, payoutQuote, payoutSimulated, type LoadedPayoutRequest } from "../lib/payout";
+import { bankLine as bankLineOf, loadPayoutRequest, payPayout, payoutOrder, payoutQuote, payoutSimulated, rememberPayout, type LoadedPayoutRequest, type PublicOrder } from "../lib/payout";
+import { PayoutTimeline } from "./PayoutTimeline";
 
 const errText = (e: unknown) => (e instanceof PayError ? friendlyError(e.code) : friendlyPasskeyError(e));
 
@@ -27,6 +28,7 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
   const [quote, setQuote] = useState<{ rate: string; stableAmount: bigint; bufferBps: number } | null>(null);
   const [state, setState] = useState<PayoutState | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [history, setHistory] = useState<PublicOrder["history"]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -44,6 +46,7 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
         if (r.order) {
           setOrderId(r.order.orderId);
           setState(r.order.state);
+          setHistory(r.order.history ?? []);
         }
         if (!r.order || r.order.state === "AWAITING_PAYMENT" || r.order.state === "EXPIRED") await refreshQuote();
       })
@@ -56,7 +59,7 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
   // follow the payout until the provider confirms (or refunds)
   useEffect(() => {
     if (!orderId || (state && isFinalPayout(state)) || state === "AWAITING_PAYMENT") return;
-    const t = setInterval(() => payoutOrder(orderId).then((o) => setState(o.state)).catch(() => {}), 3000);
+    const t = setInterval(() => payoutOrder(orderId).then((o) => { setState(o.state); setHistory(o.history ?? []); }).catch(() => {}), 2500);
     return () => clearInterval(t);
   }, [orderId, state]);
 
@@ -68,6 +71,8 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
       const o = await payPayout(account, requestId, (s) => setProgress(s === "ORDERING" ? "Getting the bank transfer ready…" : progressText(s, "Paying")));
       setOrderId(o.orderId);
       setState("PAYOUT_FUNDED");
+      setHistory([...(o.history ?? []), { state: "PAYOUT_FUNDED", at: Date.now() }]);
+      if (req) rememberPayout({ key: o.orderId, role: "sent", orderId: o.orderId, requestId, kobo: req.request.fiatAmount.toString(), to: bankLineOf(req.account), who: who ? `@${who}` : undefined, at: Date.now() });
     } catch (e) {
       setError(errText(e));
       void refreshQuote();
@@ -105,9 +110,9 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
         {header}
         {sim}
         {card}
-        {state === "DELIVERED" ? <div className="status ok">{PAYOUT_STATE_TEXT.DELIVERED}</div>
-          : state === "REFUNDED" ? <div className="status bad">{PAYOUT_STATE_TEXT.REFUNDED} Refunds go to your own account.</div>
-          : <Progress text={PAYOUT_STATE_TEXT[state]} />}
+        <PayoutTimeline state={state} history={history} />
+        {state === "DELIVERED" && <div className="status ok">{PAYOUT_STATE_TEXT.DELIVERED}</div>}
+        {state === "REFUNDED" && <div className="status bad">{PAYOUT_STATE_TEXT.REFUNDED} Refunds go to your own account.</div>}
         {!final && <p className="muted small">We only say &quot;Delivered&quot; when the payout provider confirms the bank transfer.</p>}
         <Link className="button ghost" href="/">Back to Everpiece</Link>
       </div>

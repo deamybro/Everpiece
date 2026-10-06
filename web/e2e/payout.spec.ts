@@ -30,8 +30,7 @@ async function addBank(page: Page, number: string) {
   await expect(page.getByText("Simulated bank payouts", { exact: false })).toBeVisible();
   await page.getByText("Nigerian bank account", { exact: true }).click();
   await page.getByLabel("Bank", { exact: true }).selectOption({ label: "Guaranty Trust Bank" }); // Paycrest's real NGN list
-  await page.getByLabel("Account number").fill(number);
-  await page.getByRole("button", { name: "Check account" }).click();
+  await page.getByLabel("Account number").fill(number); // checked automatically at 10 digits
   const check = page.getByLabel("Account check");
   await expect(check).toContainText(`TEST ACCOUNT ${number.slice(-4)} (SIMULATED)`);
   await check.getByRole("button", { name: /save with fingerprint/ }).click();
@@ -79,7 +78,9 @@ test("₦3,000 to a verified bank account: one prompt, 'Delivered' only on the p
   await expect(payer.getByLabel("Payment summary")).toContainText("per Dollar");
   await payer.getByRole("button", { name: "Pay with fingerprint or screen lock" }).click();
   await expect(payer.getByText("Delivered to the bank account ✓")).toBeVisible({ timeout: 180_000 });
-  await expect(maris.getByText("Delivered to the bank account ✓", { exact: false })).toBeVisible({ timeout: 60_000 });
+  await expect(maris.getByText("You received at least")).toBeVisible({ timeout: 60_000 });
+  await expect(maris.getByLabel("Payout progress")).toContainText("Delivered");
+  await expect(payer.getByLabel("Payout progress")).toContainText("Sent to the bank");
 
   // a bank payout that fails is refunded to the payer, and never shown as delivered
   const eve = await withPasskeys(await browser.newContext());
@@ -90,6 +91,24 @@ test("₦3,000 to a verified bank account: one prompt, 'Delivered' only on the p
   await payer.getByRole("button", { name: "Pay with fingerprint or screen lock" }).click();
   await expect(payer.getByText("The sender was refunded.", { exact: false })).toBeVisible({ timeout: 180_000 });
   await expect(payer.getByText("Delivered to the bank account ✓")).toHaveCount(0);
+
+  // cash out: the payer adds their own bank, then sends ₦5,000 of their Dollars to it from Home
+  await addBank(payer, "0987654321");
+  await payer.goto("/");
+  await payer.getByRole("link", { name: "Cash out to my bank" }).click();
+  await expect(payer.getByLabel("Destination")).toContainText("Guaranty Trust Bank ••4321");
+  await payer.getByRole("button", { name: "Continue" }).click();
+  await payer.getByRole("button", { name: "₦5,000" }).click();
+  await expect(payer.getByText(/≈ \$[0-9.]+ from your Dollars/)).toBeVisible();
+  await payer.getByRole("button", { name: "Continue" }).click();
+  await expect(payer.getByLabel("Payment summary")).toContainText("per Dollar");
+  await payer.getByRole("button", { name: "Pay with fingerprint or screen lock" }).click();
+  await expect(payer.getByLabel("Payout progress").getByText("Delivered")).toBeVisible();
+  await expect(payer.locator(".timeline li.done").filter({ hasText: "Delivered" })).toBeVisible({ timeout: 180_000 });
+  await payer.goto("/");
+  const list = payer.getByLabel("Bank payouts");
+  await expect(list).toContainText("Cash out · ₦5,000");
+  await expect(list).toContainText("Delivered");
 
   expect(csp).toEqual([]);
 });

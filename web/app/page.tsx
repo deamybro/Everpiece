@@ -19,6 +19,7 @@ import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "..
 import { friendlyError, type RelayStatus } from "../lib/api";
 import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
 import { payoutAvailable } from "../lib/payout";
+import { HomePayouts } from "../components/HomePayouts";
 import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
 
 /** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
@@ -202,9 +203,17 @@ export default function Home() {
           <Link className="button secondary" href="/request">Request</Link>
           <Link className="button secondary" href="/scan">Scan to pay</Link>
         </div>
+        {payoutAvailable() && (
+          <div className="row" role="group" aria-label="Bank">
+            <Link className="button secondary" href="/bank?to=them">Send to a bank</Link>
+            <Link className="button secondary" href="/bank">Cash out to my bank</Link>
+          </div>
+        )}
         {fundingAvailable() && <Link className="button ghost" href="/add">Add money from another chain</Link>}
         {payoutAvailable() && <Link className="button ghost" href="/receive">How you receive money</Link>}
       </div>
+
+      {payoutAvailable() && <HomePayouts />}
 
       {openTopUps.map((t) => (
         <Link key={t.depositAddress} href="/add" className="card stack" aria-label="Top-up in progress">
