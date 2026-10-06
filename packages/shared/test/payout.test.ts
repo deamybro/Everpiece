@@ -80,3 +80,14 @@ test("signed destination: only the account owner's signature, and requests bind 
   assert.equal(payoutAccountProblem({ ...a, institution: "x" }, 1n), "INVALID_INSTITUTION");
   assert.ok(PAYOUT_REQUEST_LINK.test(`/payout/0x${"ab".repeat(32)}`));
 });
+
+test("payout orders never exceed the price shown: quote + 3% (min $0.50), else refused", async () => {
+  const { payoutWithinQuote } = await import("../src/index.ts");
+  assert.equal(payoutWithinQuote(7_440_000n, 7_440_000n), true);
+  assert.equal(payoutWithinQuote(7_940_000n, 7_440_000n), true); // + $0.50 floor
+  assert.equal(payoutWithinQuote(7_940_001n, 7_440_000n), false);
+  assert.equal(payoutWithinQuote(103_000_000n, 100_000_000n), true); // + 3%
+  assert.equal(payoutWithinQuote(103_000_001n, 100_000_000n), false);
+  assert.equal(payoutWithinQuote(0n, 100n), false);
+  assert.equal(payoutWithinQuote(1_000_000_000n, 7_440_000n), false); // an inflated order
+});

@@ -33,7 +33,7 @@ before(async () => {
   const cfg = loadConfig({
     DIRECTORY_DOMAIN_ADDRESS: DOMAIN, EXPECTED_CHAIN_ID: String(CHAIN), PAYCREST_API_KEY: KEY, PAYCREST_API_SECRET: SECRET,
     PAYOUT_BANK_ENC_KEY: `0x${"ab".repeat(32)}`, PAYOUT_DB_PATH: ":memory:", PAYOUT_SOURCE_NETWORK: "sim-monad-testnet", PAYOUT_SOURCE_CURRENCY: "AUSD",
-    PAYOUT_RATE_BUFFER_BPS: "100", PAYOUT_SIMULATED: "1", PORT: "0",
+    PAYOUT_RATE_BUFFER_BPS: "100", PAYOUT_SIMULATED: "1", PORT: "0", ORDERS_PER_IP_PER_MINUTE: "100",
   });
   svc = new PayoutService(cfg);
   payout = createPayoutServer(svc);
@@ -183,4 +183,16 @@ test("send to their bank / cash out: sender picks the amount, only to the recipi
   const states = (done.history as { state: string; at: number }[]).map((h) => h.state);
   assert.deepEqual(states, ["AWAITING_PAYMENT", "PAYOUT_FUNDED", "BANK_PROCESSING", "DELIVERED"]);
   assert.ok((done.history as { at: number }[]).every((h, i, a) => i === 0 || h.at >= a[i - 1].at));
+});
+
+test("provider orders have their own tight per-IP budget (default 6/min)", async () => {
+  const cfg = loadConfig({
+    DIRECTORY_DOMAIN_ADDRESS: DOMAIN, EXPECTED_CHAIN_ID: String(CHAIN), PAYCREST_API_KEY: KEY, PAYCREST_API_SECRET: SECRET,
+    PAYOUT_BANK_ENC_KEY: `0x${"ab".repeat(32)}`, PAYOUT_DB_PATH: ":memory:",
+  });
+  assert.equal(cfg.ordersPerIpPerMinute, 6);
+  const s = new PayoutService(cfg);
+  for (let i = 0; i < 6; i++) assert.notEqual((await s.createOrder({ sender: "nope" }, "9.9.9.9")).httpStatus, 429);
+  assert.equal((await s.createOrder({ sender: "nope" }, "9.9.9.9")).httpStatus, 429);
+  assert.notEqual((await s.createOrder({ sender: "nope" }, "8.8.8.8")).httpStatus, 429);
 });

@@ -63,6 +63,8 @@ export class PayoutService {
   private readonly vault: BankVault;
   private readonly limiter: Limiter;
   private readonly readLimiter: Limiter;
+  /** Each order is a real provider order on mainnet: a tight per-IP budget of its own (audit 2026-10-06). */
+  private readonly orderLimiter: Limiter;
   private readonly now: () => number;
   private institutionsCache: { at: number; list: Institution[] } | null = null;
 
@@ -73,6 +75,7 @@ export class PayoutService {
     this.vault = new BankVault(cfg.bankEncKey);
     this.limiter = new Limiter(cfg.perIpPerMinute);
     this.readLimiter = new Limiter(cfg.readsPerIpPerMinute);
+    this.orderLimiter = new Limiter(cfg.ordersPerIpPerMinute);
     this.now = opts.now ?? Date.now;
   }
 
@@ -259,7 +262,8 @@ export class PayoutService {
   }
 
   /** The provider order the sender will pay. One live order per request; refunds go to the sender's own address (P3). */
-  async createOrder(body: unknown): Promise<Result> {
+  async createOrder(body: unknown, ip = "unknown"): Promise<Result> {
+    if (!this.orderLimiter.allow(ip, this.now())) return err(429, "RateLimited");
     const o = (body ?? {}) as Record<string, unknown>;
     if (typeof o.sender !== "string" || !isAddress(o.sender)) return err(400, "InvalidRequest");
     let r = typeof o.requestId === "string" && /^0x[0-9a-fA-F]{64}$/.test(o.requestId) ? this.store.request(o.requestId) : undefined;

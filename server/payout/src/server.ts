@@ -60,7 +60,7 @@ export function createPayoutServer(svc: PayoutService): Server {
       if (req.method === "GET" && (m = /^\/v1\/payout\/requests\/(0x[0-9a-fA-F]{64})$/.exec(p))) return send(res, await svc.getRequest(m[1]), origin);
       if (req.method === "GET" && p === "/v1/payout/rate") return send(res, await svc.rate(url.searchParams.get("amount")), origin);
       if (req.method === "POST" && p === "/v1/payout/quote") return send(res, await svc.quote(await readJson(req)), origin);
-      if (req.method === "POST" && p === "/v1/payout/orders") return send(res, await svc.createOrder(await readJson(req)), origin);
+      if (req.method === "POST" && p === "/v1/payout/orders") return send(res, await svc.createOrder(await readJson(req), ip), origin);
       if (req.method === "GET" && (m = /^\/v1\/payout\/orders\/([A-Za-z0-9-]{8,80})$/.exec(p))) return send(res, await svc.order(m[1]), origin);
       return send(res, { httpStatus: 404, body: { error: "NotFound" } }, origin);
     } catch (e) {

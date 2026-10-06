@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
+          // HTTPS only from the first visit on (no includeSubDomains/preload on the test domain; decide for production)
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
           // Claim links carry secrets in the #fragment; never leak the URL onward (THREAT_MODEL C6).
           { key: "Referrer-Policy", value: "no-referrer" },
           // Voice messages record on our own origin only.

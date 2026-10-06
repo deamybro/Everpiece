@@ -86,6 +86,7 @@ export function friendlyError(code: string | undefined): string {
     BAD_ORDER: "The payout provider sent something we couldn't verify. Nothing was charged.",
     UNKNOWN_ORDER: "We can't find this payout.",
     DESTINATION_MISMATCH: "We couldn't confirm the recipient's bank details, so nothing was sent.",
+    PRICE_CHANGED: "The price changed since you saw it. Nothing was paid. Check the new price and try again.",
     NoUsername: "Pick your @username first, so people can see who they're paying.",
     BelowMinimumPayment: "The minimum payment is $1.00.",
     RecipientCantGetMessages: "This person can't receive messages yet. Remove the message to send the money.",

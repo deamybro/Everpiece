@@ -24,6 +24,8 @@ export type PayoutConfig = {
   perIpPerMinute: number;
   /** Status reads (GET) per IP per minute: cheap, and polled by open screens; everyone behind one NAT shares it. */
   readsPerIpPerMinute: number;
+  /** Provider orders created per IP per minute (each is a real order at the provider on mainnet). */
+  ordersPerIpPerMinute: number;
   /** Bank-account verifications per IP per day (each one is a real name lookup at the provider). */
   verificationsPerIpPerDay: number;
   /** Label shown to users when the provider is simulated (test site). */
@@ -66,6 +68,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PayoutConfig {
     allowedOrigin,
     perIpPerMinute: int(env, "PER_IP_PER_MINUTE", 30),
     readsPerIpPerMinute: int(env, "READS_PER_IP_PER_MINUTE", 240),
+    ordersPerIpPerMinute: int(env, "ORDERS_PER_IP_PER_MINUTE", 6),
     verificationsPerIpPerDay: int(env, "VERIFICATIONS_PER_IP_PER_DAY", 20),
     simulated: env.PAYOUT_SIMULATED === "1",
   };

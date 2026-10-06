@@ -1,6 +1,6 @@
 import { getAddress, recoverTypedDataAddress, type Address, type Hex } from "viem";
 import {
-  PAYOUT_REQUEST_VERSION, payoutAccountHashOf, payoutAccountProblem, payoutAccountTyped, payoutRequestProblem, payoutRequestTyped,
+  PAYOUT_REQUEST_VERSION, payoutAccountHashOf, payoutWithinQuote, payoutAccountProblem, payoutAccountTyped, payoutRequestProblem, payoutRequestTyped,
   type PayoutAccount, type PayoutRequest, type PayoutState,
 } from "@everpiece/shared";
 import { config } from "./config";
@@ -96,13 +96,24 @@ export async function nairaEstimate(kobo: bigint): Promise<{ rate: string; stabl
  * "Send to their bank" / "cash out to my bank": the sender picks the amount; the destination is only ever the one the
  * recipient signed (checked by the caller with bankAccountOf). One prompt pays the provider order's exact amount.
  */
-export async function sendToBank(account: Account, recipient: Address, kobo: bigint, onStatus: (s: RelayStatus | "SIGNING" | "ORDERING") => void): Promise<PublicOrder> {
+/**
+ * The order's amount must match the price the payer was shown (+3% or $0.50 for the provider's fee and rate drift).
+ * A payout server or provider asking for more is refused before anything is signed (audit 2026-10-06).
+ */
+export function checkOrderAmount(order: PublicOrder, quotedUnits: bigint): bigint {
+  if (!order.amountToTransferUnits) throw new PayError("BAD_QUOTE");
+  const units = BigInt(order.amountToTransferUnits);
+  if (!payoutWithinQuote(units, quotedUnits)) throw new PayError("PRICE_CHANGED");
+  return units;
+}
+
+export async function sendToBank(account: Account, recipient: Address, kobo: bigint, quotedUnits: bigint, onStatus: (s: RelayStatus | "SIGNING" | "ORDERING") => void): Promise<PublicOrder> {
   onStatus("ORDERING");
   const { order } = (await api("POST", "/v1/payout/orders", { recipient, fiatAmount: kobo.toString(), sender: account.address })) as { order: PublicOrder };
-  if (!order.amountToTransferUnits) throw new PayError("BAD_QUOTE");
+  const units = checkOrderAmount(order, quotedUnits);
   const dollars = payTokens().find((t) => t.route === "DIRECT_AUSD");
   if (!dollars) throw new PayError("PROVIDER_UNAVAILABLE");
-  await payInstant(account, { recipient: order.receiveAddress, amount: BigInt(order.amountToTransferUnits), token: dollars, ref: order.requestId }, onStatus);
+  await payInstant(account, { recipient: order.receiveAddress, amount: units, token: dollars, ref: order.requestId }, onStatus);
   return order;
 }
 
@@ -161,13 +172,13 @@ export const payoutOrder = async (orderId: string): Promise<PublicOrder> => (awa
  * Sender: create (or resume) the provider order, then pay exactly what it asks, in Dollars, to its deposit address.
  * Refunds, if the bank payout fails, go back to this sender (P3).
  */
-export async function payPayout(account: Account, requestId: Hex, onStatus: (s: RelayStatus | "SIGNING" | "ORDERING") => void): Promise<PublicOrder> {
+export async function payPayout(account: Account, requestId: Hex, quotedUnits: bigint, onStatus: (s: RelayStatus | "SIGNING" | "ORDERING") => void): Promise<PublicOrder> {
   onStatus("ORDERING");
   const { order } = (await api("POST", "/v1/payout/orders", { requestId, sender: account.address })) as { order: PublicOrder };
   if (order.state !== "AWAITING_PAYMENT") return order;
-  if (!order.amountToTransferUnits) throw new PayError("BAD_QUOTE");
+  const units = checkOrderAmount(order, quotedUnits);
   const dollars = payTokens().find((t) => t.route === "DIRECT_AUSD");
   if (!dollars) throw new PayError("PROVIDER_UNAVAILABLE");
-  await payInstant(account, { recipient: order.receiveAddress, amount: BigInt(order.amountToTransferUnits), token: dollars, ref: requestId }, onStatus);
+  await payInstant(account, { recipient: order.receiveAddress, amount: units, token: dollars, ref: requestId }, onStatus);
   return order;
 }

@@ -172,3 +172,12 @@ export function nextPayoutState(current: PayoutState, incoming: PayoutState): Pa
   return ORDER[incoming] >= ORDER[current] ? incoming : current;
 }
 // Webhook signatures (HMAC) live in server/payout: this package also runs in the browser.
+
+/**
+ * Never pay a payout order more than the price the payer was shown: the quote + 3% (or at least $0.50, 6 dp) for the
+ * provider's fee and rate drift. Anything above is refused before signing (audit 2026-10-06).
+ */
+export function payoutWithinQuote(orderUnits: bigint, quotedUnits: bigint): boolean {
+  const tolerance = quotedUnits * 3n / 100n > 500_000n ? quotedUnits * 3n / 100n : 500_000n;
+  return orderUnits > 0n && orderUnits <= quotedUnits + tolerance;
+}

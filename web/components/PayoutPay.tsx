@@ -68,7 +68,8 @@ export function PayoutPay({ requestId }: { requestId: Hex }) {
     setBusy(true);
     setError("");
     try {
-      const o = await payPayout(account, requestId, (s) => setProgress(s === "ORDERING" ? "Getting the bank transfer ready…" : progressText(s, "Paying")));
+      if (!quote) return;
+      const o = await payPayout(account, requestId, quote.stableAmount, (s) => setProgress(s === "ORDERING" ? "Getting the bank transfer ready…" : progressText(s, "Paying")));
       setOrderId(o.orderId);
       setState("PAYOUT_FUNDED");
       setHistory([...(o.history ?? []), { state: "PAYOUT_FUNDED", at: Date.now() }]);

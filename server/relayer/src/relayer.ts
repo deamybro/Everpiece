@@ -69,6 +69,8 @@ export class Relayer {
   readonly chain: Chain;
   readonly store: Store;
   private ipLimiter: RateLimiter;
+  /** Quotes do on-chain reads: their own per-IP budget, so they can't be used to exhaust the RPC (audit 2026-10-06). */
+  private quoteLimiter = new RateLimiter(60);
   private signerLimiter: RateLimiter;
   private queue: Promise<unknown> = Promise.resolve();
   private nextNonce = 0;
@@ -407,7 +409,8 @@ export class Relayer {
    * plus headroom the payer authorizes as a ceiling; the contract returns whatever the swap didn't use. Anything else:
    * UNSUPPORTED_TOKEN (never a fake quote). 0x has no Monad testnet support (docs/ROUTING.md), so it never quotes here.
    */
-  async quote(body: unknown): Promise<ApiResult> {
+  async quote(body: unknown, ip = "unknown"): Promise<ApiResult> {
+    if (!this.quoteLimiter.allow(`quote:${ip}`, this.now())) return { httpStatus: 429, body: { error: "RateLimited" } };
     let q;
     try {
       q = parseQuote(body);

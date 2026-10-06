@@ -39,6 +39,8 @@ export class Paycrest {
   private readonly apiKey: string;
   private readonly secret: string;
   private readonly fetchFn: typeof fetch;
+  /** Rates are cached briefly so the public estimate endpoint can't be used to flood the provider (audit 2026-10-06). */
+  private rates = new Map<string, { at: number; rate: string }>();
   constructor(base: string, apiKey: string, secret: string, fetchFn: typeof fetch = fetch) {
     this.base = base;
     this.apiKey = apiKey;
@@ -80,6 +82,14 @@ export class Paycrest {
 
   /** Naira per unit of stablecoin for an off-ramp ("sell") of `amount` units. */
   async sellRate(network: string, currency: string, amount: string, fiat: string): Promise<string> {
+    const key = `${network}/${currency}/${amount.length}/${fiat}`; // bucket by order of magnitude
+    const hit = this.rates.get(key);
+    if (hit && Date.now() - hit.at < 30_000) return hit.rate;
+    const rate = await this.fetchRate(network, currency, amount, fiat);
+    this.rates.set(key, { at: Date.now(), rate });
+    return rate;
+  }
+  private async fetchRate(network: string, currency: string, amount: string, fiat: string): Promise<string> {
     const d = (await this.call("GET", `/v2/rates/${network}/${currency}/${amount}/${fiat}`)) as { sell?: { rate?: unknown } } | null;
     const rate = d?.sell?.rate;
     if (typeof rate !== "string" || !/^[0-9]{1,12}(\.[0-9]{1,12})?$/.test(rate) || Number(rate) <= 0) throw new ProviderError("NO_RATE", 503);

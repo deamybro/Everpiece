@@ -93,7 +93,7 @@ export function createHttpServer(relayer: Relayer): Server {
       }
       if (url.pathname === "/v1/quotes") {
         if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
-        const out = await relayer.quote(await readJson(req, relayer.cfg.maxBodyBytes));
+        const out = await relayer.quote(await readJson(req, relayer.cfg.maxBodyBytes), clientIp(req));
         return send(res, out.httpStatus, out.body, origin);
       }
       const method = ROUTES[url.pathname];
