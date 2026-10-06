@@ -4,6 +4,41 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 25 — 2026-10-06 — Routing design: Aurora as the future funding provider
+
+- **Owner:**
+  - Aurora Intents = preferred future multi-chain **funding** provider, not AUSD settlement. Don't enable it for real yet.
+  - Keep 0x as the alternative EVM routing provider.
+  - Never assume Aurora delivers AUSD.
+  - If Aurora completes but Agora fails, the funds stay in the payer's account; no automatic reverse route.
+  - No real mainnet transaction without owner approval.
+  - Then: "keep simulated on testnet".
+  - Asked "no way to make it real?" → answered with the mainnet path (below); no decision yet.
+- **Branch:** `feat/payment-intents-agora` (local only, not pushed). **Deployed** `a830020` to https://test.everpiece.xyz.
+- **Built:**
+  - `docs/ROUTING.md` (new; the relayer already cited it):
+    - layers: funding / settlement / payment;
+    - the flow source → Aurora → verified Monad intermediate (USDC) → Agora → exact AUSD → Instant/Protected;
+    - the conditions an intermediate asset must meet;
+    - the AUSD-directness rule;
+    - the order of checks (Agora before Aurora);
+    - the failure matrix;
+    - no automatic reverse route; no mainnet transaction without the owner.
+  - Relayer config refuses an Aurora destination that is AUSD or lacks a verified Agora route (tests).
+  - `/add`: when Aurora delivered but settlement fails, it shows the delivered asset's real balance in the payer's own account and says nothing is sent back automatically; retry later.
+  - FUNDING.md M4 and the ledger row aligned.
+- **Tests run:** relayer 22/22; web typecheck; live E2E on the host, `add` 1/1, which now forces the settlement failure, checks the held-balance message, then converts successfully.
+- **To make it real (owner):**
+  1. Intents Studio API key (via `set-secret.sh`);
+  2. Agora `APPROVED_SWAPPER` for EverpiecePay on the mainnet USDC/AUSD pair;
+  3. GO for mainnet EverpiecePay/escrow deploy + relayer funding;
+  4. confirm FUNDING.md M1–M8;
+  5. GO for one small real top-up.
+
+  A faster partial step: steps 1 + 5 alone test the Aurora leg for real (USDC lands in the owner's own account; that also confirms whether Aurora's own token API lists AUSD).
+
+---
+
 ## Session 24 — 2026-10-06 — Aurora Intents: "Add Dollars from another chain" with USDC
 
 - **Owner:** "build it, its part of our main build, use usdc". Also GO to fund the testnet relayer with 2 testnet MON.
