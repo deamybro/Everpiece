@@ -5,6 +5,7 @@
 // payments survive restarts. Test money only: TestDollar is worthless and minted by this faucet.
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
+import { startAuroraSimulator } from "./aurora-sim.mjs";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +38,9 @@ const DIRECTORY_DOMAIN = process.env.TESTNET_DIRECTORY_DOMAIN ? getAddress(proce
 const DATA = env("STACK_DATA_DIR", "/data");
 const BIND = env("STACK_BIND_HOST", "0.0.0.0");
 const INFO_FILE = process.env.STACK_INFO_FILE;
-const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, web: 3000 };
+const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, aurora: 8792, web: 3000 };
+// "Add Dollars from another chain": Aurora is mainnet-only, so the test site runs a SIMULATED Aurora (scripts/aurora-sim.mjs)
+// that delivers test CTK, the token this deployment converts to AUSD. Needs EverpiecePay for the conversion.
 const svc = (name) => `${ORIGIN}/svc/${name}`;
 const children = [];
 
@@ -101,6 +104,7 @@ writeFileSync(
     `NEXT_PUBLIC_DEV_FAUCET_URL=${svc("faucet")}`,
     `NEXT_PUBLIC_INDEXER_URL=${svc("indexer")}/v1/graphql`,
     `NEXT_PUBLIC_VOICE_URL=${svc("voice")}`,
+    `NEXT_PUBLIC_FUNDING=${PAY ? "simulated" : "off"}`,
     "NEXT_PUBLIC_NETWORK_LABEL=Monad testnet",
     "NEXT_PUBLIC_EXPLORER_URL=https://testnet.monadscan.com", // VERIFIED §4.9
     "",
@@ -116,6 +120,7 @@ const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_I
 run("relayer", ["server/relayer/src/main.ts"], {
   ...common, RELAYER_PRIVATE_KEY: env("TESTNET_RELAYER_KEY"), RELAYER_DB_PATH: join(DATA, "relayer.sqlite"), PORT: String(P.relayer),
   AUSD_ADDRESS: DOLLAR, DOLLAR_EIP712_NAME: DOLLAR_NAME, ...(PAY ? { PAY_ADDRESS: PAY } : {}), MIN_RELAYER_BALANCE_WEI: String(2n * 10n ** 17n), // 0.2 MON
+  ...(PAY ? { AURORA_API_KEY: "simulated-testnet", AURORA_API_URL: `http://127.0.0.1:${P.aurora}/api`, AURORA_DESTINATION_TOKEN: CTK_TESTNET_ADDRESS } : {}),
 });
 const twilio = process.env.TWILIO_API_USER && process.env.TWILIO_API_SECRET && process.env.TWILIO_VERIFY_SERVICE_SID;
 run("claims", ["server/claims/src/main.ts"], {
@@ -242,6 +247,16 @@ const faucetServer = createServer((req, res) => {
 });
 faucetServer.on("clientError", (_e, socket) => socket.destroy());
 faucetServer.listen(P.faucet, BIND);
+
+if (PAY) {
+  const deliver = (to, amount) =>
+    (queue = queue.then(async () => {
+      await ensureCtk(amount);
+      return sent(await wallet.writeContract({ address: CTK_TESTNET_ADDRESS, abi: erc20Abi, functionName: "transfer", args: [to, amount], chain: null }));
+    }));
+  startAuroraSimulator({ port: P.aurora, destinationToken: CTK_TESTNET_ADDRESS, destinationDecimals: 18, deliver, say });
+  say(`aurora: SIMULATED on 127.0.0.1:${P.aurora} (delivers test CTK)`);
+}
 
 await waitFor(`http://127.0.0.1:${P.relayer}/healthz`);
 await waitFor(`http://127.0.0.1:${P.claims}/healthz`);

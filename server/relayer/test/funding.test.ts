@@ -160,3 +160,36 @@ test("config: off without a key; USDC on mainnet; an explicit destination elsewh
   assert.throws(() => loadConfig({ ...base, AURORA_API_KEY: "abcdefgh12", EXPECTED_CHAIN_ID: "10143" }), /AURORA_DESTINATION_TOKEN/);
   assert.throws(() => loadConfig({ ...base, AURORA_API_KEY: "bad key/../" }), /unexpected characters/);
 });
+
+test("the test site's SIMULATED Aurora (scripts/aurora-sim.mjs) drives the real adapter end to end", async () => {
+  // @ts-expect-error plain .mjs script without types
+  const { startAuroraSimulator } = await import("../../../scripts/aurora-sim.mjs");
+  const CTK = "0x7BEb5D9DB0d85cBEa543C04f0dE8c23c2176cd9D";
+  const delivered: [string, bigint][] = [];
+  const server = startAuroraSimulator({
+    port: 0, destinationToken: CTK, destinationDecimals: 18,
+    deliver: async (to: string, amount: bigint) => (delivered.push([to, amount]), "0x" + "cd".repeat(32)),
+  });
+  await new Promise((r) => server.once("listening", r));
+  const url = `http://127.0.0.1:${server.address().port}/api`;
+  try {
+    const f = new Funding({ ...cfg(url), destinationToken: CTK });
+    const src = await f.sources("ip");
+    assert.deepEqual((src.body.sources as { chainLabel: string }[]).map((s) => s.chainLabel), ["Base (simulated)"]);
+    const amountOut = 25n * 10n ** 18n;
+    const q = await f.quote({ originAssetId: "sim:base-usdc", amountOut: amountOut.toString(), recipient: ME, refundTo: WALLET }, "ip");
+    assert.equal(q.httpStatus, 200, JSON.stringify(q.body));
+    const dep = (q.body.quote as { depositAddress: string }).depositAddress;
+    assert.equal((await f.status(dep, "ip")).body.phase, "WAITING_FOR_DEPOSIT");
+    assert.equal((await f.deposit({ depositAddress: dep, txHash: "0x" + "ab".repeat(32) }, "ip")).body.phase, "MOVING");
+    let phase = "";
+    for (let i = 0; i < 20 && phase !== "ARRIVED"; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      phase = (await f.status(dep, "ip")).body.phase as string;
+    }
+    assert.equal(phase, "ARRIVED");
+    assert.deepEqual(delivered, [[ME, amountOut]]);
+  } finally {
+    server.close();
+  }
+});
