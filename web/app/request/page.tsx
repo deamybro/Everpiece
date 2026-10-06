@@ -94,7 +94,7 @@ export default function RequestPage() {
                 {copied ? "Link copied ✓" : "Copy link"}
               </button>
             </div>
-            <p className="muted small">They can pay with Dollars or another supported token. Either way, you receive exactly this amount in Dollars.</p>
+            <p className="muted small">They can pay with Dollars or another supported currency. Either way, you receive exactly this amount in Dollars.</p>
           </>
         )}
       </div>

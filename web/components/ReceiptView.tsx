@@ -111,7 +111,7 @@ export function ReceiptView({ paymentId }: { paymentId: Hex }) {
                 <a className="small" href={`${config.explorerUrl}/tx/${s.tx}`} target="_blank" rel="noopener noreferrer">Proof on Monad</a>
               </li>
             ))}
-            {receipt.pending && <li className="muted small">Updating… the latest step is on the blockchain and will show here in a few seconds.</li>}
+            {receipt.pending && <li className="muted small">Updating… the latest step is recorded on Monad and will show here in a few seconds.</li>}
           </ol>
 
           <div className="muted small stack">

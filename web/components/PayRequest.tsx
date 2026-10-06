@@ -15,7 +15,7 @@ import { PayError, RequestMode, balanceOfToken, getQuote, loadRequest, payInstan
 import { receiptPath } from "../lib/receipt";
 import { fundingAvailable } from "../lib/funding";
 
-const tokenLabel = (t: TokenInfo) => (t.route === "DIRECT_AUSD" ? "Dollars (AUSD)" : `Test ${t.symbol}`);
+const tokenLabel = (t: TokenInfo) => (t.route === "DIRECT_AUSD" ? "Dollars" : t.testnet ? `Test ${t.symbol}` : t.symbol);
 const amountOf = (t: TokenInfo, v: bigint) => (t.route === "DIRECT_AUSD" ? formatDollars(v) : `${fromBaseUnits(v, t.decimals)} ${t.symbol}`);
 const errText = (e: unknown) => (e instanceof PayError || e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e));
 
@@ -146,7 +146,7 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
     <div className="card center stack">
       <div className="muted">Pay {who} ({recipient.displayName})</div>
       <div className="amount">{formatDollars(request.amount)}</div>
-      <div className="muted small">{recipient.displayName} receives exactly {fromBaseUnits(request.amount, 6)} AUSD</div>
+      <div className="muted small">{recipient.displayName} receives exactly {formatDollars(request.amount)}</div>
     </div>
   );
 
@@ -160,7 +160,7 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
           {result.mode === RequestMode.INSTANT ? `Paid ✓ ${recipient.displayName} received exactly ${formatDollars(request.amount)}.` : `Sent ✓ ${formatDollars(request.amount)} is protected for ${who} until they claim it.`}
         </div>
         <p className="muted small">
-          {result.mode === RequestMode.INSTANT ? "Instant payments are final." : "You can cancel from Home until they claim it."} {token?.route !== "DIRECT_AUSD" ? `Paid with ${tokenLabel(token!)} via Agora Instant Settlement.` : ""}
+          {result.mode === RequestMode.INSTANT ? "Instant payments are final." : "You can cancel from Home until they claim it."} {token?.route !== "DIRECT_AUSD" ? `Paid with ${tokenLabel(token!)}, converted to Dollars by Agora.` : ""}
         </p>
         {result.txHash && <a className="button secondary" href={`${config.explorerUrl}/tx/${result.txHash}`} target="_blank" rel="noopener noreferrer">See it on Monad</a>}
         <Link className="button secondary" href={receiptPath(result.paymentId)}>View receipt</Link>
@@ -193,9 +193,9 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
             <dt>You pay</dt>
             <dd>{token.route === "DIRECT_AUSD" ? formatDollars(request.amount) : quoting ? "…" : quote ? `${amountOf(token, quote.sellAmount)} (at most ${amountOf(token, quote.maxSellAmount)})` : "—"}</dd>
             <dt>{recipient.displayName} receives</dt>
-            <dd>{fromBaseUnits(request.amount, 6)} AUSD</dd>
+            <dd>exactly {formatDollars(request.amount)}</dd>
             <dt>Settlement</dt>
-            <dd>{token.route === "DIRECT_AUSD" ? "Direct in AUSD" : "Agora Instant Settlement"}</dd>
+            <dd>{token.route === "DIRECT_AUSD" ? "Direct, in Dollars" : "Converted to Dollars by Agora"}</dd>
             <dt>Provider fee</dt>
             <dd>{token.route === "DIRECT_AUSD" ? "None" : quote ? amountOf(token, quote.providerFee) : "—"}</dd>
             <dt>Network fee</dt>
@@ -206,7 +206,7 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
           </dl>
           {token.route !== "DIRECT_AUSD" && <p className="muted small">Any {token.symbol} the conversion doesn&apos;t need is returned to you in the same transaction.</p>}
           {request.mode === RequestMode.PROTECTED && token.route !== "DIRECT_AUSD" && (
-            <p className="muted small">Protected payment refunds are returned in AUSD after conversion.</p>
+            <p className="muted small">If a protected payment is cancelled, you get Dollars back, not the original currency.</p>
           )}
         </div>
       )}

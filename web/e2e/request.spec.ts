@@ -103,7 +103,7 @@ test("request → pay in Dollars (instant) and in CTK via Agora (protected); pai
   await scanQr(payer, svg);
   await expect(payer).toHaveURL(new RegExp(`${instant}$`));
   await expect(payer.getByText(`Pay @${M}`)).toBeVisible();
-  await payer.getByText("Dollars (AUSD)").click();
+  await payer.getByRole("radio", { name: /^Dollars ·/ }).check();
   await expect(payer.getByText("Instant · final")).toBeVisible();
   await payer.getByRole("button", { name: "Pay $3.00 with fingerprint or screen lock" }).click();
   await expect(payer.getByText("Paid ✓", { exact: false })).toBeVisible();
@@ -122,7 +122,7 @@ test("request → pay in Dollars (instant) and in CTK via Agora (protected); pai
   const protectedLink = await requestMoney(maris, "2", "Protected");
   await payer.goto(protectedLink);
   await payer.getByText("Test CTK").click();
-  await expect(payer.getByText("Agora Instant Settlement")).toBeVisible();
+  await expect(payer.getByText("Converted to Dollars by Agora")).toBeVisible();
   await expect(payer.getByText("Price valid for")).toBeVisible(); // a real quote arrived
   await payer.getByRole("button", { name: "Pay $2.00 with fingerprint or screen lock" }).click();
   await expect(payer.getByText(`Sent ✓ $2.00 is protected for @${M}`, { exact: false })).toBeVisible();
