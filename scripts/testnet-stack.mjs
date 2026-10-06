@@ -150,6 +150,8 @@ if (PAYOUT) {
     PAYCREST_API_URL: `http://127.0.0.1:${P.paycrest}`, PAYCREST_API_KEY: SIM_PAYCREST.key, PAYCREST_API_SECRET: SIM_PAYCREST.secret,
     // the simulated provider takes test AUSD on Monad testnet (mainnet: USDC on Base via CCTP, docs/PAYOUT.md §5)
     PAYOUT_SOURCE_NETWORK: "sim-monad-testnet", PAYOUT_SOURCE_CURRENCY: "AUSD", PAYOUT_SIMULATED: "1",
+    // the per-IP cap protects REAL bank-name lookups; the simulated provider returns test names, so E2E runs get room
+    VERIFICATIONS_PER_IP_PER_DAY: "500",
   });
 }
 
