@@ -21,6 +21,9 @@ contract EverpieceEarnMainnetForkTest is Test {
     );
     bytes32 constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     uint256 constant PK = 0xE4A1;
+    /// Relayer gas limits (server/relayer config + test/gasLimits.test.ts). Monad charges the full limit.
+    uint256 constant LIMIT_EARN_DEPOSIT = 800_000;
+    uint256 constant LIMIT_EARN_WITHDRAW = 750_000;
 
     EverpieceEarn earn;
     address owner;
@@ -86,8 +89,8 @@ contract EverpieceEarnMainnetForkTest is Test {
         assertGe(IERC4626(WA_AUSD).convertToAssets(IERC20(WA_AUSD).balanceOf(owner)) + 1, 100e6);
         console2.log("gas deposit", gasDep);
         console2.log("gas withdraw", gasWd);
-        assertLt(gasDep, 800_000); // relayer limit earn.deposit (Monad charges the full limit)
-        assertLt(gasWd, 750_000); // relayer limit earn.withdraw
+        assertLt(gasDep, LIMIT_EARN_DEPOSIT);
+        assertLt(gasWd, LIMIT_EARN_WITHDRAW);
     }
 
     function test_realAave_withdrawAll_liquidityBound() public {

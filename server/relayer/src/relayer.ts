@@ -1,7 +1,7 @@
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, TimeoutError, keccak256, parseEventLogs, type Hex } from "viem";
-import { agoraPairAbi, everpieceEscrowAbi, everpiecePayAbi, PaymentStatus, ausdAbi, tokenFor, type RouteQuote } from "@everpiece/shared";
+import { agoraPairAbi, everpieceEarnAbi, everpieceEscrowAbi, everpiecePayAbi, PaymentStatus, ausdAbi, tokenFor, type RouteQuote } from "@everpiece/shared";
 import { randomUUID } from "node:crypto";
-import { METHODS, PAY_METHODS, type Method, type RelayerConfig } from "./config.ts";
+import { EARN_METHODS, METHODS, PAY_METHODS, type Method, type RelayerConfig } from "./config.ts";
 import { connect, readPayment, relayAbi, startupChecks, type Chain } from "./chain.ts";
 import { prepare, PrecheckError, type EscrowEvent } from "./actions.ts";
 import { Store, type RequestRow } from "./store.ts";
@@ -20,11 +20,15 @@ const EXPECTED: Record<Method, { event: EscrowEvent; status: number }> = {
   refundExpired: { event: "PaymentRefunded", status: PaymentStatus.REFUNDED },
   payWithAusd: { event: "Paid", status: 1 },
   payWithToken: { event: "Paid", status: 1 },
+  earnDeposit: { event: "EarnDeposited", status: 1 },
+  earnWithdraw: { event: "EarnWithdrawn", status: 1 },
 };
 
 const isPay = (m: Method) => PAY_METHODS.includes(m);
 /** EverpiecePay ABI + AUSD errors, so pay simulations decode Agora/AUSD/pay reverts by name. */
 const payRelayAbi = [...everpiecePayAbi, ...ausdAbi.filter((x) => x.type === "error")] as const;
+const isEarn = (m: Method) => EARN_METHODS.includes(m);
+const earnRelayAbi = [...everpieceEarnAbi, ...ausdAbi.filter((x) => x.type === "error")] as const;
 
 /** Sliding-window limiter (in-memory; per process). */
 class RateLimiter {
@@ -93,7 +97,7 @@ export class Relayer {
 
   /** Where a method's transaction goes: fixed by config, never by the client. */
   private targetOf(m: Method) {
-    return isPay(m) ? this.cfg.pay! : this.cfg.escrow;
+    return isEarn(m) ? this.cfg.earn! : isPay(m) ? this.cfg.pay! : this.cfg.escrow;
   }
 
   private now: () => number;
@@ -205,8 +209,8 @@ export class Relayer {
     try {
       await this.chain.client.simulateContract({
         address: prep.target,
-        abi: isPay(prep.method) ? payRelayAbi : relayAbi,
-        functionName: prep.method,
+        abi: isEarn(prep.method) ? earnRelayAbi : isPay(prep.method) ? payRelayAbi : relayAbi,
+        functionName: prep.fn ?? prep.method,
         args: prep.args,
         account: this.address,
         gas: gasLimit,
@@ -347,7 +351,8 @@ export class Relayer {
     if (r.included_block !== receipt.blockNumber.toString()) this.store.update(r.id, { included_block: receipt.blockNumber.toString() });
     if (receipt.blockNumber > finalized) return; // included, maybe executed speculatively — not final yet
 
-    if (isPay(r.method)) return this.reconcilePay(r, receipt);
+    if (isPay(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.pay!, everpiecePayAbi, "Paid");
+    if (isEarn(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.earn!, everpieceEarnAbi, EXPECTED[r.method].event as "EarnDeposited" | "EarnWithdrawn");
     const payment = await readPayment(this.cfg, this.chain, r.payment_id as Hex, "finalized");
     const chainStatus = Number(payment.status);
     const gasUsed = receipt.gasUsed.toString();
@@ -362,7 +367,7 @@ export class Relayer {
     const events = parseEventLogs({
       abi: everpieceEscrowAbi,
       logs: receipt.logs.filter((l) => l.address.toLowerCase() === this.cfg.escrow.toLowerCase()),
-      eventName: expected.event as Exclude<EscrowEvent, "Paid">,
+      eventName: expected.event as Exclude<EscrowEvent, "Paid" | "EarnDeposited" | "EarnWithdrawn">,
     }) as unknown as { args: { paymentId: Hex } }[];
     const eventOk = events.some((ev) => ev.args.paymentId.toLowerCase() === r.payment_id.toLowerCase());
     // create: the payment may already have moved on by finality (claimed/cancelled) — it must at least exist.
@@ -377,23 +382,32 @@ export class Relayer {
     }
   }
 
-  /** Instant payments: CONFIRMED only with status 1, the Paid event for this id from EverpiecePay, and settled(id) at "finalized". */
-  private async reconcilePay(r: RequestRow, receipt: Awaited<ReturnType<typeof this.chain.client.getTransactionReceipt>>): Promise<void> {
+  /**
+   * Settle-once contracts (EverpiecePay, EverpieceEarn): CONFIRMED only with receipt status 1, the expected event for
+   * this id from that contract, and settled(id) at "finalized".
+   */
+  private async reconcileSettleOnce(
+    r: RequestRow,
+    receipt: Awaited<ReturnType<typeof this.chain.client.getTransactionReceipt>>,
+    contract: Hex,
+    abi: typeof everpiecePayAbi | typeof everpieceEarnAbi,
+    eventName: "Paid" | "EarnDeposited" | "EarnWithdrawn",
+  ): Promise<void> {
     const gasUsed = receipt.gasUsed.toString();
-    const settled = await this.chain.client.readContract({
-      address: this.cfg.pay!, abi: everpiecePayAbi, functionName: "settled", args: [r.payment_id as Hex], blockTag: "finalized",
-    });
+    const settled = (await this.chain.client.readContract({
+      address: contract, abi, functionName: "settled", args: [r.payment_id as Hex], blockTag: "finalized",
+    } as Parameters<typeof this.chain.client.readContract>[0])) as boolean;
     if (receipt.status !== "success") {
       this.store.update(r.id, { status: "FAILED", error: "RevertedOnChain", gas_used: gasUsed, chain_status: settled ? 1 : 0 });
       log("warn", "relayer.reverted_on_chain", { id: r.id, hash: r.tx_hash });
       return;
     }
     const events = parseEventLogs({
-      abi: everpiecePayAbi,
-      logs: receipt.logs.filter((l) => l.address.toLowerCase() === this.cfg.pay!.toLowerCase()),
-      eventName: "Paid",
-    }) as unknown as { args: { paymentId: Hex } }[];
-    const eventOk = events.some((ev) => ev.args.paymentId.toLowerCase() === r.payment_id.toLowerCase());
+      abi,
+      logs: receipt.logs.filter((l) => l.address.toLowerCase() === contract.toLowerCase()),
+      eventName,
+    } as Parameters<typeof parseEventLogs>[0]) as unknown as { args: { paymentId?: Hex; id?: Hex } }[];
+    const eventOk = events.some((ev) => (ev.args.paymentId ?? ev.args.id ?? "0x").toLowerCase() === r.payment_id.toLowerCase());
     if (eventOk && settled) {
       this.store.update(r.id, { status: "CONFIRMED", error: null, gas_used: gasUsed, chain_status: 1 });
       log("info", "relayer.confirmed", { id: r.id, method: r.method, hash: r.tx_hash, block: receipt.blockNumber, gasUsed });

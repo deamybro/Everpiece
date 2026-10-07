@@ -4,7 +4,7 @@
 set -euo pipefail
 HOST="${1:?usage: push.sh <ssh-host>}"
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
-ART="contracts/out/EverpieceEscrow.sol/EverpieceEscrow.json contracts/out/TestDollar.sol/TestDollar.json contracts/out/EverpiecePay.sol/EverpiecePay.json"
+ART="contracts/out/EverpieceEscrow.sol/EverpieceEscrow.json contracts/out/TestDollar.sol/TestDollar.json contracts/out/EverpiecePay.sol/EverpiecePay.json contracts/out/EverpieceEarn.sol/EverpieceEarn.json contracts/out/TestYieldVault.sol/TestYieldVault.json"
 cd "$ROOT"
 for a in $ART; do [ -f "$a" ] || { echo "missing $a: run forge build in contracts/" >&2; exit 1; }; done
 [ -z "$(git status --porcelain -- . ':!docs')" ] || echo "warning: uncommitted changes are NOT shipped (git archive HEAD)" >&2
@@ -20,6 +20,8 @@ ssh "$HOST" 'cd /opt/everpiece && [ -s .env ] || { umask 077; r() { head -c 24 /
 ssh "$HOST" 'cd /opt/everpiece && grep -q "^TESTNET_PAYOUT_ENC_KEY=" .env || { umask 077; printf "TESTNET_PAYOUT_ENC_KEY=0x%s
 " "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " 
 ")" >> .env; }'
+# Automate's trigger-intake key: generated once on the host (0600 .env), kept across deploys.
+ssh "$HOST" 'cd /opt/everpiece && grep -q "^TESTNET_AUTOMATE_KEY=" .env || { umask 077; printf "TESTNET_AUTOMATE_KEY=%s\n" "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n")" >> .env; }'
 # One image at a time: image builds are not under the containers' memory caps.
 ssh "$HOST" 'cd /opt/everpiece && docker compose build stack && docker compose build indexer && docker compose up -d --force-recreate'
 echo "shipped $REV → $HOST:/opt/everpiece (docker compose project everpiece-test)"

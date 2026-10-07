@@ -3,8 +3,10 @@ import { AURORA_API_URL, AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID,
 import type { FundingConfig } from "./funding.ts";
 
 /** The only methods this relayer will ever submit (master §26.2 — no arbitrary calldata): escrow + EverpiecePay. */
-export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken"] as const;
+export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken", "earnDeposit", "earnWithdraw"] as const;
 export const PAY_METHODS: readonly Method[] = ["payWithAusd", "payWithToken"];
+/** EverpieceEarn (docs/EARN.md): gasless deposits/withdrawals into verified AUSD vaults; settle-once like EverpiecePay. */
+export const EARN_METHODS: readonly Method[] = ["earnDeposit", "earnWithdraw"];
 export type Method = (typeof METHODS)[number];
 
 export type RelayerConfig = {
@@ -13,6 +15,8 @@ export type RelayerConfig = {
   escrow: Address;
   /** EverpiecePay (instant payments). Optional: without it the pay methods are refused. */
   pay?: Address;
+  /** EverpieceEarn (gasless Earn deposits/withdrawals). Optional: without it the earn methods are refused. */
+  earn?: Address;
   ausd: Address;
   /** EIP-712 name of the dollar token's domain: "Agora Dollar" (AUSD) by default, "Everpiece Test Dollar" on testnet. */
   ausdEip712Name?: string;
@@ -83,6 +87,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
     escrow: address(env, "ESCROW_ADDRESS"),
     pay: env.PAY_ADDRESS ? address(env, "PAY_ADDRESS") : undefined,
+    earn: env.EARN_ADDRESS ? address(env, "EARN_ADDRESS") : undefined,
     ausd: address(env, "AUSD_ADDRESS", AUSD_ADDRESS),
     ausdEip712Name: env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
     relayerPrivateKey: key,
@@ -100,6 +105,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       refundExpired: big(env, "GAS_LIMIT_REFUND", 155_000n), // ≤ 138,273
       payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 280_000n), // ≤ 255,331 (live testnet: 223,216)
       payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 550_000n), // ≤ 520,398 USDC on mainnet; 449,716 CTK on testnet (live: 400,622)
+      // EverpieceEarnFork.t.sol, real Aave waMonAUSD, cold state: deposit 660,269, withdraw 595,649
+      earnDeposit: big(env, "GAS_LIMIT_EARN_DEPOSIT", 800_000n),
+      earnWithdraw: big(env, "GAS_LIMIT_EARN_WITHDRAW", 750_000n),
     },
     maxFeePerGasWei: big(env, "MAX_FEE_PER_GAS_WEI", parseGwei("500")),
     priorityFeeWei: big(env, "PRIORITY_FEE_WEI", parseGwei("2")), // Monad RPC suggests 2 gwei (VERIFIED §1.14)

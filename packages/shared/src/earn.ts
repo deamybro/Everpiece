@@ -1,7 +1,7 @@
 // Everpiece Earn (docs/EARN.md): verified AUSD ERC-4626 vaults reached gaslessly through EverpieceEarn, and the
 // principal/yield accounting Automate relies on ("Earn → Invest never touches principal"). Amounts: bigint base units.
-import { type Address, type Hex } from "viem";
-import { MONAD_MAINNET_CHAIN_ID } from "./constants.ts";
+import { hashTypedData, type Address, type Hex } from "viem";
+import { AUSD_EIP712_NAME, AUSD_EIP712_VERSION, MONAD_MAINNET_CHAIN_ID } from "./constants.ts";
 
 export const MONAD_TESTNET_CHAIN_ID_EARN = 10143;
 
@@ -97,6 +97,25 @@ export const earnDepositTyped = (earn: Address, chainId: number, d: EarnDeposit)
   ({ domain: earnDomain(earn, chainId), types: { Deposit: earnTypes.Deposit }, primaryType: "Deposit" as const, message: d });
 export const earnWithdrawalTyped = (earn: Address, chainId: number, w: EarnWithdrawal) =>
   ({ domain: earnDomain(earn, chainId), types: { Withdrawal: earnTypes.Withdrawal }, primaryType: "Withdrawal" as const, message: w });
+
+/** The deposit id: EIP-712 digest of every Deposit term; also the AUSD ERC-3009 nonce (binds vault/amount/minShares). */
+export const earnDepositId = (earn: Address, chainId: number, d: EarnDeposit): Hex => hashTypedData(earnDepositTyped(earn, chainId, d));
+export const earnWithdrawalId = (earn: Address, chainId: number, w: EarnWithdrawal): Hex => hashTypedData(earnWithdrawalTyped(earn, chainId, w));
+
+/** What the owner signs to fund a deposit: AUSD ReceiveWithAuthorization to EverpieceEarn, nonce = deposit id. */
+export function earnAusdAuthorization(earn: Address, chainId: number, d: EarnDeposit, ausd: Address, ausdName: string = AUSD_EIP712_NAME) {
+  return {
+    domain: { name: ausdName, version: AUSD_EIP712_VERSION, chainId, verifyingContract: ausd },
+    types: {
+      ReceiveWithAuthorization: [
+        { name: "from", type: "address" }, { name: "to", type: "address" }, { name: "value", type: "uint256" },
+        { name: "validAfter", type: "uint256" }, { name: "validBefore", type: "uint256" }, { name: "nonce", type: "bytes32" },
+      ],
+    },
+    primaryType: "ReceiveWithAuthorization" as const,
+    message: { from: d.owner, to: earn, value: d.assets, validAfter: 0n, validBefore: d.deadline, nonce: earnDepositId(earn, chainId, d) },
+  } as const;
+}
 
 /** ERC-2612 permit on the vault's shares (Aave waMonAUSD: "Wrapped Aave Monad AUSD" v1; test vault: its own name). */
 export const sharePermitTyped = (vault: { address: Address; eip712Name: string }, chainId: number, owner: Address, spender: Address, value: bigint, nonce: bigint, deadline: bigint) => ({

@@ -12,6 +12,8 @@ const ROUTES: Record<string, Method> = {
   "/v1/payments/refund": "refundExpired",
   "/v1/pay/ausd": "payWithAusd",
   "/v1/pay/token": "payWithToken",
+  "/v1/earn/deposit": "earnDeposit",
+  "/v1/earn/withdraw": "earnWithdraw",
 };
 
 class HttpError extends Error {

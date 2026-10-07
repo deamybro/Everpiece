@@ -35,12 +35,17 @@ const REAL_AUSD = DOLLAR === AUSD_TESTNET_ADDRESS;
 const DOLLAR_NAME = REAL_AUSD ? AUSD_EIP712_NAME : TEST_DOLLAR_EIP712_NAME;
 const PAY = process.env.TESTNET_PAY_ADDRESS ? getAddress(process.env.TESTNET_PAY_ADDRESS) : "";
 const PAY_BLOCK = Number(process.env.TESTNET_PAY_BLOCK || ESCROW_BLOCK);
+// Earn (docs/EARN.md): EverpieceEarn + the SIMULATED-yield TestYieldVault (Aave has no Monad testnet deployment).
+const EARN = process.env.TESTNET_EARN_ADDRESS ? getAddress(process.env.TESTNET_EARN_ADDRESS) : "";
+const EARN_VAULT = process.env.TESTNET_EARN_VAULT_ADDRESS ? getAddress(process.env.TESTNET_EARN_VAULT_ADDRESS) : "";
+// Automate (docs/AUTOMATE.md): needs its internal key from the host .env (generated once by push.sh).
+const AUTOMATE = Boolean(process.env.TESTNET_AUTOMATE_KEY);
 // @usernames and message keys are signed in a domain whose verifyingContract was the first escrow: keep it pinned.
 const DIRECTORY_DOMAIN = process.env.TESTNET_DIRECTORY_DOMAIN ? getAddress(process.env.TESTNET_DIRECTORY_DOMAIN) : ESCROW;
 const DATA = env("STACK_DATA_DIR", "/data");
 const BIND = env("STACK_BIND_HOST", "0.0.0.0");
 const INFO_FILE = process.env.STACK_INFO_FILE;
-const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, aurora: 8792, payout: 8793, paycrest: 8794, web: 3000 };
+const P = { relayer: 8787, claims: 8788, directory: 8789, faucet: 8790, voice: 8791, aurora: 8792, payout: 8793, paycrest: 8794, automate: 8795, web: 3000 };
 // Last mile (docs/PAYOUT.md): the payout server + a SIMULATED Paycrest (scripts/paycrest-sim.mjs; Paycrest is mainnet-only).
 const PAYOUT = Boolean(PAY && process.env.TESTNET_PAYOUT_ENC_KEY);
 const SIM_PAYCREST = { key: randomBytes(16).toString("hex"), secret: randomBytes(32).toString("hex") };
@@ -112,6 +117,9 @@ writeFileSync(
     `NEXT_PUBLIC_FUNDING=${PAY ? "simulated" : "off"}`,
     `NEXT_PUBLIC_PAYOUT_URL=${PAYOUT ? `${ORIGIN}/payout-api` : ""}`,
     `NEXT_PUBLIC_PAYOUT_SIMULATED=${PAYOUT ? "1" : ""}`,
+    `NEXT_PUBLIC_EARN_ADDRESS=${EARN && EARN_VAULT ? EARN : ""}`,
+    `NEXT_PUBLIC_EARN_VAULT_ADDRESS=${EARN && EARN_VAULT ? EARN_VAULT : ""}`,
+    `NEXT_PUBLIC_AUTOMATE_URL=${AUTOMATE ? `${ORIGIN}/automate-api` : ""}`,
     "NEXT_PUBLIC_NETWORK_LABEL=Monad testnet",
     "NEXT_PUBLIC_EXPLORER_URL=https://testnet.monadscan.com", // VERIFIED §4.9
     "",
@@ -119,14 +127,14 @@ writeFileSync(
 );
 const nextBin = join(root, "node_modules/next/dist/bin/next");
 say("building the web app (next build)…");
-const b = spawnSync(process.execPath, [nextBin, "build", "--webpack"], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", ...(PAYOUT ? { PAYOUT_INTERNAL_URL: `http://127.0.0.1:${P.payout}` } : {}) } });
+const b = spawnSync(process.execPath, [nextBin, "build", "--webpack"], { cwd: join(root, "web"), stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", ...(PAYOUT ? { PAYOUT_INTERNAL_URL: `http://127.0.0.1:${P.payout}` } : {}), ...(AUTOMATE ? { AUTOMATE_INTERNAL_URL: `http://127.0.0.1:${P.automate}` } : {}) } });
 if (b.status !== 0) throw new Error("next build failed");
 
 // 2. services, with persistent keys and databases
 const common = { MONAD_RPC: RPC, EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_ID), ESCROW_ADDRESS: ESCROW, ALLOWED_ORIGIN: ORIGIN, LOG_LEVEL: "info", HOST: BIND, TRUST_PROXY: "1" };
 run("relayer", ["server/relayer/src/main.ts"], {
   ...common, RELAYER_PRIVATE_KEY: env("TESTNET_RELAYER_KEY"), RELAYER_DB_PATH: join(DATA, "relayer.sqlite"), PORT: String(P.relayer),
-  AUSD_ADDRESS: DOLLAR, DOLLAR_EIP712_NAME: DOLLAR_NAME, ...(PAY ? { PAY_ADDRESS: PAY } : {}), MIN_RELAYER_BALANCE_WEI: String(2n * 10n ** 17n), // 0.2 MON
+  AUSD_ADDRESS: DOLLAR, DOLLAR_EIP712_NAME: DOLLAR_NAME, ...(PAY ? { PAY_ADDRESS: PAY } : {}), ...(EARN && EARN_VAULT ? { EARN_ADDRESS: EARN } : {}), MIN_RELAYER_BALANCE_WEI: String(2n * 10n ** 17n), // 0.2 MON
   ...(PAY ? { AURORA_API_KEY: "simulated-testnet", AURORA_API_URL: `http://127.0.0.1:${P.aurora}/api`, AURORA_DESTINATION_TOKEN: CTK_TESTNET_ADDRESS } : {}),
 });
 const twilio = process.env.TWILIO_API_USER && process.env.TWILIO_API_SECRET && process.env.TWILIO_VERIFY_SERVICE_SID;
@@ -143,6 +151,12 @@ run("directory", ["server/directory/src/main.ts"], {
 });
 
 run("voice", ["server/voice/src/main.ts"], { ...common, VOICE_DB_PATH: join(DATA, "voice.sqlite"), PORT: String(P.voice) });
+if (AUTOMATE) {
+  run("automate", ["server/automate/src/main.ts"], {
+    EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_ID), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN, PORT: String(P.automate), HOST: "127.0.0.1",
+    AUTOMATE_DB: join(DATA, "automate.sqlite"), AUTOMATE_INTERNAL_KEY: process.env.TESTNET_AUTOMATE_KEY, TRUST_PROXY: "1", LOG_LEVEL: "info",
+  });
+}
 if (PAYOUT) {
   run("payout", ["server/payout/src/main.ts"], {
     EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_ID), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN, PORT: String(P.payout), HOST: "127.0.0.1",

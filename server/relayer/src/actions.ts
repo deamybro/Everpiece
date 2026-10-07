@@ -15,10 +15,15 @@ import {
   tokenFor,
   linkClaimIntent,
   paymentIdOf,
+  earnAusdAuthorization,
+  earnDepositId,
+  earnWithdrawalId,
+  earnWithdrawalTyped,
+  everpieceEarnAbi,
 } from "@everpiece/shared";
 import type { Method, RelayerConfig } from "./config.ts";
 import { readPayment, type Chain } from "./chain.ts";
-import { parseCancel, parseClaimLink, parseClaimUsername, parseCreate, parsePayAusd, parsePayToken, parseRefund } from "./validate.ts";
+import { parseCancel, parseClaimLink, parseClaimUsername, parseCreate, parseEarnDeposit, parseEarnWithdraw, parsePayAusd, parsePayToken, parseRefund } from "./validate.ts";
 
 /** Refused before any RPC-costly step; `code` is returned to the client. */
 export class PrecheckError extends Error {
@@ -31,10 +36,12 @@ export class PrecheckError extends Error {
   }
 }
 
-export type EscrowEvent = "PaymentCreated" | "PaymentClaimed" | "PaymentCancelled" | "PaymentRefunded" | "Paid";
+export type EscrowEvent = "PaymentCreated" | "PaymentClaimed" | "PaymentCancelled" | "PaymentRefunded" | "Paid" | "EarnDeposited" | "EarnWithdrawn";
 
 export type Prepared = {
   method: Method;
+  /** Contract function name when it differs from the relayer method (EverpieceEarn: deposit / withdraw). */
+  fn?: string;
   args: readonly unknown[];
   data: Hex;
   signer: Address | null;
@@ -65,6 +72,10 @@ async function signedBy(expected: Address, typed: Parameters<typeof recoverTyped
 }
 
 function encode(method: Method, args: readonly unknown[]): Hex {
+  if (method === "earnDeposit" || method === "earnWithdraw") {
+    const functionName = method === "earnDeposit" ? "deposit" : "withdraw";
+    return encodeFunctionData({ abi: everpieceEarnAbi, functionName, args } as Parameters<typeof encodeFunctionData>[0]);
+  }
   const abi = method === "payWithAusd" || method === "payWithToken" ? everpiecePayAbi : everpieceEscrowAbi;
   return encodeFunctionData({ abi, functionName: method, args } as Parameters<typeof encodeFunctionData>[0]);
 }
@@ -176,6 +187,35 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
         method, args, data: encode(method, args), signer: payment.sender, paymentId, idemKey: `${method}:${paymentId}`,
         expectedEvent: "Paid", expectedStatus: 1, target: cfg.pay,
         money: { sender: payment.sender, recipient: payment.recipient, amount: payment.amount, sourceToken: payment.sourceToken, route: "AGORA_INSTANT_SETTLEMENT", mode: "INSTANT" },
+      };
+    }
+
+    // Earn: the owner's own money into / out of the owner's own position (EverpieceEarn hard-wires shares and assets
+    // to the owner). The vault list is fixed in the contract; simulation refuses any other vault.
+    case "earnDeposit": {
+      if (!cfg.earn) throw new PrecheckError(503, "EarnUnavailable");
+      const { deposit, ausdSignature } = parseEarnDeposit(body);
+      if (deposit.assets < cfg.minPaymentAmount) throw new PrecheckError(422, "BelowMinimumPayment");
+      const auth = earnAusdAuthorization(cfg.earn, chainId, deposit, cfg.ausd, cfg.ausdEip712Name);
+      if (!(await signedBy(deposit.owner, { ...auth, signature: ausdSignature }))) throw new PrecheckError(401, "InvalidFundingSignature");
+      const id = earnDepositId(cfg.earn, chainId, deposit);
+      const args = [deposit, ausdSignature] as const;
+      return {
+        method, fn: "deposit", args, data: encode(method, args), signer: deposit.owner, paymentId: id, idemKey: `${method}:${id}`,
+        expectedEvent: "EarnDeposited", expectedStatus: 1, target: cfg.earn,
+      };
+    }
+
+    case "earnWithdraw": {
+      if (!cfg.earn) throw new PrecheckError(503, "EarnUnavailable");
+      const { withdrawal, ownerSignature, permit } = parseEarnWithdraw(body);
+      const typed = earnWithdrawalTyped(cfg.earn, chainId, withdrawal);
+      if (!(await signedBy(withdrawal.owner, { ...typed, signature: ownerSignature }))) throw new PrecheckError(401, "InvalidOwnerSignature");
+      const id = earnWithdrawalId(cfg.earn, chainId, withdrawal);
+      const args = [withdrawal, ownerSignature, permit.v, permit.r, permit.s] as const;
+      return {
+        method, fn: "withdraw", args, data: encode(method, args), signer: withdrawal.owner, paymentId: id, idemKey: `${method}:${id}`,
+        expectedEvent: "EarnWithdrawn", expectedStatus: 1, target: cfg.earn,
       };
     }
   }

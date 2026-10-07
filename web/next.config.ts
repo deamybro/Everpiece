@@ -5,9 +5,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Last-mile payouts (docs/PAYOUT.md): the payout server is reached through the app's own origin on stacks that run
   // it next to the web (PAYOUT_INTERNAL_URL at build time), so no extra public route is needed on the host.
+  // Automate (docs/AUTOMATE.md) the same way; only the owner-facing routes are proxied: trigger intake stays internal.
   async rewrites() {
-    const target = process.env.PAYOUT_INTERNAL_URL;
-    return target ? [{ source: "/payout-api/:path*", destination: `${target}/:path*` }] : [];
+    const payout = process.env.PAYOUT_INTERNAL_URL;
+    const automate = process.env.AUTOMATE_INTERNAL_URL;
+    return [
+      ...(payout ? [{ source: "/payout-api/:path*", destination: `${payout}/:path*` }] : []),
+      ...(automate ? [{ source: "/automate-api/v1/automate/:kind(rules|executions|legs)/:path*", destination: `${automate}/v1/automate/:kind/:path*` }, { source: "/automate-api/v1/automate/legs", destination: `${automate}/v1/automate/legs` }, { source: "/automate-api/v1/automate/rules", destination: `${automate}/v1/automate/rules` }] : []),
+    ];
   },
   async headers() {
     return [

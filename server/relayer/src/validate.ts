@@ -188,3 +188,30 @@ export function parseQuote(body: unknown): QuoteParams {
   const o = obj(body, "body", ["sellToken", "buyAmount", "recipient", "sender"]);
   return { sellToken: addr(o.sellToken, "sellToken"), buyAmount: u256(o.buyAmount, "buyAmount"), recipient: addr(o.recipient, "recipient"), sender: addr(o.sender, "sender") };
 }
+
+export type EarnDepositParams = { deposit: { ref: Hex; owner: Address; vault: Address; assets: bigint; minShares: bigint; deadline: bigint }; ausdSignature: Hex };
+export function parseEarnDeposit(body: unknown): EarnDepositParams {
+  const o = obj(body, "body", ["deposit", "ausdSignature"]);
+  const d = obj(o.deposit, "deposit", ["ref", "owner", "vault", "assets", "minShares", "deadline"]);
+  return {
+    deposit: { ref: b32(d.ref, "deposit.ref"), owner: addr(d.owner, "deposit.owner"), vault: addr(d.vault, "deposit.vault"), assets: u256(d.assets, "deposit.assets"), minShares: u256(d.minShares, "deposit.minShares"), deadline: u256(d.deadline, "deposit.deadline") },
+    ausdSignature: sig(o.ausdSignature, "ausdSignature"),
+  };
+}
+
+export type EarnWithdrawParams = {
+  withdrawal: { ref: Hex; owner: Address; vault: Address; assets: bigint; maxShares: bigint; deadline: bigint };
+  ownerSignature: Hex;
+  permit: { v: number; r: Hex; s: Hex };
+};
+export function parseEarnWithdraw(body: unknown): EarnWithdrawParams {
+  const o = obj(body, "body", ["withdrawal", "ownerSignature", "permit"]);
+  const w = obj(o.withdrawal, "withdrawal", ["ref", "owner", "vault", "assets", "maxShares", "deadline"]);
+  const pm = obj(o.permit, "permit", ["v", "r", "s"]);
+  if (pm.v !== 27 && pm.v !== 28) throw new ValidationError("permit.v: 27 or 28");
+  return {
+    withdrawal: { ref: b32(w.ref, "withdrawal.ref"), owner: addr(w.owner, "withdrawal.owner"), vault: addr(w.vault, "withdrawal.vault"), assets: u256(w.assets, "withdrawal.assets"), maxShares: u256(w.maxShares, "withdrawal.maxShares"), deadline: u256(w.deadline, "withdrawal.deadline") },
+    ownerSignature: sig(o.ownerSignature, "ownerSignature"),
+    permit: { v: pm.v, r: b32(pm.r, "permit.r"), s: b32(pm.s, "permit.s") },
+  };
+}
