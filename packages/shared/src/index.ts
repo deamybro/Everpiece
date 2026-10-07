@@ -10,3 +10,4 @@ export * from "./messageKey.ts";
 export * from "./pay.ts";
 export * from "./funding.ts";
 export * from "./payout.ts";
+export * from "./automate.ts";

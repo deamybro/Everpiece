@@ -8,6 +8,7 @@
     "server/directory",
     "server/voice",
     "server/payout",
+    "server/automate",
     "web"
   ],
   "engines": {
