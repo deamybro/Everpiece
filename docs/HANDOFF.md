@@ -4,6 +4,23 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 33 — 2026-10-07 — Live E2E all green; Kuru × aStocks verification (NOT_AVAILABLE)
+
+- **E2E on `62952fc`, all green:**
+  - `payout`, `add` (server);
+  - `username` (incl. instant), `history`, `request`, `message` ×2 (PC);
+  - **new** test: pay a request from another chain (`061e4e4`).
+- **Owner request:** verify on live mainnet whether Anchored aStocks (aNVDA/aAAPL/aMSFT) can be bought through Kuru; do not implement Invest.
+- **Result: `KURU_ASTOCK_EXECUTION = NOT_AVAILABLE`** (`docs/INTEGRATION_VERIFICATION.md`, VERIFIED §4.16, `evidence/kuru-astocks-2026-10-07/`):
+  - No Kuru market for any aStock: exchangeInfo API (7 markets) and all 597 on-chain `MarketRegistered` events; `verifiedMarket` checked for every API market.
+  - Kuru Flow: no route for aAAPL/aMSFT.
+  - aNVDA routes only through non-Kuru pools and a ~0.5-aNVDA Uniswap v4 pool, at +25.8% ($5) to +53.1% ($25) over NVDA $239.24, with a ~10% buy/sell gap. The $10 build reverts in fork simulation. **Rejected.**
+  - Nothing broadcast. **No `KuruInvestmentProvider` created** (the condition was a valid route).
+- **Open:** `TODO(VERIFY)` 1 aStock = 1 share (Anchored's own docs); a re-check trigger is defined in the doc.
+- **Still due:** the O12 refund check after 10:11 UTC today; push once the owner logs in to GitHub.
+
+---
+
 ## Session 32 — 2026-10-06 — Real-phone feedback: instant @username, receipts, QR, Slush-style UI, pay from any chain
 
 - **Owner on a real phone:**

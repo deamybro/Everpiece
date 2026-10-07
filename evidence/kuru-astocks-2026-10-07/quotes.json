@@ -1,0 +1,419 @@
+[
+ {
+  "label": "CONTROL USDC->MON $10",
+  "at": "2026-10-06T23:52:39.888Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x0000000000000000000000000000000000000000",
+   "amount": "10000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "352016094585991972565",
+   "minOut": "350326417331979211096",
+   "transaction": {
+    "calldata": "ce1e70300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012fdc174745bded158000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb603000000000000000000000000000000000000000000000000000000000098968000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000c002754704bc059f8c67012fed69bc8a327a5aafb603034d6c01659bd0bc4167ba25c62e05656f78043e7ed4a9da001fae075afd3ec861f6104af26e8755abcc1f876de776200092e501e84765b4e2634f3bd8a91c89e432f6b81f0647bc00013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000100000000efe302beaa2b3e6e1b18d08d69a9012a01ffff01d5b70d70cbe6c42bcd1aaa662a21673a83f4615b01013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff0200",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "103.00",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "153.00",
+    "extreme": "180.00"
+   }
+  }
+ },
+ {
+  "label": "USDC->aNVDA $5",
+  "at": "2026-10-06T23:52:42.977Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x701193374879131f923532987c7ef363a91a80eb",
+   "amount": "5000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "16625627097459321",
+   "minOut": "16572425090747451",
+   "transaction": {
+    "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000003ae0886699cc3b000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000004c4b4000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000db02754704bc059f8c67012fed69bc8a327a5aafb60302c0700163e48b725540a3db24acf6682a29f877808c53f2003f8f075afd3ec861f6104af26e8755abcc1f876de7762000013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.50",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "153.00",
+    "extreme": "180.00"
+   }
+  }
+ },
+ {
+  "label": "USDC->aNVDA $10",
+  "at": "2026-10-06T23:52:45.003Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x701193374879131f923532987c7ef363a91a80eb",
+   "amount": "10000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "31531376641964885",
+   "minOut": "31430476236710597",
+   "transaction": {
+    "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000006fa9da0335e2c5000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb603000000000000000000000000000000000000000000000000000000000098968000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000db02754704bc059f8c67012fed69bc8a327a5aafb60302e0370163e48b725540a3db24acf6682a29f877808c53f2001fc8075afd3ec861f6104af26e8755abcc1f876de7762000013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.00",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "130.00",
+    "extreme": "180.00"
+   }
+  }
+ },
+ {
+  "label": "USDC->aNVDA $25",
+  "at": "2026-10-06T23:52:47.066Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x701193374879131f923532987c7ef363a91a80eb",
+   "amount": "25000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "68268111247242981",
+   "minOut": "68049653291251803",
+   "transaction": {
+    "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb00000000000000000000000000000000000000000000000000f1c2cc9383785b000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000017d784000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000db02754704bc059f8c67012fed69bc8a327a5aafb60302f3480163e48b725540a3db24acf6682a29f877808c53f2000cb7075afd3ec861f6104af26e8755abcc1f876de7762000013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.00",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "153.00",
+    "extreme": "180.00"
+   }
+  }
+ },
+ {
+  "label": "USDC->aAAPL $5",
+  "at": "2026-10-06T23:52:49.105Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "amount": "5000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "USDC->aAAPL $10",
+  "at": "2026-10-06T23:52:51.060Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "amount": "10000000"
+  },
+  "http": 502,
+  "body": "<!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 8]>    <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if gt IE 8]><!--> <html class=\"no-js\" lang=\"en-US\"> <!--<![endif]-->\n<head>\n\n<title>kuru.io | 502: Bad gateway</title>\n<meta charset=\"UTF-8\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\" />\n<meta name=\"robots\" content=\"noindex, nofollow\" />\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />\n<link rel=\"stylesheet\" id=\"cf_styles-css\" href=\"/cdn-cgi/styles/main.css\" />\n</head>\n<body>\n<div id=\"cf-wrapper\">\n    <div id=\"cf-error-details\" class=\"p-0\">\n        <header class=\"mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-8\">\n            <h1 class=\"inline-block sm:block sm:mb-2 font-light text-60 lg:text-4xl text-black-dark leading-tight mr-2\">\n                <span class=\"inline-block\">Bad gateway</span>\n                <span class=\"code-label\">Error code 502</span>\n            </h1>\n            <div>\n                Visit <a href=\"https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&utm_campaign=ws.kuru.io\" target=\"_blank\" rel=\"noopener noreferrer\">cloudflare.com</a> for more information.\n            </div>\n            <div class=\"mt-3\">2026-10-06 23:53:25 UTC</div>\n        </header>\n        <div class=\"my-8 bg-gradient-gray\">\n            <div class=\"w-240 lg:w-full mx-auto\">\n                <div class=\"clearfix md:px-8\">\n                    <div id=\"cf-browser-status\" class=\" relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center\">\n  <div class=\"relative mb-10 md:m-0\">\n    \n    <span class=\"cf-icon-browser block md:hidden h-20 bg-center bg-no-repeat\"></span>\n    <span class=\"cf-icon-ok w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4\"></span>\n    \n  </div>\n  <span class=\"md:block w-full truncate\">You</span>\n  <h3 class=\"md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3\">\n  \n    Browser\n  \n  </h3>\n  \n  <span class=\"leading-1.3 text-2xl text-green-success\">Working</span>\n  \n</div>\n                    <div id=\"cf-cloudflare-status\" class=\" relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center\">\n  <div class=\"relative mb-10 md:m-0\">\n    <a href=\"https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&#38;utm_campaign=ws.kuru.io\" target=\"_blank\" rel=\"noopener noreferrer\">\n    <span class=\"cf-icon-cloud block md:hidden h-20 bg-center bg-no-repeat\"></span>\n    <span class=\"cf-icon-ok w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4\"></span>\n    </a>\n  </div>\n  <span class=\"md:block w-full truncate\">Amsterdam</span>\n  <h3 class=\"md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3\">\n  <a href=\"https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&utm_campaign=ws.kuru.io\" target=\"_blank\" rel=\"noopener noreferrer\">\n    Cloudflare\n  </a>\n  </h3>\n  \n  <span class=\"leading-1.3 text-2xl text-green-success\">Working</span>\n  \n</div>\n                    <div id=\"cf-host-status\" class=\"cf-error-source relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center\">\n  <div class=\"relative mb-10 md:m-0\">\n    \n    <span class=\"cf-icon-server block md:hidden h-20 bg-center bg-no-repeat\"></span>\n    <span class=\"cf-icon-error w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4\"></span>\n    \n  </div>\n  <span class=\"md:block w-full truncate\">ws.kuru.io</span>\n  <h3 class=\"md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3\">\n  \n    Host\n  \n  </h3>\n  \n  <span class=\"leading-1.3 text-2xl text-red-error\">Error</span>\n  \n</div>\n                </div>\n            </div>\n        </div>\n\n        <div class=\"w-240 lg:w-full mx-auto mb-8 lg:px-8\">\n            <div class=\"clearfix\">\n                <div class=\"w-1/2 md:w-full float-left pr-6 md:pb-10 md:pr-0 leading-relaxed\">\n                    <h2 class=\"text-3xl font-normal leading-1.3 mb-4\">What happened?</h2>\n                    <p>The web server reported a bad gateway error.</p>\n                </div>\n                <div class=\"w-1/2 md:w-full float-left leading-relaxed\">\n                    <h2 class=\"text-3xl font-normal leading-1.3 mb-4\">What can I do?</h2>\n                    <p class=\"mb-6\">Please try again in a few minutes.</p>\n                </div>\n            </div>\n        </div>\n\n        <div class=\"cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300\">\n    <p class=\"text-13\">\n      <span class=\"cf-footer-item sm:block sm:mb-1\">Cloudflare Ray ID: <strong class=\"font-semibold\">a46895078d34acfd</strong></span>\n      <span class=\"cf-footer-separator sm:hidden\">&bull;</span>\n      <span id=\"cf-footer-item-ip\" class=\"cf-footer-item hidden sm:block sm:mb-1\">\n        Your IP:\n        <button type=\"button\" id=\"cf-footer-ip-reveal\" class=\"cf-footer-ip-reveal-btn\">Click to reveal</button>\n        <span class=\"hidden\" id=\"cf-footer-ip\">185.107.56.212</span>\n        <span class=\"cf-footer-separator sm:hidden\">&bull;</span>\n      </span>\n      <span class=\"cf-footer-item sm:block sm:mb-1\"><span>Performance &amp; security by</span> <a rel=\"noopener noreferrer\" href=\"https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&#38;utm_campaign=ws.kuru.io\" id=\"brand_link\" target=\"_blank\">Cloudflare</a></span>\n      \n    </p>\n    <script>(function(){function d(){var b=a.getElementById(\"cf-footer-item-ip\"),c=a.getElementById(\"cf-footer-ip-reveal\");b&&\"classList\"in b&&(b.classList.remove(\"hidden\"),c.addEventListener(\"click\",function(){c.classList.add(\"hidden\");a.getElementById(\"cf-footer-ip\").classList.remove(\"hidden\")}))}var a=document;document.addEventListener&&a.addEventListener(\"DOMContentLoaded\",d)})();</script>\n  </div><!-- /.error-footer -->\n\n    </div>\n</div>\n</body>\n</html>"
+ },
+ {
+  "label": "USDC->aAAPL $25",
+  "at": "2026-10-06T23:53:26.992Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "amount": "25000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "USDC->aMSFT $5",
+  "at": "2026-10-06T23:53:29.032Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "amount": "5000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "USDC->aMSFT $10",
+  "at": "2026-10-06T23:53:31.093Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "amount": "10000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "USDC->aMSFT $25",
+  "at": "2026-10-06T23:53:33.030Z",
+  "request": {
+   "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "tokenOut": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "amount": "25000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "AUSD->aNVDA $10",
+  "at": "2026-10-06T23:53:35.054Z",
+  "request": {
+   "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+   "tokenOut": "0x701193374879131f923532987c7ef363a91a80eb",
+   "amount": "10000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "31583395171896713",
+   "minOut": "31482328307346643",
+   "transaction": {
+    "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000006fd902c3762cd300000000000000000000000000000000efe302beaa2b3e6e1b18d08d69a9012a000000000000000000000000000000000000000000000000000000000098968000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000c30200000000efe302beaa2b3e6e1b18d08d69a9012a01ffff01d5b70d70cbe6c42bcd1aaa662a21673a83f4615b01013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.00",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "125.00",
+    "extreme": "235.10"
+   }
+  }
+ },
+ {
+  "label": "AUSD->aAAPL $10",
+  "at": "2026-10-06T23:53:37.027Z",
+  "request": {
+   "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+   "tokenOut": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "amount": "10000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "AUSD->aMSFT $10",
+  "at": "2026-10-06T23:53:38.968Z",
+  "request": {
+   "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+   "tokenOut": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "amount": "10000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "MON->aNVDA 500 MON",
+  "at": "2026-10-06T23:53:40.919Z",
+  "request": {
+   "tokenIn": "0x0000000000000000000000000000000000000000",
+   "tokenOut": "0x701193374879131f923532987c7ef363a91a80eb",
+   "amount": "500000000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "43008620038235712",
+   "minOut": "42681754525945120",
+   "transaction": {
+    "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb0000000000000000000000000000000000000000000000000097a2d460e8cd20000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001b1ae4d6e2ef50000000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000007b0301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "value": "500000000000000000000",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.00",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "120.00",
+    "extreme": "153.00"
+   }
+  }
+ },
+ {
+  "label": "MON->aAAPL 500 MON",
+  "at": "2026-10-06T23:53:42.959Z",
+  "request": {
+   "tokenIn": "0x0000000000000000000000000000000000000000",
+   "tokenOut": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "amount": "500000000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "MON->aMSFT 500 MON",
+  "at": "2026-10-06T23:53:44.914Z",
+  "request": {
+   "tokenIn": "0x0000000000000000000000000000000000000000",
+   "tokenOut": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "amount": "500000000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "aNVDA->USDC 0.01",
+  "at": "2026-10-06T23:53:46.826Z",
+  "request": {
+   "tokenIn": "0x701193374879131f923532987c7ef363a91a80eb",
+   "tokenOut": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "amount": "10000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "2718410",
+   "minOut": "2709711",
+   "transaction": {
+    "calldata": "ce1e7030000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000002958cf000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000002386f26fc1000000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000ce02701193374879131f923532987c7ef363a91a80eb01ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000301ffff03065c9d28e428a0db40191a54d33d5b7c71a9c3940005f5e10000000000000000000000000000000000000000000000000000000002540be40012000000000000000000000000000000000000",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.00",
+    "standard": "105.00",
+    "fast": "112.00",
+    "rapid": "120.00",
+    "extreme": "153.00"
+   }
+  }
+ },
+ {
+  "label": "aAAPL->USDC 0.01",
+  "at": "2026-10-06T23:53:48.758Z",
+  "request": {
+   "tokenIn": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "tokenOut": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "amount": "10000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "aMSFT->USDC 0.01",
+  "at": "2026-10-06T23:53:50.448Z",
+  "request": {
+   "tokenIn": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "tokenOut": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+   "amount": "10000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "aNVDA->MON 0.01",
+  "at": "2026-10-06T23:53:52.082Z",
+  "request": {
+   "tokenIn": "0x701193374879131f923532987c7ef363a91a80eb",
+   "tokenOut": "0x0000000000000000000000000000000000000000",
+   "amount": "10000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "type": "calculate_swap_result",
+   "status": "success",
+   "output": "95719761661060848659",
+   "minOut": "94992291472436786209",
+   "transaction": {
+    "calldata": "ce1e70300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005264869cdaef67421000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000002386f26fc1000000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000008f02701193374879131f923532987c7ef363a91a80eb01ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "value": "0",
+    "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb"
+   },
+   "gasPrices": {
+    "slow": "102.00",
+    "standard": "108.00",
+    "fast": "112.00",
+    "rapid": "120.00",
+    "extreme": "160.00"
+   }
+  }
+ },
+ {
+  "label": "aAAPL->MON 0.01",
+  "at": "2026-10-06T23:53:54.116Z",
+  "request": {
+   "tokenIn": "0x17683e492d0c8910f7c0157d04af31cb7a23ad71",
+   "tokenOut": "0x0000000000000000000000000000000000000000",
+   "amount": "10000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ },
+ {
+  "label": "aMSFT->MON 0.01",
+  "at": "2026-10-06T23:53:56.169Z",
+  "request": {
+   "tokenIn": "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375",
+   "tokenOut": "0x0000000000000000000000000000000000000000",
+   "amount": "10000000000000000"
+  },
+  "http": 200,
+  "body": {
+   "error": "calculation_failed",
+   "message": "no candidate paths available between tokens"
+  }
+ }
+]

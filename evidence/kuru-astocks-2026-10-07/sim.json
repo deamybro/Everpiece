@@ -1,0 +1,202 @@
+[
+ {
+  "usd": 5,
+  "quotedOut": "16580789327895264",
+  "minOut": "16527730802045999",
+  "simStatus": "0x1",
+  "gasUsed": 976642,
+  "estimate": 976642,
+  "received": "16609932229950144",
+  "usdcSpent": "5000000",
+  "effPrice": 301.02470803488694,
+  "tx": "0x4113c462931bd8c84f05d3d690ddd3f8d63846924e1139c269f8c2e4678348e5",
+  "logs": [
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0xb3e6778480b2e488385e8205ea05e20060b813cb",
+    "topic0": "0x96eb3fc6c7bb48c8c6ce483f629e8a0419c53894800310957fb39bc3247e0efb"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x63e48b725540a3db24acf6682a29f877808c53f2",
+    "topic0": "0x19b47279256b2a23a1665c810c8d55a1758940ee09377d4f8d26497a3577dc83"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+    "topic0": "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65"
+   },
+   {
+    "address": "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+    "topic0": "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
+   },
+   {
+    "address": "0x701193374879131f923532987c7ef363a91a80eb",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x701193374879131f923532987c7ef363a91a80eb",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x2f84fb8982073f39ba47c7fcc29119af074abbcb",
+    "topic0": "0xee700064966adfceac1861848d5fa954797d5ac8f0a6d73006ff6269b85a7a8a"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+   },
+   {
+    "address": "0x701193374879131f923532987c7ef363a91a80eb",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0xb3e6778480b2e488385e8205ea05e20060b813cb",
+    "topic0": "0xc2e9a469a567800a865e66b33df0528af708b4d0764eb83443b96980e99f4c68"
+   }
+  ]
+ },
+ {
+  "usd": 25,
+  "quotedOut": "68146298344716902",
+  "minOut": "67928230190013807",
+  "simStatus": "0x1",
+  "gasUsed": 978282,
+  "estimate": 978282,
+  "received": "68258838308894146",
+  "usdcSpent": "25000000",
+  "effPrice": 366.25293689978446,
+  "tx": "0x830b173743e62f505224418b0b13bb53de03be4c4c0b889479b7213d178d515b",
+  "logs": [
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0xb3e6778480b2e488385e8205ea05e20060b813cb",
+    "topic0": "0x96eb3fc6c7bb48c8c6ce483f629e8a0419c53894800310957fb39bc3247e0efb"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x63e48b725540a3db24acf6682a29f877808c53f2",
+    "topic0": "0x19b47279256b2a23a1665c810c8d55a1758940ee09377d4f8d26497a3577dc83"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x5afd3ec861f6104af26e8755abcc1f876de77620",
+    "topic0": "0xad7d6f97abf51ce18e17a38f4d70e975be9c0708474987bb3e26ad21bd93ca70"
+   },
+   {
+    "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+    "topic0": "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65"
+   },
+   {
+    "address": "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+    "topic0": "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
+   },
+   {
+    "address": "0x701193374879131f923532987c7ef363a91a80eb",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x701193374879131f923532987c7ef363a91a80eb",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0x2f84fb8982073f39ba47c7fcc29119af074abbcb",
+    "topic0": "0xee700064966adfceac1861848d5fa954797d5ac8f0a6d73006ff6269b85a7a8a"
+   },
+   {
+    "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "topic0": "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+   },
+   {
+    "address": "0x701193374879131f923532987c7ef363a91a80eb",
+    "topic0": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+   },
+   {
+    "address": "0xb3e6778480b2e488385e8205ea05e20060b813cb",
+    "topic0": "0xc2e9a469a567800a865e66b33df0528af708b4d0764eb83443b96980e99f4c68"
+   }
+  ]
+ }
+]

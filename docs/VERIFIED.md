@@ -558,6 +558,16 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - `depositForBurn(amount, destinationDomain, mintRecipient, burnToken, destinationCaller, maxFee, minFinalityThreshold)`; minFinalityThreshold 1000 = fast, 2000 = standard.
 - **Yellow Card** (backup payout provider, bank + mobile money, partner sandbox): not verified yet. TODO(VERIFY) from its API docs before any use.
 
+### 4.16 Kuru × Anchored aStocks (Monad 143) — NOT AVAILABLE
+- **Fact:** whether aNVDA/aAAPL/aMSFT can be bought through Kuru.
+- **Value:** `KURU_ASTOCK_EXECUTION = NOT_AVAILABLE` (2026-10-07 00:15 UTC):
+  - Kuru has no aStock market (597 registered markets checked on-chain, plus the exchangeInfo API);
+  - Kuru Flow has no route for aAAPL/aMSFT;
+  - the only aNVDA route goes through a ~0.5-aNVDA Uniswap v4 pool at +25.8% to +53.1% over NVDA, and was rejected.
+- **Official source:** https://docs.kuru.io/contracts/Contract-addresses ; https://docs.kuru.io/contracts/Router ; https://docs.monad.xyz/guides/kuru-flow ; https://developers.uniswap.org/docs/protocols/v4/deployments
+- **Evidence:** `docs/INTEGRATION_VERIFICATION.md` "Kuru × Anchored aStocks"; `evidence/kuru-astocks-2026-10-07/`.
+- **Open:** `TODO(VERIFY): 1 aStock = 1 underlying share — Anchored's own docs`.
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**
