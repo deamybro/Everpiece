@@ -179,6 +179,22 @@ contract EverpieceEarnTest is EscrowBase {
         assertEq(ausd.balanceOf(sender), start - 500 * DOLLAR + harvestable);
     }
 
+    /// @notice EIP-712 parity with packages/shared (earn.test.ts EARN_VECTOR): the app signs exactly what this hashes.
+    function test_ids_matchSharedVectors() public {
+        vm.chainId(10143);
+        address at = 0x00000000000000000000000000000000000e4A1a;
+        address[] memory vs = new address[](1);
+        vs[0] = address(vault);
+        deployCodeTo("EverpieceEarn.sol:EverpieceEarn", abi.encode(IAUSD(AUSD_ADDR), vs), at);
+        EverpieceEarn e = EverpieceEarn(at);
+        address o = 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf;
+        address v = 0x00000000000000000000000000000000000000AA;
+        bytes32 d = e.depositIdOf(EverpieceEarn.Deposit(bytes32(uint256(0x1111111111111111111111111111111111111111111111111111111111111111)), o, v, 100_000_000, 99_000_000, 1_800_000_000));
+        bytes32 w = e.withdrawalIdOf(EverpieceEarn.Withdrawal(bytes32(uint256(0x2222222222222222222222222222222222222222222222222222222222222222)), o, v, 40_000_000, 41_000_000, 1_800_000_000));
+        assertEq(d, 0xa9de6608378cf05f4f29c99b1d00e964704f4bfeba4d16ff6bca8ac78b0049dc);
+        assertEq(w, 0x80165b29c0495aceb1b088834e04360996a667ce4c3b30bd392f112e45a6ef72);
+    }
+
     // ── construction ─────────────────────────────────────────────────────────────────────────────
 
     function test_constructor_rejectsNonAusdVaults() public {
