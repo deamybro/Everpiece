@@ -568,6 +568,33 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Evidence:** `docs/INTEGRATION_VERIFICATION.md` "Kuru × Anchored aStocks"; `evidence/kuru-astocks-2026-10-07/`.
 - **Open:** `TODO(VERIFY): 1 aStock = 1 underlying share — Anchored's own docs`.
 
+### 4.17 Aave V3 on Monad: AUSD reserve and "Wrapped Aave Monad AUSD" (Earn provider, checked 2026-10-07)
+- **Fact:** the Earn provider Everpiece uses on mainnet.
+- **Value:**
+  - Pool `0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef`: `PoolAddressesProvider 0x34793Fb9935F7bB5E5aE920fb963F39063E7A615` `getPool()` returns it; code 1,863 B (proxy).
+  - AUSD reserve (underlying `0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a`, the same AUSD as §2):
+    - aToken `0xdeBFeDF35faEd5d1664E553545e144C02227A2Ec` ("Aave Monad AUSD"); variable-debt token `0x8F4c10B392ef10c811E4d4BAFC74Bfc1A2671C75`; reserve id 4.
+    - `getReserveConfigurationData`: decimals 6, LTV 0 (not collateral), reserve factor 10%, borrowing on, active, not frozen. `getPaused` false.
+    - Caps: supply 20,000,000, borrow 18,000,000.
+    - At block 111,356,659: supplied 11.377M, borrowed 8.436M (≈74% utilization), free liquidity ≈2.947M AUSD.
+    - `currentLiquidityRate` 3.089e25 ray ≈ 3.09% APR. **This is a live, variable reading, never a constant.**
+  - ERC-4626 wrapper `0x9e1AcC5BFbf34e2E579763cE14042d957719fE76` "Wrapped Aave Monad AUSD" / waMonAUSD:
+    - 6 dp; `asset()` = AUSD; `aToken()` = the aToken above.
+    - EIP-712 domain "Wrapped Aave Monad AUSD" v1, chainId 143; `nonces()` present (ERC-2612 permit on shares).
+    - At block 111,372,770: 1 share = 1.008728 AUSD; totalAssets 1.149M; `maxDeposit` 8.22M.
+  - No Aave Monad **testnet** deployment exists (the address book has only `AaveV3Monad`, `GhoMonad`, `GovernanceV3Monad`, `MiscMonad`).
+- **Official source:** https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol (`POOL`, `AUSD_A_TOKEN`, `AUSD_STATA_TOKEN`, …); Aave governance "Deploy Aave Protocol v3.7 on Monad".
+- **Explorer / verified-source reference:** the live `cast call`s above on rpc.monad.xyz / rpc2 / rpc3.
+- **Proven on a fork** (`contracts/test/fork/EverpieceEarnFork.t.sol`, block 111,374,179):
+  - real AUSD ERC-3009 deposit through EverpieceEarn → shares to the owner;
+  - 30 days of real accrual: $100 → +0.233123 AUSD;
+  - harvesting exactly that yield leaves the principal intact;
+  - withdraw-all is bounded by `maxWithdraw`.
+  - Cold-state gas: deposit 660,269 / withdraw 595,649 → relayer limits 800k / 750k.
+- **Notes:**
+  - Withdrawals depend on free reserve liquidity (high utilization can delay a full exit).
+  - Smart-contract and oracle risk is Aave's; there is no "safe yield" claim.
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**

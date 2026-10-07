@@ -173,6 +173,16 @@ contract MockAUSD {
         return true;
     }
 
+    /// @dev Standard allowance-based pull (ERC-4626 vaults use it); same pause/freeze rules as `transfer`.
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        if (isTransferPaused) revert TransferPaused();
+        uint256 a = allowance[from][msg.sender];
+        if (a < amount) revert ERC20InsufficientBalance(from, a, amount);
+        if (a != type(uint256).max) allowance[from][msg.sender] = a - amount;
+        _move(from, to, amount, amount);
+        return true;
+    }
+
     /// @dev debit `debit` from `from`, credit `credit` to `to` (credit < debit models a fee/short delivery).
     function _move(address from, address to, uint256 debit, uint256 credit) internal {
         if (isAccountFrozen[from]) revert AccountIsFrozen(from);
