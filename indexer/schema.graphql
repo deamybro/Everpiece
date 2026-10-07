@@ -78,6 +78,22 @@ type Account {
 }
 
 "An instant payment (EverpiecePay.Paid, id = paymentId): the recipient received exactly `amount` AUSD. Final."
+# One EverpieceEarn deposit or withdrawal: the facts the principal/yield ledger (docs/EARN.md) is folded from.
+type EarnEvent {
+  "The EverpieceEarn deposit/withdrawal id (EIP-712 digest of its terms)."
+  id: ID!
+  "DEPOSIT or WITHDRAW. Whether a withdrawal was a harvest is decided by its ref (the Automate leg), not here."
+  kind: String!
+  ref: String!
+  owner: String! @index
+  vault: String!
+  assets: BigInt!
+  shares: BigInt!
+  block: Int!
+  timestamp: Int!
+  txHash: String!
+}
+
 type InstantPayment {
   id: ID!
   ref: String!

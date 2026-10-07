@@ -117,4 +117,17 @@ describe("EverpieceEscrow history", () => {
     expect((await indexer.InstantPayment.getWhere({ recipient: { _eq: RECIPIENT } })).length).toBe(2);
     await expect(createTestIndexer().process({ chains: { 143: { simulate: [paid(1, 1n, 10), paid(1, 1n, 11)] } } })).rejects.toThrow(/Paid twice/);
   });
+
+  it("Earn (EverpieceEarn): deposits and withdrawals recorded once per id, queryable by owner (the principal/yield ledger)", async () => {
+    const earnEv = (event: "EarnDeposited" | "EarnWithdrawn", n: number, assets: bigint, block: number) => ({
+      contract: "EverpieceEarn" as const, event, block: { number: block, timestamp: 1_790_000_000 + block }, transaction: { hash: tx(block) },
+      params: { id: id(700 + n), ref: id(800 + n), owner: SENDER, vault: ANYONE, assets, shares: assets * 1_000_000n },
+    });
+    const indexer = createTestIndexer();
+    await indexer.process({ chains: { 143: { simulate: [earnEv("EarnDeposited", 1, 500_000_000n, 10), earnEv("EarnWithdrawn", 2, 12_000_000n, 20)] } } });
+    expect(await indexer.EarnEvent.getOrThrow(id(701))).toMatchObject({ kind: "DEPOSIT", owner: SENDER, assets: 500_000_000n, ref: id(801), txHash: tx(10) });
+    expect(await indexer.EarnEvent.getOrThrow(id(702))).toMatchObject({ kind: "WITHDRAW", assets: 12_000_000n });
+    expect((await indexer.EarnEvent.getWhere({ owner: { _eq: SENDER } })).length).toBe(2);
+    await expect(createTestIndexer().process({ chains: { 143: { simulate: [earnEv("EarnDeposited", 1, 1n, 10), earnEv("EarnDeposited", 1, 1n, 11)] } } })).rejects.toThrow(/twice/);
+  });
 });

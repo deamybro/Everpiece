@@ -18,8 +18,10 @@ while :; do
   ENVIO_ESCROW_START_BLOCK="$(field deployBlock)"
   ENVIO_PAY_ADDRESS="$(field pay)"
   case "$ENVIO_PAY_ADDRESS" in 0x*) ;; *) ENVIO_PAY_ADDRESS=0x0000000000000000000000000000000000000000 ;; esac
-  export ENVIO_ESCROW_ADDRESS ENVIO_ESCROW_START_BLOCK ENVIO_PAY_ADDRESS
-  echo "indexer: escrow $ENVIO_ESCROW_ADDRESS, pay $ENVIO_PAY_ADDRESS from block $ENVIO_ESCROW_START_BLOCK (lag $ENVIO_BLOCK_LAG)"
+  ENVIO_EARN_ADDRESS="$(field earn)"
+  case "$ENVIO_EARN_ADDRESS" in 0x*) ;; *) ENVIO_EARN_ADDRESS=0x0000000000000000000000000000000000000000 ;; esac
+  export ENVIO_ESCROW_ADDRESS ENVIO_ESCROW_START_BLOCK ENVIO_PAY_ADDRESS ENVIO_EARN_ADDRESS
+  echo "indexer: escrow $ENVIO_ESCROW_ADDRESS, pay $ENVIO_PAY_ADDRESS, earn $ENVIO_EARN_ADDRESS from block $ENVIO_ESCROW_START_BLOCK (lag $ENVIO_BLOCK_LAG)"
   want="$gen $(code_hash)"
   fails="$(cat "$FAILS" 2>/dev/null || echo 0)"
   if [ -s "$STATE" ] && [ "$(cat "$STATE")" = "$want" ] && [ "$fails" -lt 3 ]; then

@@ -337,5 +337,5 @@ if (PAYOUT) await waitFor(`http://127.0.0.1:${P.payout}/healthz`);
 // 4. web, then tell the indexer what to index (stable content: it only re-indexes when the escrow changes)
 run("web", [nextBin, "start", "--port", String(P.web), "--hostname", BIND], {}, join(root, "web"));
 await waitFor(`http://127.0.0.1:${P.web}`);
-if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow: ESCROW, deployBlock: ESCROW_BLOCK, pay: PAY || null, payBlock: PAY ? PAY_BLOCK : null, chainId: MONAD_TESTNET_CHAIN_ID, rpc: RPC }) + "\n");
+if (INFO_FILE) writeFileSync(INFO_FILE, JSON.stringify({ escrow: ESCROW, deployBlock: ESCROW_BLOCK, pay: PAY || null, payBlock: PAY ? PAY_BLOCK : null, earn: EARN && EARN_VAULT ? EARN : null, chainId: MONAD_TESTNET_CHAIN_ID, rpc: RPC }) + "\n");
 say(`✅ Everpiece on Monad testnet is up → ${ORIGIN}`);

@@ -14,7 +14,7 @@ import { privateKeyToAccount } from "viem/accounts";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TESTNET = 10143; // VERIFIED §4.9
 const env = (n, d) => {
-  const v = process.env[n] ?? d;
+  const v = process.env[n] || d;
   if (!v) throw new Error(`${n} is required`);
   return v;
 };

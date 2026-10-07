@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=./node_modules/envio/evm.schema.json
-# Everpiece history indexer (master §29): the four EverpieceEscrow payment events and EverpiecePay's Paid event.
+# Everpiece history indexer (master §29): the four EverpieceEscrow payment events, EverpiecePay's Paid event and
+# EverpieceEarn's deposits/withdrawals (the principal/yield ledger of docs/EARN.md).
 # Keys follow node_modules/envio/evm.schema.json of envio 3.12.1 (pinned). History only: financial truth stays
 # getPayment at "finalized" (ESCROW_SPEC §17).
 name: everpiece-indexer
@@ -26,6 +27,11 @@ contracts:
     events:
       # Must match contracts/src/EverpiecePay.sol (checked against the shared ABI in test/abi.test.ts).
       - event: Paid(bytes32 indexed paymentId, bytes32 indexed ref, address indexed sender, address recipient, uint256 amount, address sourceToken, uint256 sourceAmount, address pair)
+  - name: EverpieceEarn
+    events:
+      # Must match contracts/src/EverpieceEarn.sol (checked against the shared ABI in test/abi.test.ts).
+      - event: EarnDeposited(bytes32 indexed id, bytes32 indexed ref, address indexed owner, address vault, uint256 assets, uint256 shares)
+      - event: EarnWithdrawn(bytes32 indexed id, bytes32 indexed ref, address indexed owner, address vault, uint256 assets, uint256 shares)
 chains:
   - id: ${ENVIO_CHAIN_ID}
     start_block: ${ENVIO_ESCROW_START_BLOCK}
@@ -47,3 +53,6 @@ chains:
       # Instant payments (deployed after the escrow, so the escrow's start block covers it). Zero address = none.
       - name: EverpiecePay
         address: "${ENVIO_PAY_ADDRESS}"
+      # Earn router (deployed after the escrow). Zero address = none.
+      - name: EverpieceEarn
+        address: "${ENVIO_EARN_ADDRESS}"
