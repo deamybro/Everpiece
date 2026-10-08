@@ -51,6 +51,11 @@ contract EverpieceEarn is EIP712, ReentrancyGuard {
     mapping(address vault => bool) public isVault;
     /// @notice Deposit / withdrawal id → executed.
     mapping(bytes32 id => bool) public settled;
+    /// @notice AUSD the owner put into a vault through this contract, minus what they took back out (principal first).
+    ///         A HARVEST withdrawal (ref starts with "HRV1") can never leave the position worth less than this: Earn →
+    ///         Invest only ever spends earnings, enforced here rather than by any off-chain ledger.
+    mapping(address owner => mapping(address vault => uint256)) public principalOf;
+    bytes4 public constant HARVEST_TAG = 0x48525631; // "HRV1"
 
     event VaultEnabled(address indexed vault);
     event EarnDeposited(bytes32 indexed id, bytes32 indexed ref, address indexed owner, address vault, uint256 assets, uint256 shares);
@@ -68,6 +73,7 @@ contract EverpieceEarn is EIP712, ReentrancyGuard {
     error SlippageExceeded();
     error SettlementMismatch();
     error AusdSemanticsChanged();
+    error PrincipalProtected();
 
     constructor(IAUSD ausd, address[] memory vaults) EIP712("Everpiece Earn", "1") {
         if (address(ausd) == address(0)) revert ZeroAddress();
@@ -107,6 +113,7 @@ contract EverpieceEarn is EIP712, ReentrancyGuard {
         if (shares < d.minShares) revert SlippageExceeded();
         if (IERC20(d.vault).balanceOf(d.owner) != sharesBefore + shares) revert SettlementMismatch();
         if (AUSD.balanceOf(address(this)) != before) revert SettlementMismatch(); // nothing left behind
+        principalOf[d.owner][d.vault] += d.assets;
         emit EarnDeposited(id, d.ref, d.owner, d.vault, d.assets, shares);
     }
 
@@ -133,6 +140,14 @@ contract EverpieceEarn is EIP712, ReentrancyGuard {
         shares = IERC4626(w.vault).withdraw(w.assets, w.owner, w.owner);
         if (shares > w.maxShares) revert SlippageExceeded();
         if (AUSD.balanceOf(w.owner) != assetsBefore + w.assets) revert SettlementMismatch();
+        uint256 p = principalOf[w.owner][w.vault];
+        if (bytes4(w.ref) == HARVEST_TAG) {
+            // earnings only: what stays in the vault must still be worth at least the principal
+            if (IERC4626(w.vault).convertToAssets(IERC20(w.vault).balanceOf(w.owner)) < p) revert PrincipalProtected();
+        } else {
+            // an owner withdrawal takes principal first (docs/EARN.md §accounting)
+            principalOf[w.owner][w.vault] = p > w.assets ? p - w.assets : 0;
+        }
         emit EarnWithdrawn(id, w.ref, w.owner, w.vault, w.assets, shares);
     }
 

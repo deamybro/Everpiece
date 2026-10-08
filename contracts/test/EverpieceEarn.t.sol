@@ -173,10 +173,48 @@ contract EverpieceEarnTest is EscrowBase {
         ausd.mint(address(vault), 12_400_000); // $12.40 of simulated yield (the only depositor gets all of it)
         uint256 value = vault.convertToAssets(vault.balanceOf(sender));
         assertApproxEqAbs(value, 512_400_000, 1);
-        uint256 harvestable = value - 500 * DOLLAR;
-        _withdraw(_wd(harvestable), SENDER_PK);
-        assertGe(vault.convertToAssets(vault.balanceOf(sender)), 500 * DOLLAR - 1);
+        assertEq(earn.principalOf(sender, address(vault)), 500 * DOLLAR);
+        uint256 harvestable = value - 500 * DOLLAR - 2; // the client's rounding margin (shared HARVEST_ROUNDING_MARGIN)
+        _withdraw(_harvest(harvestable), SENDER_PK);
+        assertGe(vault.convertToAssets(vault.balanceOf(sender)), 500 * DOLLAR);
         assertEq(ausd.balanceOf(sender), start - 500 * DOLLAR + harvestable);
+        assertEq(earn.principalOf(sender, address(vault)), 500 * DOLLAR); // a harvest never lowers principal
+    }
+
+    /// @notice On-chain principal protection: a HARVEST that would dip into principal reverts, whatever the caller
+    ///         computed off-chain (e.g. a lagging indexer reading principal as zero).
+    function test_harvest_cannotTouchPrincipal() public {
+        _deposit(500 * DOLLAR);
+        ausd.mint(address(vault), 10 * DOLLAR);
+        EverpieceEarn.Withdrawal memory w = _harvest(10 * DOLLAR + 1);
+        bytes memory os = _sig(SENDER_PK, earn.withdrawalIdOf(w));
+        (uint8 v, bytes32 r, bytes32 s) = _permit(SENDER_PK, sender, w.maxShares, w.deadline);
+        vm.expectRevert(EverpieceEarn.PrincipalProtected.selector);
+        earn.withdraw(w, os, v, r, s);
+        // the whole deposit as a "harvest" with no yield at all
+        EverpieceEarn.Withdrawal memory all = _harvest(400 * DOLLAR);
+        bytes memory os2 = _sig(SENDER_PK, earn.withdrawalIdOf(all));
+        (v, r, s) = _permit(SENDER_PK, sender, all.maxShares, all.deadline);
+        vm.expectRevert(EverpieceEarn.PrincipalProtected.selector);
+        earn.withdraw(all, os2, v, r, s);
+    }
+
+    /// @notice An owner withdrawal takes principal first; afterwards only what's above the rest is harvestable.
+    function test_ownerWithdrawal_reducesPrincipalFirst() public {
+        _deposit(500 * DOLLAR);
+        _withdraw(_wd(200 * DOLLAR), SENDER_PK);
+        assertEq(earn.principalOf(sender, address(vault)), 300 * DOLLAR);
+        ausd.mint(address(vault), 6 * DOLLAR);
+        _withdraw(_harvest(6 * DOLLAR - 2), SENDER_PK);
+        assertGe(vault.convertToAssets(vault.balanceOf(sender)), 300 * DOLLAR);
+        // taking out more than the principal leaves principal at zero, never negative
+        _withdraw(_wd(vault.maxWithdraw(sender)), SENDER_PK);
+        assertEq(earn.principalOf(sender, address(vault)), 0);
+    }
+
+    function _harvest(uint256 assets) internal view returns (EverpieceEarn.Withdrawal memory w) {
+        w = _wd(assets);
+        w.ref = bytes32(abi.encodePacked(bytes4(0x48525631), bytes28(keccak256("harvest-1"))));
     }
 
     /// @notice EIP-712 parity with packages/shared (earn.test.ts EARN_VECTOR): the app signs exactly what this hashes.

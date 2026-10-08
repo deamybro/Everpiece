@@ -2477,6 +2477,19 @@ export const everpieceEarnAbi = [
   },
   {
     "type": "function",
+    "name": "HARVEST_TAG",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "WITHDRAWAL_TYPEHASH",
     "inputs": [],
     "outputs": [
@@ -2658,6 +2671,30 @@ export const everpieceEarnAbi = [
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "principalOf",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "vault",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -2951,6 +2988,11 @@ export const everpieceEarnAbi = [
   {
     "type": "error",
     "name": "InvalidVault",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PrincipalProtected",
     "inputs": []
   },
   {

@@ -51,12 +51,15 @@ async function deploy(path, args) {
 const vaultAbi = artifact("TestYieldVault.sol/TestYieldVault.json").abi;
 const earnAbi = artifact("EverpieceEarn.sol/EverpieceEarn.json").abi;
 let vault, earn;
-if (process.env.TESTNET_EARN_ADDRESS && process.env.TESTNET_EARN_VAULT_ADDRESS) {
+if (process.env.TESTNET_EARN_ADDRESS && process.env.TESTNET_EARN_VAULT_ADDRESS && !process.env.REDEPLOY_EARN) {
   vault = { address: getAddress(process.env.TESTNET_EARN_VAULT_ADDRESS), block: Number(process.env.TESTNET_EARN_VAULT_BLOCK ?? 0) };
   earn = { address: getAddress(process.env.TESTNET_EARN_ADDRESS), block: Number(process.env.TESTNET_EARN_BLOCK ?? 0) };
   log("already deployed; verifying only");
 } else {
-  vault = await deploy("TestYieldVault.sol/TestYieldVault.json", [AUSD]);
+  // a new EverpieceEarn can reuse the existing test vault (REDEPLOY_EARN=1 with TESTNET_EARN_VAULT_ADDRESS set)
+  vault = process.env.TESTNET_EARN_VAULT_ADDRESS
+    ? { address: getAddress(process.env.TESTNET_EARN_VAULT_ADDRESS), block: Number(process.env.TESTNET_EARN_VAULT_BLOCK ?? 0) }
+    : await deploy("TestYieldVault.sol/TestYieldVault.json", [AUSD]);
   earn = await deploy("EverpieceEarn.sol/EverpieceEarn.json", [AUSD, [vault.address]]);
 }
 

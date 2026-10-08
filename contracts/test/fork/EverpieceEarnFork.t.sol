@@ -56,7 +56,11 @@ contract EverpieceEarnMainnetForkTest is Test {
     }
 
     function _withdraw(uint256 assets) internal returns (uint256 shares, uint256 gasUsed) {
-        EverpieceEarn.Withdrawal memory w = EverpieceEarn.Withdrawal(bytes32("harvest"), owner, WA_AUSD, assets, IERC4626(WA_AUSD).previewWithdraw(assets), block.timestamp + 600);
+        return _withdraw(assets, bytes32("out"));
+    }
+
+    function _withdraw(uint256 assets, bytes32 ref) internal returns (uint256 shares, uint256 gasUsed) {
+        EverpieceEarn.Withdrawal memory w = EverpieceEarn.Withdrawal(ref, owner, WA_AUSD, assets, IERC4626(WA_AUSD).previewWithdraw(assets), block.timestamp + 600);
         (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(PK, earn.withdrawalIdOf(w));
         bytes32 pd = keccak256(abi.encodePacked("\x19\x01", IERC20Permit(WA_AUSD).DOMAIN_SEPARATOR(), keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(earn), w.maxShares, IERC20Permit(WA_AUSD).nonces(owner), w.deadline))));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PK, pd);
@@ -79,14 +83,15 @@ contract EverpieceEarnMainnetForkTest is Test {
         vm.warp(block.timestamp + 30 days);
         uint256 v1 = IERC4626(WA_AUSD).convertToAssets(shares);
         assertGt(v1, v0);
-        uint256 harvestable = v1 - 100e6; // principal = what was deposited (docs/EARN.md §accounting)
+        assertEq(earn.principalOf(owner, WA_AUSD), 100e6);
+        uint256 harvestable = v1 - 100e6 - 2; // principal is on-chain; 2 units of ERC-4626 rounding margin
         console2.log("30-day yield on $100 (base units)", harvestable);
 
         uint256 before = IERC20(AUSD).balanceOf(owner);
-        (, uint256 gasWd) = _withdraw(harvestable);
+        (, uint256 gasWd) = _withdraw(harvestable, bytes32(abi.encodePacked(bytes4(0x48525631), bytes28(0)))); // HARVEST
         assertEq(IERC20(AUSD).balanceOf(owner), before + harvestable);
         // principal intact (to rounding)
-        assertGe(IERC4626(WA_AUSD).convertToAssets(IERC20(WA_AUSD).balanceOf(owner)) + 1, 100e6);
+        assertGe(IERC4626(WA_AUSD).convertToAssets(IERC20(WA_AUSD).balanceOf(owner)), 100e6);
         console2.log("gas deposit", gasDep);
         console2.log("gas withdraw", gasWd);
         assertLt(gasDep, LIMIT_EARN_DEPOSIT);

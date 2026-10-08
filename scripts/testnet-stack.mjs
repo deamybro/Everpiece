@@ -261,11 +261,50 @@ async function faucetHandler(req, res) {
       return json(res, 503, { error: "Test Dollars are unavailable right now." });
     }
   }
+  // SIMULATED earnings for the Earn test vault (test site only): $1 of test AUSD added to the vault, shared by every
+  // depositor in proportion to their shares, exactly as interest would be. Rate limited per IP.
+  if (req.method === "POST" && req.url === "/faucet/earnings") {
+    if (!EARN_VAULT) return json(res, 404, { error: "Earn isn't configured" });
+    const ip = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || req.socket.remoteAddress || "?";
+    const key = `earn:${ip}:${new Date().toISOString().slice(0, 10)}`;
+    if ((byIpDay.get(key) ?? 0) >= EARNINGS_PER_IP_PER_DAY) return json(res, 429, { error: "Daily simulated-earnings limit reached." });
+    byIpDay.set(key, (byIpDay.get(key) ?? 0) + 1);
+    try {
+      return json(res, 200, { ok: true, hash: await addToVault(1_000_000n), simulated: true });
+    } catch (e) {
+      say(`simulated earnings failed: ${String(e?.shortMessage ?? e).slice(0, 120)}`);
+      return json(res, 503, { error: "Simulated earnings are unavailable right now." });
+    }
+  }
   if (req.method === "GET" && req.url === "/sms") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     return res.end("<!doctype html><title>Everpiece testnet</title><p>On Monad testnet, codes are sent by real SMS (Twilio) or email (Resend). Nothing is simulated.</p>");
   }
   res.writeHead(404).end();
+}
+// Earn test vault (docs/EARN.md): SIMULATED yield = test AUSD the deployer adds to the vault (raises the share price).
+const EARNINGS_PER_IP_PER_DAY = 30;
+const SIM_APR_BPS = 500n; // 5% a year, simulated
+const vaultAbi = [{ type: "function", name: "totalAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] }];
+const addToVault = (amount) =>
+  (queue = queue.then(async () => {
+    await ensureAusd(amount + AUSD_DRIP);
+    return sent(await wallet.writeContract({ address: DOLLAR, abi: erc20Abi, functionName: "transfer", args: [EARN_VAULT, amount], chain: null }));
+  }));
+if (EARN_VAULT && REAL_AUSD) {
+  const TICK_MS = 10 * 60_000;
+  setInterval(async () => {
+    try {
+      const assets = await pub.readContract({ address: EARN_VAULT, abi: vaultAbi, functionName: "totalAssets" });
+      const accrual = (assets * SIM_APR_BPS * BigInt(TICK_MS / 1000)) / (10_000n * 31_536_000n);
+      if (accrual >= 10_000n) {
+        const hash = await addToVault(accrual); // at least $0.01, else wait for the next tick
+        say(`earn: simulated ${Number(accrual) / 1e6} test AUSD of yield on ${Number(assets) / 1e6} in the test vault (${hash})`);
+      }
+    } catch (e) {
+      say(`earn: simulated yield tick failed: ${String(e?.shortMessage ?? e).slice(0, 120)}`);
+    }
+  }, TICK_MS).unref();
 }
 const json = (res, status, body) => {
   res.writeHead(status, { "content-type": "application/json" });

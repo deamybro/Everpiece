@@ -33,6 +33,11 @@ export const config = {
   payoutUrl: process.env.NEXT_PUBLIC_PAYOUT_URL ?? "",
   /** The payout provider is SIMULATED (test site): no bank is paid. */
   payoutSimulated: process.env.NEXT_PUBLIC_PAYOUT_SIMULATED === "1",
+  /** Earn (docs/EARN.md): EverpieceEarn + its vault. Empty = Earn unavailable. Testnet vault = SIMULATED yield. */
+  earn: (process.env.NEXT_PUBLIC_EARN_ADDRESS ?? "") as Address,
+  earnVault: (process.env.NEXT_PUBLIC_EARN_VAULT_ADDRESS ?? "") as Address,
+  /** Automate (docs/AUTOMATE.md): the service, via the app's own origin. Empty = Automate unavailable. */
+  automateUrl: process.env.NEXT_PUBLIC_AUTOMATE_URL ?? "",
   /** Shown on the test-money banner, e.g. "Monad testnet"; default "Local test network" (the fork). */
   networkLabel: process.env.NEXT_PUBLIC_NETWORK_LABEL || "Local test network",
 };

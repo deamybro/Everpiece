@@ -127,6 +127,24 @@ export const sharePermitTyped = (vault: { address: Address; eip712Name: string }
 
 // ── principal / yield accounting ───────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A withdrawal is a HARVEST (earnings only) when its on-chain `ref` starts with the 4 bytes "HRV1"; everything else
+ * is an owner withdrawal. The ref is part of the signed Withdrawal, so the label can't be changed after signing.
+ */
+const HARVEST_TAG = "48525631"; // "HRV1"
+export const harvestRef = (random28: Hex): Hex => {
+  if (!/^0x[0-9a-fA-F]{56}$/.test(random28)) throw new Error("harvestRef: need 28 random bytes");
+  return `0x${HARVEST_TAG}${random28.slice(2).toLowerCase()}` as Hex;
+};
+export const isHarvestRef = (ref: string) => ref.toLowerCase().startsWith(`0x${HARVEST_TAG}`);
+
+/** Indexed EverpieceEarn events (indexer `EarnEvent`) → ledger entries, for one vault. */
+export function ledgerFromEvents(events: readonly { id: string; kind: string; ref: string; vault: string; assets: bigint }[], vault: Address): LedgerEntry[] {
+  return events
+    .filter((e) => e.vault.toLowerCase() === vault.toLowerCase())
+    .map((e) => ({ id: e.id, assets: e.assets, kind: e.kind === "DEPOSIT" ? "DEPOSIT" : isHarvestRef(e.ref) ? "HARVEST" : "WITHDRAW" }) as LedgerEntry);
+}
+
 export type LedgerEntry =
   | { kind: "DEPOSIT"; id: string; assets: bigint }
   /** The owner taking money out (principal first, then earnings). */
@@ -178,6 +196,16 @@ export function earnPosition(model: AccountingModel, entries: readonly LedgerEnt
     principalDeposited: deposited, principalWithdrawn: principalOut, yieldAlreadyHarvested: harvested, yieldWithdrawn: yieldOut,
     currentRedeemableValue, netPrincipal, harvestableYield,
   };
+}
+
+/**
+ * The authoritative numbers come from EverpieceEarn's on-chain `principalOf` (enforced at harvest time), not from the
+ * indexed ledger, which can lag behind a fresh deposit: a lagging ledger must never make principal look harvestable.
+ * The ledger still supplies history (deposited, withdrawn, harvested totals).
+ */
+export function withOnchainPrincipal(p: EarnPosition, onchainPrincipal: bigint): EarnPosition {
+  const excess = p.currentRedeemableValue - onchainPrincipal;
+  return { ...p, netPrincipal: onchainPrincipal, harvestableYield: excess > HARVEST_ROUNDING_MARGIN ? excess - HARVEST_ROUNDING_MARGIN : 0n };
 }
 
 /** A harvest may never exceed the harvestable yield (principal protection, enforced again before signing). */

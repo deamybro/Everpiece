@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { hashTypedData, type Address } from "viem";
-import { aaveRates, earnDepositTyped, earnPosition, earnWithdrawalTyped, harvestProblem, EARN_OPPORTUNITIES, HARVEST_ROUNDING_MARGIN, type LedgerEntry } from "../src/index.ts";
+import { aaveRates, earnDepositTyped, earnPosition, earnWithdrawalTyped, harvestProblem, harvestRef, isHarvestRef, ledgerFromEvents, withOnchainPrincipal, EARN_OPPORTUNITIES, HARVEST_ROUNDING_MARGIN, type LedgerEntry } from "../src/index.ts";
 
 const $ = (d: number) => BigInt(Math.round(d * 100)) * 10_000n;
 const M = "ERC4626_MONOTONIC" as const;
@@ -49,6 +49,32 @@ test("owner withdrawals take principal first; the earnings stay identifiable; du
   assert.equal(all.netPrincipal, 0n);
   assert.equal(all.yieldWithdrawn, $(12.4));
   assert.equal(all.harvestableYield, 0n);
+});
+
+test("indexed events → ledger: harvests are recognised by their signed ref; other vaults are ignored", () => {
+  const V = "0x00000000000000000000000000000000000000aa" as Address;
+  const h = harvestRef(`0x${"cd".repeat(28)}`);
+  assert.ok(isHarvestRef(h) && !isHarvestRef(`0x${"cd".repeat(32)}`));
+  assert.throws(() => harvestRef("0x1234"));
+  const entries = ledgerFromEvents([
+    { id: "a", kind: "DEPOSIT", ref: `0x${"00".repeat(32)}`, vault: V, assets: $(500) },
+    { id: "b", kind: "WITHDRAW", ref: h, vault: V, assets: $(10) },
+    { id: "c", kind: "WITHDRAW", ref: `0x${"11".repeat(32)}`, vault: V, assets: $(50) },
+    { id: "d", kind: "DEPOSIT", ref: `0x${"00".repeat(32)}`, vault: "0x00000000000000000000000000000000000000bb", assets: $(999) },
+  ], V);
+  assert.deepEqual(entries.map((e) => e.kind), ["DEPOSIT", "HARVEST", "WITHDRAW"]);
+  const p = earnPosition(M, entries, $(452.4));
+  assert.equal(p.netPrincipal, $(450));
+  assert.equal(p.yieldAlreadyHarvested, $(10));
+});
+
+test("on-chain principal wins over a lagging ledger: a deposit the indexer hasn't seen is never harvestable", () => {
+  const lagging = earnPosition(M, [], $(500)); // indexer hasn't seen the $500 deposit yet
+  assert.equal(lagging.harvestableYield, $(500) - HARVEST_ROUNDING_MARGIN); // the ledger alone would be wrong
+  const safe = withOnchainPrincipal(lagging, $(500));
+  assert.equal(safe.netPrincipal, $(500));
+  assert.equal(safe.harvestableYield, 0n);
+  assert.equal(withOnchainPrincipal(earnPosition(M, [], $(512.4)), $(500)).harvestableYield, $(12.4) - HARVEST_ROUNDING_MARGIN);
 });
 
 test("unknown accounting models are refused", () => {
