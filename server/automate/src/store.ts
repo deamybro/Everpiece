@@ -1,3 +1,4 @@
+import { getAddress } from "viem";
 import { DatabaseSync } from "node:sqlite";
 import type { ExecutionState, LegStatus } from "@everpiece/shared";
 
@@ -126,6 +127,26 @@ export class AutomateStore {
       WHERE e.owner = ? AND e.source = 'BALANCE' AND e.state IN ('READY', 'EXECUTING') AND l.status IN ('PENDING', 'LIMITED', 'EXECUTING')`).all(owner.toLowerCase()) as { amount: string }[];
     return rows.reduce((s, r) => s + BigInt(r.amount), 0n);
   }
+  private enabledRules(): { owner: string; trigger: { kind: string; positionId?: string } }[] {
+    return (this.db.prepare("SELECT owner, record FROM rules WHERE enabled = 1").all() as { owner: string; record: string }[])
+      .map((r) => ({ owner: r.owner, trigger: JSON.parse(r.record).trigger }));
+  }
+  /** Owners with at least one enabled rule (checksummed, as the indexer stores addresses). */
+  enabledOwners(): string[] {
+    return [...new Set(this.enabledRules().map((r) => getAddress(r.owner)))];
+  }
+  ownersWithTrigger(kind: string): string[] {
+    return [...new Set(this.enabledRules().filter((r) => r.trigger.kind === kind).map((r) => getAddress(r.owner)))];
+  }
+  /** [owner, Earn position id] for every enabled YIELD_THRESHOLD rule. */
+  yieldPositions(): [string, string][] {
+    const seen = new Map<string, [string, string]>();
+    for (const r of this.enabledRules()) {
+      if (r.trigger.kind === "YIELD_THRESHOLD" && r.trigger.positionId) seen.set(`${r.owner}|${r.trigger.positionId}`, [getAddress(r.owner), r.trigger.positionId]);
+    }
+    return [...seen.values()];
+  }
+
   /** Highest SCHEDULE period this rule has an execution for (whatever its outcome: a period never runs twice). */
   lastSchedulePeriod(ruleId: string): bigint | undefined {
     const rows = this.db.prepare("SELECT event_id FROM executions WHERE rule_id = ? AND event_id LIKE 'sched:%'").all(ruleId.toLowerCase()) as { event_id: string }[];

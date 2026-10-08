@@ -155,6 +155,9 @@ if (AUTOMATE) {
   run("automate", ["server/automate/src/main.ts"], {
     EXPECTED_CHAIN_ID: String(MONAD_TESTNET_CHAIN_ID), DIRECTORY_DOMAIN_ADDRESS: DIRECTORY_DOMAIN, PORT: String(P.automate), HOST: "127.0.0.1",
     AUTOMATE_DB: join(DATA, "automate.sqlite"), AUTOMATE_INTERNAL_KEY: process.env.TESTNET_AUTOMATE_KEY, TRUST_PROXY: "1", LOG_LEVEL: "info",
+    // the world at finality + the trigger watcher on the indexer (docs/AUTOMATE.md)
+    MONAD_RPC: RPC, AUSD_ADDRESS: DOLLAR, INDEXER_URL: `${svc("indexer")}/v1/graphql`,
+    ...(EARN && EARN_VAULT ? { EARN_ADDRESS: EARN, EARN_VAULT_ADDRESS: EARN_VAULT, EARN_OPPORTUNITY_ID: "test-vault" } : {}),
   });
 }
 if (PAYOUT) {
