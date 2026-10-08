@@ -122,6 +122,33 @@ export interface InvestmentProvider {
   getPosition(owner: Address, asset: InvestAsset): Promise<bigint>;
 }
 
+/**
+ * The candidate providers and why each is (not) enabled — evidence in docs/INVEST.md and evidence/kuru-astocks-*.
+ * A provider becomes enabled only by changing this record together with new evidence; nothing infers it.
+ */
+export type ProviderRecord = { id: string; name: string; enabled: boolean; kind: "AGGREGATOR" | "AMM" | "ISSUER_API"; missing: string[]; evidence: string };
+export const INVEST_PROVIDERS: readonly ProviderRecord[] = [
+  {
+    id: "kuru-flow", name: "Kuru Flow (route provider)", enabled: false, kind: "AGGREGATOR",
+    missing: ["No Kuru order-book market for any aStock (597 registered markets checked on-chain)", "The only route found (aNVDA) runs through a ~0.5-aNVDA Uniswap v4 pool and fails the price-quality policy"],
+    evidence: "evidence/kuru-astocks-2026-10-07, evidence/kuru-astocks-2026-10-08",
+  },
+  {
+    id: "uniswap-v4", name: "Uniswap v4 (liquidity)", enabled: false, kind: "AMM",
+    missing: ["MON/aNVDA pool: mid price ≈ +18% over NVDA and ~0.5 aNVDA in total: LOW_LIQUIDITY / demo-only", "No pool for most aStocks"],
+    evidence: "docs/INTEGRATION_VERIFICATION.md (Kuru × Anchored)",
+  },
+  {
+    id: "anchored-rwa-api", name: "Anchored RWA API (issuer; Monday Trade runs on it)", enabled: false, kind: "ISSUER_API",
+    missing: [
+      "Partner API key + secret (x-api-key / HMAC) with a WRITABLE scope for chain 143 (and 10143 for testnet)",
+      "Egress IP whitelisted on the key (an empty whitelist rejects every request)",
+      "Investor eligibility per Anchored: KYC/KYB; professional/qualified investors; prohibited jurisdictions include the US and Canada",
+    ],
+    evidence: "https://docs.anchored.finance/trading-api/getting-started/introduction ; …/authentication/headers-and-permissions ; …/getting-started/eligibility",
+  },
+];
+
 /** Recipient binding: a quote whose route delivers anywhere but the owner is refused before anything else. */
 export function recipientProblem(q: Pick<InvestQuote, "recipient">, owner: Address): "RECIPIENT_MISMATCH" | null {
   return q.recipient.toLowerCase() === owner.toLowerCase() ? null : "RECIPIENT_MISMATCH";
