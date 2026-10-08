@@ -14,7 +14,7 @@ test("Invest: no stock is offered, NVIDIA shows low liquidity with its reason, n
   const details = page.getByLabel("NVIDIA details");
   await expect(details).toContainText("above Everpiece's 2% limit");
   await expect(details).toContainText("Shown only with a live, verified quote");
-  await expect(details).not.toContainText("$");
+  await expect(details).not.toContainText(/\$\d+\.\d{2}/); // no share price; the "$5" in the reason is an amount
   await expect(page.getByRole("button", { name: /buy/i })).toHaveCount(0);
   await details.getByRole("button", { name: "Back to stocks" }).click();
   await expect(page.getByLabel("Stocks")).toBeVisible();

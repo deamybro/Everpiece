@@ -4,6 +4,25 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 34 — 2026-10-08 — Invest screen on a fresh mainnet route scan
+
+- **Shared:** Invest model (`packages/shared/src/invest.ts`):
+  - verified aStock registry, `InvestmentProvider` interface, quote-quality policy;
+  - provider records (Kuru Flow, Uniswap v4, Anchored RWA API), each with what it lacks;
+  - `INVEST_AVAILABILITY` snapshot.
+- **Re-scan, read-only (`evidence/kuru-astocks-2026-10-08/`, `docs/INVEST.md`):**
+  - 10 aStocks × USDC/AUSD/MON × $1–$25. Only aNVDA routes, and price impact is ~500 bps by $5 (max 200), so it is `LOW_LIQUIDITY`.
+  - Everything else: no route. Still no Kuru market for any aStock.
+  - Nothing broadcast.
+- **Web:** `/invest`, linked from home under "Grow":
+  - lists the stocks with status and reason, and the routes checked;
+  - shows the eligibility notice;
+  - no buy button, no price. E2E: `web/e2e/invest.spec.ts`.
+- **Ops:** local disk hit 0 MB. Freed space by deleting old scratch folders and `web/.next` (regenerable).
+- **Open:** a buy flow only once a route passes the policy and simulates. `TODO(VERIFY)` 1 aStock = 1 share is still open.
+
+---
+
 ## Session 33 — 2026-10-07 — Live E2E all green; Kuru × aStocks verification (NOT_AVAILABLE)
 
 - **E2E on `62952fc`, all green:**
