@@ -35,7 +35,7 @@ test("Earn: put $50 in, earnings only come out, the deposit stays whole, then ta
   await expect(page.locator(".balance")).toHaveText("$100.00");
 
   await page.getByRole("link", { name: "Earn on your Dollars" }).click();
-  await expect(page.getByText("Simulated yield", { exact: false })).toBeVisible();
+  await expect(page.getByText("Simulated yield: this test vault", { exact: false })).toBeVisible();
   await expect(page.getByLabel("Current rate")).toContainText("simulated");
   await expect(page.getByText("In your balance: $100.00")).toBeVisible();
 
