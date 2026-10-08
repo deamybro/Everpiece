@@ -266,22 +266,24 @@ export default function Home() {
         </ul>
       </section>
 
-      {(earnAvailable() || config.automateUrl) && (
-        <div className="bank-actions" role="group" aria-label="Grow">
-          {earnAvailable() && (
-            <Link href="/earn" className="card settings-row" aria-label="Earn on your Dollars">
-              <span className="settings-icon"><Icon name="spark" size={20} /></span>
-              <span className="grow"><strong>Earn</strong><span className="muted small">put Dollars to work</span></span>
-            </Link>
-          )}
-          {config.automateUrl && (
-            <Link href="/automate" className="card settings-row" aria-label="Automate your money">
-              <span className="settings-icon"><Icon name="clock" size={20} /></span>
-              <span className="grow"><strong>Automate</strong><span className="muted small">rules for incoming money</span></span>
-            </Link>
-          )}
-        </div>
-      )}
+      <div className="bank-actions" role="group" aria-label="Grow">
+        {earnAvailable() && (
+          <Link href="/earn" className="card settings-row" aria-label="Earn on your Dollars">
+            <span className="settings-icon"><Icon name="spark" size={20} /></span>
+            <span className="grow"><strong>Earn</strong><span className="muted small">put Dollars to work</span></span>
+          </Link>
+        )}
+        {config.automateUrl && (
+          <Link href="/automate" className="card settings-row" aria-label="Automate your money">
+            <span className="settings-icon"><Icon name="clock" size={20} /></span>
+            <span className="grow"><strong>Automate</strong><span className="muted small">rules for incoming money</span></span>
+          </Link>
+        )}
+        <Link href="/invest" className="card settings-row" aria-label="Invest in stocks">
+          <span className="settings-icon"><Icon name="activity" size={20} /></span>
+          <span className="grow"><strong>Invest</strong><span className="muted small">tokenized US stocks</span></span>
+        </Link>
+      </div>
       {payoutAvailable() && (
         <div className="bank-actions" role="group" aria-label="Bank">
           <Link href="/bank" className="card settings-row" aria-label="Cash out to my bank">

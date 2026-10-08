@@ -149,6 +149,23 @@ export const INVEST_PROVIDERS: readonly ProviderRecord[] = [
   },
 ];
 
+/**
+ * Latest verified availability per asset (read-only mainnet scan; docs/INVEST.md). The app shows this with its date —
+ * never as a live price. An asset only becomes AVAILABLE here after a quote passes the policy AND simulates.
+ */
+export type AssetAvailability = { assetId: string; status: AssetStatus; reason: string };
+export type AvailabilitySnapshot = { checkedAt: string; evidence: string; assets: AssetAvailability[] };
+export const INVEST_AVAILABILITY: AvailabilitySnapshot = {
+  checkedAt: "2026-10-08",
+  evidence: "evidence/kuru-astocks-2026-10-08/discovery.json (Kuru Flow quotes at block 111501031; nothing signed or sent)",
+  assets: [
+    // $1 → $5 moves the effective price from $263.19 to $276.38 per aNVDA (~500 bps impact; policy max 200).
+    { assetId: "aNVDA", status: "LOW_LIQUIDITY", reason: "A route exists, but even a $5 buy moves the price about 5%, above Everpiece's 2% limit." },
+    { assetId: "aAAPL", status: "UNAVAILABLE", reason: "No route: Kuru found no path from USDC, AUSD or MON." },
+    { assetId: "aMSFT", status: "UNAVAILABLE", reason: "No route: Kuru found no path from USDC, AUSD or MON." },
+  ],
+};
+
 /** Recipient binding: a quote whose route delivers anywhere but the owner is refused before anything else. */
 export function recipientProblem(q: Pick<InvestQuote, "recipient">, owner: Address): "RECIPIENT_MISMATCH" | null {
   return q.recipient.toLowerCase() === owner.toLowerCase() ? null : "RECIPIENT_MISMATCH";

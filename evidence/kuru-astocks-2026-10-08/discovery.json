@@ -1,0 +1,1257 @@
+{
+ "startedAt": "2026-10-08T03:19:46.161Z",
+ "finishedAt": "2026-10-08T04:50:14.455Z",
+ "head": 111501031,
+ "registeredMarkets": 597,
+ "stockMarkets": [],
+ "exchangeInfoSymbols": [
+  "WETH_USDC",
+  "XAUT_USDC",
+  "WBTC_AUSD",
+  "AUSD_USDC",
+  "MON_USDC",
+  "MON_AUSD",
+  "cbBTC_USDC"
+ ],
+ "apiHits": [],
+ "monPerUsd": 39.340516,
+ "summary": {
+  "aNVDA": {
+   "routes": [
+    "USDC->aNVDA $1",
+    "USDC->aNVDA $2",
+    "USDC->aNVDA $5",
+    "USDC->aNVDA $10",
+    "USDC->aNVDA $25",
+    "AUSD->aNVDA $5",
+    "MON->aNVDA ~$5"
+   ],
+   "kuruMarkets": 0
+  },
+  "aAAPL": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aMSFT": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aTSLA": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aGOOGL": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aAMZN": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aMETA": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aAMD": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aPLTR": {
+   "routes": [],
+   "kuruMarkets": 0
+  },
+  "aAVGO": {
+   "routes": [],
+   "kuruMarkets": 0
+  }
+ },
+ "quotes": [
+  {
+   "label": "CONTROL USDC->MON $10",
+   "at": "2026-10-08T03:19:48.992Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x0000000000000000000000000000000000000000",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "393405160174507065461",
+   "minOut": "392657690370175502036",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e703000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000154938590087a186d4000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb603000000000000000000000000000000000000000000000000000000000098968000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000004802754704bc059f8c67012fed69bc8a327a5aafb60301ffff0163e48b725540a3db24acf6682a29f877808c53f200013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff0200000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "USDC->aNVDA $1",
+   "at": "2026-10-08T03:19:50.761Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "3799533851710211",
+   "minOut": "3787375343384738",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000000d749909f938a2000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000000f424000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000c302754704bc059f8c67012fed69bc8a327a5aafb60301ffff0163e48b725540a3db24acf6682a29f877808c53f200013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "USDC->aNVDA $2",
+   "at": "2026-10-08T03:19:52.168Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "7504889988196184",
+   "minOut": "7480874340233956",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000001a93d0c9a8b2e4000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000001e848000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000c302754704bc059f8c67012fed69bc8a327a5aafb60301ffff0163e48b725540a3db24acf6682a29f877808c53f200013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "USDC->aNVDA $5",
+   "at": "2026-10-08T03:19:53.559Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "18090851658862538",
+   "minOut": "18032960933554177",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000004010e1e6b16801000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000004c4b4000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000ce02754704bc059f8c67012fed69bc8a327a5aafb60301ffff03065c9d28e428a0db40191a54d33d5b7c71a9c3940105f5e10000000000000000000000000000000000000000000000000000000002540be400060301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c400001900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "USDC->aNVDA $10",
+   "at": "2026-10-08T03:19:55.020Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "34141986226240151",
+   "minOut": "34032731870316182",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb0000000000000000000000000000000000000000000000000078e896ddddc696000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb603000000000000000000000000000000000000000000000000000000000098968000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000ce02754704bc059f8c67012fed69bc8a327a5aafb60301ffff03065c9d28e428a0db40191a54d33d5b7c71a9c3940105f5e10000000000000000000000000000000000000000000000000000000002540be400060301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c400001900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "USDC->aNVDA $25",
+   "at": "2026-10-08T03:19:56.468Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "73007698557480227",
+   "minOut": "72774073922096290",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb00000000000000000000000000000000000000000000000001028ba278fc0ca2000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000017d784000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000ce02754704bc059f8c67012fed69bc8a327a5aafb60301ffff03065c9d28e428a0db40191a54d33d5b7c71a9c3940105f5e10000000000000000000000000000000000000000000000000000000002540be400060301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c400001900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "AUSD->aNVDA $5",
+   "at": "2026-10-08T03:19:57.990Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "18072689490933172",
+   "minOut": "18014856884562185",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "0",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb0000000000000000000000000000000000000000000000000040006ab948a90900000000000000000000000000000000efe302beaa2b3e6e1b18d08d69a9012a00000000000000000000000000000000000000000000000000000000004c4b4000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000c30200000000efe302beaa2b3e6e1b18d08d69a9012a01ffff01d5b70d70cbe6c42bcd1aaa662a21673a83f4615b01013bd359c1119da7da1d913d1c4d2b7c461115433a01ffff02000301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "MON->aNVDA ~$5",
+   "at": "2026-10-08T03:19:59.821Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0x701193374879131f923532987c7Ef363a91a80eB",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": "success",
+   "output": "18089455043593670",
+   "minOut": "18004434604888779",
+   "message": null,
+   "to": "0xb3e6778480b2E488385E8205eA05E20060B813cb",
+   "value": "196702580000000000000",
+   "calldata": "ce1e7030000000000000000000000000701193374879131f923532987c7ef363a91a80eb000000000000000000000000000000000000000000000000003ff6f0190192cb000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000aa9cbf255c6db400000000000000000000000000062ee1b8d1efdf8f73c78db87b888406b194e266a000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000007b0301ffff08188d586ddcf52439676ca21a244753fa19f9ea8e0000000000000000000000000000000000000000701193374879131f923532987c7ef363a91a80eb0009c4000019000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "label": "USDC->aAAPL $1",
+   "at": "2026-10-08T03:20:01.274Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAAPL $2",
+   "at": "2026-10-08T03:20:02.646Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAAPL $5",
+   "at": "2026-10-08T03:20:04.087Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAAPL $10",
+   "at": "2026-10-08T03:20:05.539Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAAPL $25",
+   "at": "2026-10-08T03:20:06.918Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aAAPL $5",
+   "at": "2026-10-08T03:20:08.313Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aAAPL ~$5",
+   "at": "2026-10-08T03:20:09.735Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0x17683e492d0C8910F7c0157D04af31Cb7A23Ad71",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMSFT $1",
+   "at": "2026-10-08T03:20:11.179Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMSFT $2",
+   "at": "2026-10-08T03:20:12.670Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMSFT $5",
+   "at": "2026-10-08T03:20:14.048Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMSFT $10",
+   "at": "2026-10-08T03:20:15.444Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMSFT $25",
+   "at": "2026-10-08T03:20:16.883Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aMSFT $5",
+   "at": "2026-10-08T03:20:18.277Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aMSFT ~$5",
+   "at": "2026-10-08T03:20:19.656Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0x73E9EB2C7a4B4E8c68232b31Ea0F1246963D0375",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aTSLA $1",
+   "at": "2026-10-08T03:20:21.049Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aTSLA $2",
+   "at": "2026-10-08T03:20:22.878Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aTSLA $5",
+   "at": "2026-10-08T03:20:24.590Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aTSLA $10",
+   "at": "2026-10-08T03:20:26.018Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aTSLA $25",
+   "at": "2026-10-08T03:20:27.437Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aTSLA $5",
+   "at": "2026-10-08T03:20:28.828Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aTSLA ~$5",
+   "at": "2026-10-08T03:20:30.581Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0x10FAD4A60Adb421F8F5Ca6f9f2eAf2DbC110E146",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aGOOGL $1",
+   "at": "2026-10-08T03:23:37.261Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": "pending",
+   "output": null,
+   "minOut": null,
+   "message": "failed to get liquidity data for any pair, please retry in a moment",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aGOOGL $2",
+   "at": "2026-10-08T03:45:02.569Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "2000000"
+   },
+   "http": null,
+   "status": null,
+   "message": "network: TimeoutError"
+  },
+  {
+   "label": "USDC->aGOOGL $5",
+   "at": "2026-10-08T04:06:27.872Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "5000000"
+   },
+   "http": null,
+   "status": null,
+   "message": "network: TimeoutError"
+  },
+  {
+   "label": "USDC->aGOOGL $10",
+   "at": "2026-10-08T04:27:53.182Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "10000000"
+   },
+   "http": null,
+   "status": null,
+   "message": "network: TimeoutError"
+  },
+  {
+   "label": "USDC->aGOOGL $25",
+   "at": "2026-10-08T04:49:18.501Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "25000000"
+   },
+   "http": null,
+   "status": null,
+   "message": "network: TimeoutError"
+  },
+  {
+   "label": "AUSD->aGOOGL $5",
+   "at": "2026-10-08T04:49:19.912Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": "error",
+   "output": null,
+   "minOut": null,
+   "message": "insufficient liquidity",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aGOOGL ~$5",
+   "at": "2026-10-08T04:49:21.298Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0xBDe676CDF5564Ef64CCD8555Aa9B56867D8D1aD5",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": "error",
+   "output": null,
+   "minOut": null,
+   "message": "insufficient liquidity",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMZN $1",
+   "at": "2026-10-08T04:49:22.684Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMZN $2",
+   "at": "2026-10-08T04:49:24.142Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMZN $5",
+   "at": "2026-10-08T04:49:25.897Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMZN $10",
+   "at": "2026-10-08T04:49:27.297Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMZN $25",
+   "at": "2026-10-08T04:49:28.808Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aAMZN $5",
+   "at": "2026-10-08T04:49:30.192Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aAMZN ~$5",
+   "at": "2026-10-08T04:49:31.572Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0x06f272082339A90e81e1DCB8AB892fD1a8c5E4C0",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMETA $1",
+   "at": "2026-10-08T04:49:32.950Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMETA $2",
+   "at": "2026-10-08T04:49:34.353Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMETA $5",
+   "at": "2026-10-08T04:49:35.914Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMETA $10",
+   "at": "2026-10-08T04:49:37.269Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aMETA $25",
+   "at": "2026-10-08T04:49:38.863Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aMETA $5",
+   "at": "2026-10-08T04:49:40.466Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aMETA ~$5",
+   "at": "2026-10-08T04:49:42.256Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0xa1847139cbd660ABC2f7b889d7CBCF18C56407fb",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMD $1",
+   "at": "2026-10-08T04:49:43.946Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMD $2",
+   "at": "2026-10-08T04:49:45.803Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMD $5",
+   "at": "2026-10-08T04:49:47.686Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMD $10",
+   "at": "2026-10-08T04:49:49.359Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAMD $25",
+   "at": "2026-10-08T04:49:50.745Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aAMD $5",
+   "at": "2026-10-08T04:49:52.364Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aAMD ~$5",
+   "at": "2026-10-08T04:49:53.745Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0xbdf82C0DAFCf73834d10639c0F0Bf14b84808C43",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aPLTR $1",
+   "at": "2026-10-08T04:49:55.197Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aPLTR $2",
+   "at": "2026-10-08T04:49:56.734Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aPLTR $5",
+   "at": "2026-10-08T04:49:58.655Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aPLTR $10",
+   "at": "2026-10-08T04:50:00.008Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aPLTR $25",
+   "at": "2026-10-08T04:50:01.385Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aPLTR $5",
+   "at": "2026-10-08T04:50:02.983Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aPLTR ~$5",
+   "at": "2026-10-08T04:50:04.521Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0xB95956daacE89226185FB696C2Cc3F0d9BBFD4e3",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAVGO $1",
+   "at": "2026-10-08T04:50:05.898Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "1000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAVGO $2",
+   "at": "2026-10-08T04:50:07.255Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "2000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAVGO $5",
+   "at": "2026-10-08T04:50:08.766Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAVGO $10",
+   "at": "2026-10-08T04:50:10.371Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "10000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "USDC->aAVGO $25",
+   "at": "2026-10-08T04:50:11.755Z",
+   "request": {
+    "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "25000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "AUSD->aAVGO $5",
+   "at": "2026-10-08T04:50:13.108Z",
+   "request": {
+    "tokenIn": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "5000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  },
+  {
+   "label": "MON->aAVGO ~$5",
+   "at": "2026-10-08T04:50:14.454Z",
+   "request": {
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0x4dfbCd033662BC41de8996886E751613C2B8e8e5",
+    "amount": "196702580000000000000"
+   },
+   "http": 200,
+   "status": null,
+   "output": null,
+   "minOut": null,
+   "message": "no candidate paths available between tokens",
+   "to": null,
+   "value": null,
+   "calldata": null
+  }
+ ]
+}
