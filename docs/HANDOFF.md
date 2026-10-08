@@ -19,6 +19,8 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
   - shows the eligibility notice;
   - no buy button, no price. E2E: `web/e2e/invest.spec.ts`.
 - **Ops:** local disk hit 0 MB. Freed space by deleting old scratch folders and `web/.next` (regenerable).
+  - The full disk truncated `web/e2e/earn.spec.ts` to 0 bytes and `c023df8` committed it empty. Restored in `dfa7e9d`; no other tracked file is empty.
+- **E2E on `0fb4746` + specs from `dfa7e9d`:** `invest` and `earn` green on the test stack.
 - **Open:** a buy flow only once a route passes the policy and simulates. `TODO(VERIFY)` 1 aStock = 1 share is still open.
 
 ---
