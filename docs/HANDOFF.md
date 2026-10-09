@@ -4,6 +4,37 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 36 — 2026-10-09 — Mainnet audit: USDC + AUSD first-class (no broadcast)
+
+- **Audit (`docs/MAINNET_AUDIT.md`):** EverpiecePay v1 made AUSD mandatory, and on mainnet it could not accept USDC without Agora's approval. **Do not deploy v1.**
+  - Monad USDC has the same payee-checked ERC-3009 receive as AUSD (VERIFIED §4.18).
+  - The escrow, Earn and Pay rejected USDC only because of AUSD's upgrade-flag read.
+- **Built (branch `feat/usdc-first-class`):**
+  - `EverpiecePayV2`: USDC or AUSD settlement, DIRECT or CONVERTED via the Agora pair; one signature; no owner; `quote()` reports unavailable.
+  - `EverpieceEscrowUsdc` and `EverpieceEarnUsdc`: the guard is `internal virtual`, otherwise unchanged.
+  - Shared: `payV2.ts` (USDC is the default) and `flags.ts` (the ten mandated flags, fail-closed).
+  - V2 ABI; `DeployEverpieceMainnetV2.s.sol`.
+- **Tests:**
+  - 265 offline contract tests pass;
+  - 30/30 mainnet-fork tests;
+  - shared 76/76, relayer 22/22;
+  - typecheck clean.
+  - The deploy script simulates on mainnet at ≈7.84M gas, ≤1.58 MON.
+- **Next (code):**
+  - relayer `/v1/pay/v2`, with per-asset escrow, Earn and gas limits (MAINNET_AUDIT §4);
+  - web asset choice, USDC by default;
+  - indexer V2 event;
+  - Automate per-asset;
+  - wiring the flags.
+- **Owner:**
+  - scoped GO for the deploy and canaries;
+  - Agora APPROVED_SWAPPER for the PayV2 address (after the deploy);
+  - Aurora key;
+  - escrow owner (Safe) and claim approver;
+  - F-01.
+
+---
+
 ## Session 35 — 2026-10-09 — Working clone, refund check (DoD #15)
 
 - **Working folder is now `C:Everpiece`**, a clone of github.com/deamybro/Everpiece (160 commits, no trailers). The old folder is an archive and is never pushed from.
