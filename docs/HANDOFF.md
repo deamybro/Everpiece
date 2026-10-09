@@ -4,6 +4,15 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 35 — 2026-10-09 — Working clone, refund check (DoD #15)
+
+- **Working folder is now `C:Everpiece`**, a clone of github.com/deamybro/Everpiece (160 commits, no trailers). The old folder is an archive and is never pushed from.
+  - A clean install of the clone passes: 137 JS/TS tests across 7 workspaces, typecheck clean, 243 contract tests (6 fork tests skipped without `RUN_FORK_TESTS=true`).
+- **O12 / DoD #15 proven live:** the expired $1 testnet payment was refunded through the public relayer. tx `0xe2472401…f428`, block 69472739, CONFIRMED, REFUNDED, sender balance 99.00 → 100.00 AUSD.
+- **Still open (owner):** F-01 decision; mainnet GO with amounts, `everpiece.xyz` for passkeys, Agora `APPROVED_SWAPPER` for EverpiecePay; deadline time; demo video, project text and bounty text; the manual link-claim and real-phone checks in READINESS.md. Internal deadline 12 Oct.
+
+---
+
 ## Session 34 — 2026-10-08 — Invest screen on a fresh mainnet route scan
 
 - **Shared:** Invest model (`packages/shared/src/invest.ts`):

@@ -49,7 +49,7 @@ These run from the server in a capped container (`deploy/test-stack/e2e.sh`).
 | 12 | create another payment | ✅ | `username.spec` (second payment, pinned) |
 | 13 | cancel before claim | ✅ | `history.spec`, `username.spec` |
 | 14 | receive an exact refund | ✅ | the balance is back to the cent ($80.00 after cancel) |
-| 15 | allow an expired payment's refund | ⏳ | A live $1 testnet payment with the minimum 1-day expiry: `0xb1eb8e92…a5dc`, created today, CONFIRMED at finality. It expires **2026-10-07 10:11 UTC**. Refunding early was correctly refused (`PaymentNotExpired`, no gas). The refund runs after expiry. Fork-proven already |
+| 15 | allow an expired payment's refund | ✅ | Run live 2026-10-09 06:48 UTC on the testnet AUSD escrow: `0xb1eb8e92…a5dc` ($1, minimum 1-day expiry) was refunded by anyone through the public relayer, no signature: tx `0xe2472401d4a02539d23f42f7cc47b23bb4ec9ebc50a92ec1c7ce9201541cf428`, block 69472739, CONFIRMED at finality, chain status REFUNDED. The sender's AUSD went 99.00 → 100.00 (exactly the $1). Earlier the refund was correctly refused before expiry (`PaymentNotExpired`). |
 | 16 | inspect real Monad evidence | ✅ | receipts link every step to the explorer (`history.spec`) |
 
 ## Final Release Checklist (§60)
