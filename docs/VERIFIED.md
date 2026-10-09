@@ -457,6 +457,17 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Notes:** TODO(VERIFY): the dashboard/appId requirement, whether arbitrary ERC-20s (an Everpiece test dollar) can be deposited, Mera EOA `personal_sign` compatibility, and audit status. Master §28.2 gate items 6–13 must be proven on testnet before launch.
 
 ### 4.11 TACEO Merces (private ERC-20 balances) on Monad
+- **Re-checked 2026-10-09** (docs.taceo.io "Deployments and status"; client SDK `@taceo/merces-client` 0.1.1, maintainers @taceo.io, repo taceolabs/merces):
+  - Mainnet status: "Mainnet, limited users, volume caps".
+  - Merces `0x9Dd5DE40592AdfcDD60F0f3fF3B014553998f7c1`, ID registry `0xF55DFe8242ec117F44Acd932adb5C233b582A04a`, token = Monad USDC.
+  - Group 4 (ANON): fee 0, max 1 USDC per action, 35 actions per epoch, 100 members.
+  - Three query nodes `query.node{0,1,2}.usdc.monad.merces.taceo.network`; compliance `compliance.usdc.monad.merces.taceo.network`.
+  - Live, read-only:
+    - `isRegistered` works;
+    - the Merces contract has code;
+    - `fetchComplianceData` returned a 256-byte attestation for a fresh address.
+  - The SDK submits from the user's own wallet (no relayer documented), so the account needs MON for gas.
+  - Private: a transfer's sender, receiver and amount. Public: registration, deposit and withdrawal amounts and accounts.
 - **Fact:** The privacy provider on Monad's official privacy page
 - **Value:**
   - Wraps existing ERC-20s into private balances. Balances and identifiers are secret-shared across independent MPC nodes (the TACEO Network), and every state change is verified on-chain by a collaborative ZK proof (coSNARK).
@@ -658,6 +669,48 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Notes:**
   - Concentrated liquidity: large conversions cross many ticks and cost more. The converter refuses partial fills (`PartialFill`).
   - The relayer caps the signed slippage at 50 bps (`MAX_CONVERT_SLIPPAGE_BPS`).
+
+### 4.20 Anchored aStocks: on-chain StockOracle, issuer contracts and access model (checked 2026-10-09)
+- **Fact:** where a fair reference price for aStocks comes from, and the only documented way to buy at it.
+- **Value:**
+  - StockOracle proxy `0x037848af338c38e1e0ab722be80bf4c2e612a1f7` on Monad (same on Ethereum and Base):
+    - 8-decimal prices; `priceId = keccak256(uppercase(trim(symbol)))`.
+    - Live `latestPrice` at ≈1791570142, session REGULAR, feed ≈19 min old:
+
+      | Symbol | Price | Bid / ask |
+      |---|---|---|
+      | NVDA | 229.52 | 229.51 / 229.53 |
+      | AAPL | 335.27 | 335.24 / 335.30 |
+      | MSFT | 533.605 | 533.55 / 533.66 |
+
+    - Anchored documents the feed may be ~15 min delayed with a 10 min heartbeat, and names 1,500 s as a practical freshness lower bound.
+  - Issuer contracts on Monad (code present, 1,589-byte proxies):
+    - StockRouter `0x4f090d817fd83753988a7b0c1d76f170f8461be8`;
+    - Cashier `0x8c1b182bb0fe4e8407404ffe37c974d6dacef3a9`;
+    - Stock `0x6d202d2f78aa26a7db51491416abf7f7a5003aac`;
+    - OneClickRouter `0x102c30ac544aed8cbf838fdc1b1677ff16df0e65`.
+  - Cash token on Monad: USDC. Production cash config: minimum amount "90" cash-token units (TODO(VERIFY): whole USDC or base units); withdrawal rate 0.9979.
+  - RWA Trading API `https://rwa-api.anchored.finance/rwa/trading`:
+    - HMAC-SHA256 over `METHOD
+URI
+TS
+NONCE
+BODY`, plus headers `x-api-chain-id` and `x-api-p: Anchored`.
+    - Every key needs a non-empty egress-IP whitelist and a `chainId + product + access` scope.
+    - Orders: the API returns StockRouter calldata that the **bound wallet** submits ("API key userAddress matches order user"), or it is sent via One Click delegation. Execution is async by Anchored's backend.
+  - Eligibility: professional/qualified investors after KYC/KYB; US and China residents excluded; a prohibited-jurisdiction list applies.
+- **Today's DEX route vs the oracle** (Kuru Flow USDC→aNVDA, 2026-10-09):
+
+  | Amount | aNVDA out | Effective price | Over oracle |
+  |---|---|---|---|
+  | $1 | 0.0039095 | $255.79 | +11.4% |
+  | $5 | 0.0185845 | $269.04 | +17.2% |
+
+  Everpiece's policy allows at most 3%, so aNVDA is LOW_LIQUIDITY and never executable.
+- **Official source:** https://docs.anchored.finance/trading-api/market-data/stock-oracle ; …/reference/environments-and-chains ; …/guides/self-submit-on-chain ; …/authentication/signature ; …/getting-started/eligibility ; …/getting-started/how-to-onboard.
+- **Code:**
+  - `packages/shared/src/invest.ts` (`ANCHORED_STOCK_ORACLE`, `referenceFromOracle`, `ANCHORED_MONAD`);
+  - `server/relayer/src/anchored.ts` (HMAC client, cross-checked against Python `hmac`).
 
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window

@@ -52,3 +52,25 @@ test("registry: only on-chain-verified aStock addresses; unknown tokens are not 
   assert.deepEqual(INVEST_ASSETS.map((a) => a.id), ["aNVDA", "aAAPL", "aMSFT"]);
   for (const a of INVEST_ASSETS) assert.match(a.verification, /on-chain/);
 });
+
+test("Anchored StockOracle: documented priceId derivation, 8dp → micro-dollars, fail closed when stale", async () => {
+  const { priceIdOf, referenceFromOracle, ORACLE_MAX_AGE_SEC } = await import("../src/index.ts");
+  assert.equal(priceIdOf(" nvda "), priceIdOf("NVDA"));
+  // live read 2026-10-09: NVDA 229.52 (bid 229.51 / ask 229.53), REGULAR session
+  const p = { price: 22_952_000_000n, bestBid: 22_951_000_000n, bestAsk: 22_953_000_000n, feedUpdateTimestamp: 1_791_568_987n, session: 2 };
+  const r = referenceFromOracle("NVDA", p, 1_791_570_142n);
+  assert.equal(r.priceMicroUsd, 229_520_000n);
+  assert.equal(r.session, "REGULAR");
+  assert.equal(r.stale, false);
+  assert.equal(referenceFromOracle("NVDA", p, 1_791_568_987n + ORACLE_MAX_AGE_SEC + 1n).stale, true);
+});
+
+test("today's aNVDA route fails the policy against the oracle reference (never executable)", async () => {
+  const { evaluateQuote, DEFAULT_QUALITY_POLICY } = await import("../src/index.ts");
+  // $5 USDC → 0.018584516 aNVDA (Kuru Flow, 2026-10-09); reference $229.52
+  const v = evaluateQuote({ amountInUsd: 5_000_000n, expectedOut: 18_584_516_141_920_770n, minOut: 18_584_516_141_920_770n, decimals: 18,
+    referencePriceMicroUsd: 229_520_000n, probePriceMicroUsd: 255_790_000n, simulated: true, expiresAt: 2n ** 62n }, DEFAULT_QUALITY_POLICY, 0n);
+  assert.equal(v.status, "LOW_LIQUIDITY");
+  assert.ok(v.failures.includes("PRICE_DEVIATION"));
+  assert.ok((v.deviationBps ?? 0) > 1_500);
+});

@@ -4,6 +4,41 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 37 — 2026-10-09 — Complete mainnet product (no broadcast)
+
+Current status, blockers and approvals: `docs/MAINNET_AUDIT.md` (rewritten as a short status page).
+
+- **Conversion without Agora:** EverpieceStableConverter on the fixed Uniswap v4 AUSD/USDC pool, the pool Kuru Flow actually routes through (found by tracing a real Kuru quote; VERIFIED §4.19). Kuru's own orderbook reverts `MarketStateError`.
+  - PayV2 tries Agora (only while approved), then the converter, then a signed truthful fallback or a revert.
+  - Gas floors stop a relayer from forcing the fallback.
+- **End to end:**
+  - relayer V2 pay and quote endpoints;
+  - directory `instantV2` / `crossChain` proofs;
+  - indexer V2 (delivered asset);
+  - web Send/Request/Pay with asset choice;
+  - external-wallet request payments via Aurora, no account;
+  - USDC Earn;
+  - feature flags.
+- **EverpieceAutomate:** bounded, unattended Earn legs via one owner grant. Relayer gasless activate/revoke plus an internal execute; the service links grants and executes them.
+- **TACEO Merces:** private balance/send in the app (`/private`). Web build fixed with an `fs/promises` alias; circuits ship as static assets.
+- **Invest:** live Anchored StockOracle reference prices; aNVDA route +11–17% over oracle → LOW_LIQUIDITY. Anchored HMAC client built; access is per-wallet KYC + key (VERIFIED §4.20).
+- **Tests:**
+  - 292+ contract tests;
+  - fork suites (converter, PayV2, gas, Automate, USDC variants);
+  - shared 81, relayer 31, directory 15, automate 11, others green;
+  - indexer 7 (WSL);
+  - web production build OK.
+- **Deploy simulation:** 5 contracts, 12.09M gas, ≤2.44 MON.
+- **Open (owner):**
+  - deploy GO, relayer funding GO, canary GO;
+  - Aurora key;
+  - optional Agora approval;
+  - MON for TACEO users;
+  - Anchored partner access.
+- **Naira:** Coming Soon.
+
+---
+
 ## Session 36 — 2026-10-09 — Mainnet audit: USDC + AUSD first-class (no broadcast)
 
 - **Audit (`docs/MAINNET_AUDIT.md`):** EverpiecePay v1 made AUSD mandatory, and on mainnet it could not accept USDC without Agora's approval. **Do not deploy v1.**

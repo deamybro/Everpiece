@@ -2,7 +2,7 @@
 
 > Money arrives. You decide what it should do next. Money then moves only within limits you signed, and every result can be verified.
 
-**Status (2026-10-07):**
+**Status (2026-10-09):** bounded unattended runs are built (§5). Earlier status (2026-10-07):
 - The engine and persistence are built and tested:
   - `packages/shared/src/automate.ts` (12 tests);
   - `server/automate` (5 HTTP tests).
@@ -82,13 +82,24 @@
   - the owner confirms it with one fingerprint, which signs the leg transactions themselves;
   - the service verifies the result on-chain.
   - Nothing runs while the owner is away.
-- **`BOUNDED_MODULE` (designed, not built; owner decision O-A):** an `EverpieceAutomate` contract would:
-  - hold an AUSD allowance capped at the rule's total;
-  - check each execution against the rule's signed caps, expiry and allow-listed targets (verified Earn vault, verified swap route) on-chain;
-  - send every output to the owner (deposit `onBehalfOf` owner, stock to owner);
-  - let the relayer execute.
+- **`BOUNDED_MODULE` (built 2026-10-09: `contracts/src/EverpieceAutomate.sol`):**
+  - **Signing:** the owner signs ONE grant (EIP-712 "Everpiece Automate" v1) plus an ERC-2612 permit for its total, in one passkey prompt. The grant contains:
+    - the rule id;
+    - the executor (the relayer);
+    - one allow-listed Earn vault;
+    - maxPerExecution ≤ maxPerDay ≤ total;
+    - an expiry ≤ 366 days.
 
-  It needs its own adversarial suite and owner review before mainnet. Until then the engine refuses `BOUNDED_MODULE` rules (`AUTHORIZATION_NOT_AVAILABLE`).
+    The app builds it from the rule's own signed limits (`total` = the monthly cap), and the service refuses a grant looser than its rule.
+  - **On-chain enforcement:** only the executor may call `execute`. Each call is limited to the per-run, UTC-day and total caps, and runs once per `executionId` (the leg's idempotency key). It pulls exactly `assets` and deposits them into the vault with receiver = owner, with `minShares` enforced and nothing left behind. Principal is recorded in `principalOf`, so "yield only" never counts it as earnings.
+  - **What it cannot do:** no other destination, no withdrawal, no admin, no upgrade.
+  - **Revoking:** `revoke` (owner) or `revokeBySig` (gasless). An expired or revoked grant can't run.
+  - **Service side:** `POST /v1/automate/grants` links a grant after reading it on-chain at finality (same rule, owner and executor; active; vault in the rule). Planned runs of a linked rule execute through the relayer's internal `/v1/internal/automate/execute` (key `RELAYER_INTERNAL_KEY`). A leg is DONE only after the relayer confirms the `Executed` event and state at finality. A failure leaves the money in the balance. A leg not final in time stays EXECUTING and `sweepBounded` re-checks it; it is idempotent on-chain, so it is never run twice and never reported failed while it may still settle.
+  - **Proof:**
+    - 11 unit + fuzz tests (`EverpieceAutomate.t.sol`);
+    - a fork with real USDC into Aave waMonUSDC (`RelayerGasV2.t.sol` AutomateForkTest);
+    - service tests (`server/automate/test/bounded.test.ts`).
+  - **Only Earn deposits run unattended.** BUY_STOCK has no executable route (docs/INVEST.md).
 
 ## 6. Service API (`server/automate`, port 8794, behind the web proxy)
 

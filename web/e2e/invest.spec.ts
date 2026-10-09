@@ -1,5 +1,6 @@
 // Invest (docs/INVEST.md): the screen tells the truth about availability. No aStock route passes the quality rules
-// (2026-10-08 mainnet scan), so nothing is offered for purchase and no price is invented.
+// (2026-10-09: the only aNVDA route pays 11–17% over Anchored's own oracle price), so nothing is offered for purchase.
+// A reference price may be shown, clearly labelled as not a buy price; no buy price is ever invented.
 import { expect, test } from "@playwright/test";
 
 test("Invest: no stock is offered, NVIDIA shows low liquidity with its reason, no price is shown", async ({ page }) => {
@@ -12,9 +13,9 @@ test("Invest: no stock is offered, NVIDIA shows low liquidity with its reason, n
 
   await page.getByRole("button", { name: "NVIDIA Low liquidity" }).click();
   const details = page.getByLabel("NVIDIA details");
-  await expect(details).toContainText("above Everpiece's 2% limit");
+  await expect(details).toContainText("above Everpiece's 3% limit");
   await expect(details).toContainText("Shown only with a live, verified quote");
-  await expect(details).not.toContainText(/\$\d+\.\d{2}/); // no share price; the "$5" in the reason is an amount
+  await expect(details).toContainText("Reference price (not a buy price)");
   await expect(page.getByRole("button", { name: /buy/i })).toHaveCount(0);
   await details.getByRole("button", { name: "Back to stocks" }).click();
   await expect(page.getByLabel("Stocks")).toBeVisible();

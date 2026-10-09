@@ -1,7 +1,7 @@
 // Everpiece Invest (docs/INVEST.md): tokenized equities as a money-account feature, not a trading terminal. An asset is
 // AVAILABLE only when a real route exists, its quote passes the quality policy, the transaction simulates, and the
 // owner is eligible. Existence of an ERC-20 proves nothing. Amounts: bigint base units; prices in micro-dollars.
-import type { Address, Hex } from "viem";
+import { keccak256, toBytes, type Address, type Hex } from "viem";
 
 export type AssetStatus = "AVAILABLE" | "LOW_LIQUIDITY" | "UNAVAILABLE" | "COMING_SOON" | "RESTRICTED";
 
@@ -26,6 +26,69 @@ export const INVEST_ASSETS: readonly InvestAsset[] = [
   { id: "aAAPL", symbol: "aAAPL", company: "Apple", issuer: "Anchored", referenceTicker: "AAPL", chainId: 143, token: "0x17683e492d0c8910f7c0157d04af31cb7a23ad71", decimals: 18, verification: "on-chain name \"Apple aStock\" / aAAPL / 18 (2026-10-06)" },
   { id: "aMSFT", symbol: "aMSFT", company: "Microsoft", issuer: "Anchored", referenceTicker: "MSFT", chainId: 143, token: "0x73e9eb2c7a4b4e8c68232b31ea0f1246963d0375", decimals: 18, verification: "on-chain name \"Microsoft aStock\" / aMSFT / 18 (2026-10-06)" },
 ];
+
+// ── reference price: Anchored's on-chain StockOracle (docs.anchored.finance "Stock Oracle"; VERIFIED §4.20) ───────────
+
+/** Same deterministic proxy on Ethereum, Monad and Base. 8-decimal prices; one priceId per symbol. */
+export const ANCHORED_STOCK_ORACLE: Address = "0x037848af338c38e1e0ab722be80bf4c2e612a1f7";
+export const stockOracleAbi = [
+  {
+    type: "function", name: "latestPrice", stateMutability: "view",
+    inputs: [{ name: "priceId", type: "bytes32" }],
+    outputs: [{
+      name: "", type: "tuple", components: [
+        { name: "price", type: "int128" }, { name: "bestBid", type: "int128" }, { name: "bestAsk", type: "int128" },
+        { name: "feedUpdateTimestamp", type: "uint64" }, { name: "publishedAt", type: "uint64" }, { name: "roundId", type: "uint80" },
+        { name: "session", type: "uint8" },
+      ],
+    }],
+  },
+] as const;
+export const ORACLE_SESSIONS = ["UNKNOWN", "PRE_MARKET", "REGULAR", "POST_MARKET", "OVERNIGHT", "CLOSED"] as const;
+export type OracleSession = (typeof ORACLE_SESSIONS)[number];
+/** priceId = keccak256(uppercase(trim(symbol))) — the documented derivation. */
+export const priceIdOf = (ticker: string): Hex => keccak256(toBytes(ticker.trim().toUpperCase()));
+/**
+ * Anchored documents that the source quote may be ~15 min delayed with a 10 min heartbeat; 1,500 s is their stated
+ * practical lower bound for a freshness check. Older than this = no usable reference price (fail closed).
+ */
+export const ORACLE_MAX_AGE_SEC = 1_500n;
+export type ReferencePrice = { ticker: string; priceMicroUsd: bigint; bidMicroUsd: bigint; askMicroUsd: bigint; session: OracleSession; ageSec: bigint; stale: boolean };
+/** 8-decimal oracle payload → micro-dollars (6 dp), with session and staleness. */
+export function referenceFromOracle(
+  ticker: string,
+  p: { price: bigint; bestBid: bigint; bestAsk: bigint; feedUpdateTimestamp: bigint; session: number },
+  nowSec: bigint,
+  maxAgeSec: bigint = ORACLE_MAX_AGE_SEC,
+): ReferencePrice {
+  const ageSec = nowSec > p.feedUpdateTimestamp ? nowSec - p.feedUpdateTimestamp : 0n;
+  return {
+    ticker, priceMicroUsd: p.price / 100n, bidMicroUsd: p.bestBid / 100n, askMicroUsd: p.bestAsk / 100n,
+    session: ORACLE_SESSIONS[p.session] ?? "UNKNOWN", ageSec, stale: ageSec > maxAgeSec || p.price <= 0n,
+  };
+}
+
+// ── Anchored issuer route (docs.anchored.finance Trading API; VERIFIED §4.20) ──────────────────────────────────────
+/**
+ * The ONLY documented way to buy aStocks at the reference price: Anchored's RWA Trading API + StockRouter (same
+ * addresses on Base, Monad, Ethereum). Orders are placed by the trading wallet and executed by Anchored's backend.
+ * Access is per wallet: an API key bound to that wallet ("API key userAddress matches order user"), HMAC-signed
+ * requests from a whitelisted egress IP, and a KYC'd professional/qualified investor behind it.
+ */
+export const ANCHORED_MONAD = {
+  apiBase: "https://rwa-api.anchored.finance/rwa/trading",
+  chainId: 143,
+  product: "Anchored",
+  stockRouter: "0x4f090d817fd83753988a7b0c1d76f170f8461be8",
+  cashier: "0x8c1b182bb0fe4e8407404ffe37c974d6dacef3a9",
+  stock: "0x6d202d2f78aa26a7db51491416abf7f7a5003aac",
+  oneClickRouter: "0x102c30ac544aed8cbf838fdc1b1677ff16df0e65",
+  cashToken: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+  /** "Minimum amount: 90 cash-token units" (production cash config). TODO(VERIFY): whole USDC vs base units — Anchored. */
+  minCashUnits: "90",
+  /** Cash withdrawal rate 0.9979 (production cash config). */
+  withdrawalRate: "0.9979",
+} as const;
 
 // ── quote-quality policy ────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -141,9 +204,11 @@ export const INVEST_PROVIDERS: readonly ProviderRecord[] = [
   {
     id: "anchored-rwa-api", name: "Anchored RWA API (issuer; Monday Trade runs on it)", enabled: false, kind: "ISSUER_API",
     missing: [
-      "Partner API key + secret (x-api-key / HMAC) with a WRITABLE scope for chain 143 (and 10143 for testnet)",
-      "Egress IP whitelisted on the key (an empty whitelist rejects every request)",
-      "Investor eligibility per Anchored: KYC/KYB; professional/qualified investors; prohibited jurisdictions include the US and Canada",
+      "An Anchored account per trading wallet, approved after KYC/KYB as a professional/qualified investor (US and China residents excluded; prohibited-jurisdiction list)",
+      "An API key + secret for each such wallet: keys are bound to one userAddress (orders must come from it), with chainId 143 + product Anchored + WRITE scope",
+      "Everpiece's egress IP on every key's whitelist (an empty whitelist rejects every request)",
+      "For gasless orders: the user's One Click delegation (OneClickRouter) — otherwise the wallet self-submits and pays MON gas",
+      "Or: a partner/omnibus arrangement with Anchored that removes the per-wallet key model — not documented; only Anchored can offer it",
     ],
     evidence: "https://docs.anchored.finance/trading-api/getting-started/introduction ; …/authentication/headers-and-permissions ; …/getting-started/eligibility",
   },
@@ -156,11 +221,11 @@ export const INVEST_PROVIDERS: readonly ProviderRecord[] = [
 export type AssetAvailability = { assetId: string; status: AssetStatus; reason: string };
 export type AvailabilitySnapshot = { checkedAt: string; evidence: string; assets: AssetAvailability[] };
 export const INVEST_AVAILABILITY: AvailabilitySnapshot = {
-  checkedAt: "2026-10-08",
-  evidence: "evidence/kuru-astocks-2026-10-08/discovery.json (Kuru Flow quotes at block 111501031; nothing signed or sent)",
+  checkedAt: "2026-10-09",
+  evidence: "Kuru Flow quotes vs Anchored StockOracle (NVDA $229.52, REGULAR session) on 2026-10-09; nothing signed or sent. Earlier scan: evidence/kuru-astocks-2026-10-08/",
   assets: [
-    // $1 → $5 moves the effective price from $263.19 to $276.38 per aNVDA (~500 bps impact; policy max 200).
-    { assetId: "aNVDA", status: "LOW_LIQUIDITY", reason: "A route exists, but even a $5 buy moves the price about 5%, above Everpiece's 2% limit." },
+    // $1 → 0.0039095 aNVDA ($255.79 each, +11.4% over the oracle); $5 → $269.04 each (+17.2%). Policy max deviation 3%.
+    { assetId: "aNVDA", status: "LOW_LIQUIDITY", reason: "The only route pays about 11–17% over the real NVDA price (Anchored's oracle), far above Everpiece's 3% limit." },
     { assetId: "aAAPL", status: "UNAVAILABLE", reason: "No route: Kuru found no path from USDC, AUSD or MON." },
     { assetId: "aMSFT", status: "UNAVAILABLE", reason: "No route: Kuru found no path from USDC, AUSD or MON." },
   ],
