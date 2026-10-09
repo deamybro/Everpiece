@@ -2,7 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {EverpiecePayV2} from "../src/EverpiecePayV2.sol";
+import {EverpiecePayV2, IStableConverter} from "../src/EverpiecePayV2.sol";
+import {EverpieceStableConverter, IV4PoolManager} from "../src/EverpieceStableConverter.sol";
 import {EverpieceEscrowUsdc, EverpieceEarnUsdc} from "../src/EverpieceUsdc.sol";
 import {IAUSD} from "../src/interfaces/IAUSD.sol";
 
@@ -21,7 +22,8 @@ interface IVaultView {
     function asset() external view returns (address);
 }
 
-/// @notice USDC-first mainnet set (mainnet mandate): EverpiecePayV2 (USDC + AUSD, Agora pair for conversions),
+/// @notice USDC-first mainnet set (mainnet mandate): EverpieceStableConverter (fixed Uniswap v4 AUSD/USDC pool),
+///         EverpiecePayV2 (USDC + AUSD; conversions via Agora when approved, else the converter),
 ///         EverpieceEscrowUsdc (protected USDC payments) and EverpieceEarnUsdc (Aave V3 USDC). Asserts every
 ///         on-chain fact first. The AUSD escrow / AUSD Earn keep their own scripts.
 /// @dev MAINNET BROADCAST REQUIRES THE OWNER'S EXPLICIT, SCOPED GO. Simulate only:
@@ -34,9 +36,12 @@ contract DeployEverpieceMainnetV2 is Script {
     address internal constant USDC = 0x754704Bc059F8C67012fEd69BC8A327a5aafb603; // VERIFIED §4.14, §4.18
     bytes32 internal constant USDC_DOMAIN_SEPARATOR = 0xfe22123edc0dd4aeb912eb7948c5f0e531592c2053b3067612f427db342c93c6; // §4.18
     address internal constant AUSD_USDC_PAIR = 0xf33286E3222D1c829dACeac48c0Ec651F6452470; // VERIFIED §4.14
+    address internal constant V4_POOL_MANAGER = 0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e; // VERIFIED §4.19
+    uint24 internal constant V4_FEE = 9; // VERIFIED §4.19 (pool id 0xd112fde9…27e8)
+    int24 internal constant V4_TICK_SPACING = 1;
     address internal constant WA_USDC = 0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2; // VERIFIED §4.18 (Aave USDC_STATA_TOKEN)
 
-    function run() external returns (EverpiecePayV2 pay, EverpieceEscrowUsdc escrow, EverpieceEarnUsdc earn) {
+    function run() external returns (EverpieceStableConverter conv, EverpiecePayV2 pay, EverpieceEscrowUsdc escrow, EverpieceEarnUsdc earn) {
         address owner = vm.envAddress("ESCROW_OWNER");
         address approver = vm.envAddress("CLAIM_APPROVER");
         require(owner != address(0) && approver != address(0), "owner/approver unset");
@@ -50,6 +55,7 @@ contract DeployEverpieceMainnetV2 is Script {
         require(!ITokenView(USDC).paused(), "USDC paused");
         require(IPairView(AUSD_USDC_PAIR).token0() == AUSD && IPairView(AUSD_USDC_PAIR).token1() == USDC, "pair tokens changed");
         require(IVaultView(WA_USDC).asset() == USDC, "vault asset != USDC");
+        require(V4_POOL_MANAGER.code.length > 0, "v4 PoolManager has no code");
 
         EverpiecePayV2.Asset[] memory assets = new EverpiecePayV2.Asset[](2);
         assets[0] = EverpiecePayV2.Asset({token: USDC, ausdSemantics: false});
@@ -60,7 +66,8 @@ contract DeployEverpieceMainnetV2 is Script {
         vaults[0] = WA_USDC;
 
         vm.startBroadcast();
-        pay = new EverpiecePayV2(assets, pairs);
+        conv = new EverpieceStableConverter(IV4PoolManager(V4_POOL_MANAGER), AUSD, USDC, V4_FEE, V4_TICK_SPACING);
+        pay = new EverpiecePayV2(assets, pairs, IStableConverter(address(conv)));
         escrow = new EverpieceEscrowUsdc(USDC, owner, approver);
         earn = new EverpieceEarnUsdc(USDC, vaults);
         vm.stopBroadcast();
@@ -69,6 +76,8 @@ contract DeployEverpieceMainnetV2 is Script {
         require(pay.pairFor(USDC, AUSD) == AUSD_USDC_PAIR && pay.pairFor(AUSD, USDC) == AUSD_USDC_PAIR, "post: pair");
         require(address(escrow.AUSD()) == USDC, "post: escrow token");
 
+        require(address(pay.CONVERTER()) == address(conv), "post: converter");
+        console.log("EverpieceStableConverter", address(conv));
         console.log("EverpiecePayV2", address(pay));
         console.log("EverpieceEscrowUsdc", address(escrow));
         console.log("EverpieceEarnUsdc", address(earn));

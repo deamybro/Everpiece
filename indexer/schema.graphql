@@ -103,8 +103,12 @@ type InstantPayment {
   "AUSD for a direct payment, otherwise the token converted through Agora Instant Settlement."
   sourceToken: String!
   sourceAmount: BigInt!
-  "The Agora pair used (zero address for a direct AUSD payment)."
+  "The Agora pair used (zero address for a direct AUSD payment). EverpiecePayV2: the provider (Agora pair or the v4 converter; zero = direct or fallback)."
   pair: String!
+  "EverpiecePayV2 only: the asset the recipient ACTUALLY received (from the Paid event). Null for v1 rows (AUSD)."
+  asset: String
+  "EverpiecePayV2 only: the asset the payment asked for, when a conversion fell back to delivering the source asset."
+  requestedAsset: String
   block: Int!
   timestamp: Int!
   txHash: String!

@@ -1,6 +1,6 @@
 import { getAddress, type Address } from "viem";
-import { tokenFor, type FundingPhase, type FundingSource, type RouteQuote, type TokenInfo } from "@everpiece/shared";
-import { config } from "./config";
+import { settlementAsset, tokenFor, type FundingPhase, type FundingSource, type RouteQuote, type TokenInfo } from "@everpiece/shared";
+import { config, flags } from "./config";
 import { relayer, type RelayStatus } from "./api";
 import { PayError, balanceOfToken, getQuote, payInstant } from "./pay";
 import type { Account } from "./mera";
@@ -113,3 +113,24 @@ export function saveTopUp(t: TopUp) {
   }
 }
 export const activeTopUps = () => loadTopUps().filter((t) => !t.done);
+
+// ── External-wallet payments (no Everpiece account): pay a request from any supported chain ──────────────────────
+/**
+ * Aurora delivers USDC straight to the REQUESTER on Monad (recipient = the request's account). Nothing passes through
+ * Everpiece: the payer sends from their own wallet on the origin chain to Aurora's deposit address; Aurora's solver
+ * delivers on Monad; the delivery transaction is the proof the directory checks before marking the request paid.
+ */
+export const externalPayAvailable = () => config.funding === "simulated" || (config.funding === "live" && flags.AURORA_LIVE_ENABLED);
+
+export async function loadExternalSources(): Promise<{ sources: FundingSource[]; destination: Address }> {
+  const b = await get("/v1/funding/sources");
+  const destination = getAddress(String(b.destinationToken));
+  // only an asset the requester can hold as-is (USDC is first-class) is acceptable for a direct delivery
+  if (!settlementAsset(config.chainId, destination) && config.funding !== "simulated") throw new PayError("NO_ROUTE");
+  return { sources: b.sources as FundingSource[], destination };
+}
+
+export async function externalStatus(depositAddress: Address): Promise<{ phase: FundingPhase; deliveredTxHash: string | null }> {
+  const b = await get(`/v1/funding/status?depositAddress=${depositAddress}`);
+  return { phase: b.phase as FundingPhase, deliveredTxHash: (b.deliveredTxHash as string | null) ?? null };
+}

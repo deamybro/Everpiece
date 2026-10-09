@@ -1,10 +1,13 @@
 import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
+import { readFlags, settlementAsset, type FeatureFlags } from "@everpiece/shared";
 import { AURORA_API_URL, AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID, USDC_MAINNET_ADDRESS, tokenFor } from "@everpiece/shared";
 import type { FundingConfig } from "./funding.ts";
 
 /** The only methods this relayer will ever submit (master §26.2 — no arbitrary calldata): escrow + EverpiecePay. */
-export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken", "earnDeposit", "earnWithdraw"] as const;
+export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken", "earnDeposit", "earnWithdraw", "payV2Direct", "payV2Convert"] as const;
 export const PAY_METHODS: readonly Method[] = ["payWithAusd", "payWithToken"];
+/** EverpiecePayV2 (USDC + AUSD). Two methods for one contract function so each route has its own tight gas limit. */
+export const PAY_V2_METHODS: readonly Method[] = ["payV2Direct", "payV2Convert"];
 /** EverpieceEarn (docs/EARN.md): gasless deposits/withdrawals into verified AUSD vaults; settle-once like EverpiecePay. */
 export const EARN_METHODS: readonly Method[] = ["earnDeposit", "earnWithdraw"];
 export type Method = (typeof METHODS)[number];
@@ -15,6 +18,12 @@ export type RelayerConfig = {
   escrow: Address;
   /** EverpiecePay (instant payments). Optional: without it the pay methods are refused. */
   pay?: Address;
+  /** EverpiecePayV2 (USDC + AUSD settlement). Optional: without it the V2 pay methods are refused. */
+  payV2?: Address;
+  /** Converted V2 payments: refuse a signed maxSourceAmount above amount × (1 + this), however the payer signed. */
+  maxConvertSlippageBps: bigint;
+  /** Mainnet feature flags (packages/shared/src/flags.ts), from this process's env. */
+  flags: FeatureFlags;
   /** EverpieceEarn (gasless Earn deposits/withdrawals). Optional: without it the earn methods are refused. */
   earn?: Address;
   ausd: Address;
@@ -87,6 +96,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
     escrow: address(env, "ESCROW_ADDRESS"),
     pay: env.PAY_ADDRESS ? address(env, "PAY_ADDRESS") : undefined,
+    payV2: env.PAY_V2_ADDRESS ? address(env, "PAY_V2_ADDRESS") : undefined,
+    maxConvertSlippageBps: big(env, "MAX_CONVERT_SLIPPAGE_BPS", 50n),
+    flags: readFlags(env),
     earn: env.EARN_ADDRESS ? address(env, "EARN_ADDRESS") : undefined,
     ausd: address(env, "AUSD_ADDRESS", AUSD_ADDRESS),
     ausdEip712Name: env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
@@ -108,6 +120,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       // EverpieceEarnFork.t.sol, real Aave waMonAUSD, cold state: deposit 660,269, withdraw 595,649
       earnDeposit: big(env, "GAS_LIMIT_EARN_DEPOSIT", 800_000n),
       earnWithdraw: big(env, "GAS_LIMIT_EARN_WITHDRAW", 750_000n),
+      // RelayerGasV2.t.sol, real mainnet tokens, cold state: direct USDC 307,702 / AUSD 271,199; conversion worst case
+      // (Agora approved but failing, then the v4 converter) 664,077, and that path completes at exactly this limit.
+      payV2Direct: big(env, "GAS_LIMIT_PAY_V2_DIRECT", 340_000n),
+      payV2Convert: big(env, "GAS_LIMIT_PAY_V2_CONVERT", 800_000n),
     },
     maxFeePerGasWei: big(env, "MAX_FEE_PER_GAS_WEI", parseGwei("500")),
     priorityFeeWei: big(env, "PRIORITY_FEE_WEI", parseGwei("2")), // Monad RPC suggests 2 gwei (VERIFIED §1.14)
@@ -143,12 +159,14 @@ function fundingConfig(env: NodeJS.ProcessEnv): FundingConfig | undefined {
     ? address(env, "AURORA_DESTINATION_TOKEN")
     : chainId === MONAD_MAINNET_CHAIN_ID ? USDC_MAINNET_ADDRESS : undefined;
   if (!destination) throw new Error("config: AURORA_DESTINATION_TOKEN is required off mainnet");
-  // Aurora is a FUNDING provider, never AUSD settlement (docs/ROUTING.md §3.2): it delivers a verified intermediate
-  // asset that Agora then settles into exact AUSD. AUSD itself, or a token without an Agora route, is refused.
+  // Aurora is a FUNDING provider (docs/ROUTING.md §3.2). It delivers USDC, which is itself a first-class settlement
+  // asset (EverpiecePayV2), so a payment request in USDC is settled by Aurora's delivery alone; an AUSD request is
+  // delivered as USDC and converted on-chain by the recipient. AUSD is not on Aurora's list (VERIFIED §4.14).
   const ausd = env.AUSD_ADDRESS ? address(env, "AUSD_ADDRESS") : AUSD_ADDRESS;
   if (destination.toLowerCase() === ausd.toLowerCase()) throw new Error("config: Aurora must not deliver AUSD directly (docs/ROUTING.md §3.2)");
   const t = tokenFor(chainId, destination);
-  if (!t || t.route !== "AGORA_INSTANT_SETTLEMENT") throw new Error("config: AURORA_DESTINATION_TOKEN needs a verified Agora route to AUSD (docs/ROUTING.md §3.1)");
+  const settleable = settlementAsset(chainId, destination) !== undefined || t?.route === "AGORA_INSTANT_SETTLEMENT";
+  if (!settleable) throw new Error("config: AURORA_DESTINATION_TOKEN must be a settlement asset or have a verified Agora route (docs/ROUTING.md §3.1)");
   return {
     apiUrl: (env.AURORA_API_URL || AURORA_API_URL).replace(/\/$/, ""),
     apiKey: env.AURORA_API_KEY,

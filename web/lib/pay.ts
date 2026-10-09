@@ -112,10 +112,12 @@ export type LoadedRequest = {
   problem: string | null;
 };
 
-export async function createRequest(account: Account, amount: bigint, mode: RequestMode, hours = 24): Promise<Hex> {
+/** `asset`: what the requester receives. Instant requests may name USDC or AUSD (EverpiecePayV2); protected ones use
+ *  the escrow's asset. */
+export async function createRequest(account: Account, amount: bigint, mode: RequestMode, hours = 24, asset: Address = config.dollar.address): Promise<Hex> {
   const now = await chainTime();
   const request: PaymentRequest = {
-    version: 1, requestId: randomBytes32(), recipient: account.address, asset: config.dollar.address, amount, mode,
+    version: 1, requestId: randomBytes32(), recipient: account.address, asset: mode === RequestMode.PROTECTED ? config.dollar.address : asset, amount, mode,
     expiresAt: now + BigInt(hours * 3600), memoHash: `0x${"00".repeat(32)}`,
   };
   onlyAfter(requestProblem(request, now, config.chainId));

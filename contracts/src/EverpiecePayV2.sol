@@ -23,17 +23,28 @@ interface IERC3009Receive {
     ) external;
 }
 
+/// @notice EverpieceStableConverter (fixed Uniswap v4 pool, exact output).
+interface IStableConverter {
+    function supportsPair(address tokenIn, address tokenOut) external view returns (bool);
+    function convertExactOut(address tokenIn, address tokenOut, uint256 amountOut, uint256 maxIn, address recipient)
+        external
+        returns (uint256 amountIn);
+}
+
 /// @title EverpiecePayV2
 /// @notice Instant multi-asset payments (mainnet mandate: USDC and AUSD are both first-class). The recipient receives
 ///         EXACTLY `amount` of the `asset` the payment names, final at once. The payer funds it either
-///         - DIRECT: in the same asset (USDC → USDC, AUSD → AUSD), no conversion, no pair, no third party; or
-///         - CONVERTED: in the other asset through a fixed Agora Instant Settlement pair (exact-output swap straight to
-///           the recipient, unused input back to the payer). If the pair can't deliver, the whole payment reverts:
-///           funds are never stranded half-way.
+///         - DIRECT: in the same asset (USDC → USDC, AUSD → AUSD), no conversion, no third party; or
+///         - CONVERTED: in the other asset. Providers, in order: (1) the Agora Instant Settlement pair, only while
+///           Agora has granted this contract APPROVED_SWAPPER; (2) the fixed EverpieceStableConverter (permissionless
+///           Uniswap v4 pool). Both are exact-output swaps straight to the recipient; unused input returns to the payer.
+///           If neither can deliver: with `fallbackToSource` the recipient receives `amount` of the SOURCE asset
+///           instead (event says so: `deliveredAsset` = source, never the requested asset); without it the whole
+///           payment reverts and nothing moves.
 /// @dev Gasless: a relayer submits, the payer signs ONE ERC-3009 ReceiveWithAuthorization in the source token's own
 ///      domain whose nonce is the payment id (EIP-712 digest of every term), so nothing can be changed or replayed.
-///      No owner, no admin, no upgrade path, no arbitrary calls. Assets and pairs are fixed at deployment. Agora pairs
-///      are permissioned: conversions need this contract to hold APPROVED_SWAPPER; `quote` reports when it doesn't.
+///      No owner, no admin, no upgrade path, no arbitrary calls: assets, pairs and the converter are fixed at
+///      deployment. A relayer can't starve a conversion into the fallback: each attempt requires a gas floor.
 contract EverpiecePayV2 is EIP712, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -49,42 +60,54 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
         bytes32 ref;
         address sender;
         address recipient;
-        address asset; // what the recipient receives
-        uint256 amount; // exact, in `asset` base units
+        address asset; // what the recipient asked for
+        uint256 amount; // exact, in `asset` base units (all assets have 6 decimals)
         address sourceToken; // what the payer spends
         uint256 maxSourceAmount; // the most of sourceToken the payer allows (from the quote)
         uint256 deadline;
+        bool fallbackToSource; // if conversion is unavailable, deliver `amount` of sourceToken instead of reverting
     }
 
     bytes32 public constant PAYMENT_TYPEHASH = keccak256(
-        "Payment(bytes32 ref,address sender,address recipient,address asset,uint256 amount,address sourceToken,uint256 maxSourceAmount,uint256 deadline)"
+        "Payment(bytes32 ref,address sender,address recipient,address asset,uint256 amount,address sourceToken,uint256 maxSourceAmount,uint256 deadline,bool fallbackToSource)"
     );
+
+    /// @notice Gas that must remain before each conversion attempt (well above the measured worst case), so a
+    ///         failed attempt reflects the route, not a relayer-chosen gas limit.
+    uint256 public constant MIN_GAS_AGORA = 250_000;
+    uint256 public constant MIN_GAS_CONVERTER = 400_000;
 
     /// @notice 0 = not an asset, 1 = asset, 2 = asset with AUSD semantics.
     mapping(address token => uint8) public assetKind;
     /// @notice sourceToken → asset → the Agora pair that converts between them (both directions registered).
     mapping(address source => mapping(address asset => address pair)) public pairFor;
+    /// @notice The permissionless converter (address(0) = none).
+    IStableConverter public immutable CONVERTER;
     /// @notice Payment id → settled. A signed payment executes once.
     mapping(bytes32 paymentId => bool) public settled;
 
     event AssetEnabled(address indexed token, bool ausdSemantics);
     event PairEnabled(address indexed tokenA, address indexed tokenB, address indexed pair);
+    /// @param deliveredAsset what the recipient actually received (== the requested asset unless a fallback happened)
+    /// @param provider address(0) direct / fallback, else the Agora pair or the converter that delivered
     event Paid(
         bytes32 indexed paymentId,
         bytes32 indexed ref,
         address indexed sender,
         address recipient,
-        address asset,
+        address deliveredAsset,
         uint256 amount,
         address sourceToken,
         uint256 sourceAmount,
-        address pair
+        address provider
     );
+    event ConversionFallback(bytes32 indexed paymentId, address requestedAsset, address deliveredAsset);
 
     error ZeroAddress();
     error DuplicateAsset();
     error InvalidPair();
     error DuplicatePair();
+    error InvalidConverter();
     error InvalidRecipient();
     error ZeroAmount();
     error Expired();
@@ -92,11 +115,14 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
     error UnsupportedAsset();
     error UnsupportedRoute();
     error DirectAmountMismatch();
+    error FallbackExceedsMax();
+    error ConversionUnavailable();
+    error InsufficientGas();
     error FundingMismatch();
     error SettlementMismatch();
     error AusdSemanticsChanged();
 
-    constructor(Asset[] memory assets, address[] memory pairs) EIP712("Everpiece Pay", "2") {
+    constructor(Asset[] memory assets, address[] memory pairs, IStableConverter converter) EIP712("Everpiece Pay", "2") {
         for (uint256 i = 0; i < assets.length; i++) {
             address t = assets[i].token;
             if (t == address(0)) revert ZeroAddress();
@@ -114,6 +140,8 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
             pairFor[t1][t0] = pairs[i];
             emit PairEnabled(t0, t1, pairs[i]);
         }
+        if (address(converter) != address(0) && address(converter).code.length == 0) revert InvalidConverter();
+        CONVERTER = converter;
     }
 
     /// @notice Settle a signed payment. `signature` is the sender's ERC-3009 ReceiveWithAuthorization in the
@@ -121,17 +149,19 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
     ///         validBefore = deadline, nonce = paymentIdOf(p).
     function pay(Payment calldata p, bytes calldata signature) external nonReentrant returns (bytes32 paymentId) {
         if (assetKind[p.asset] == 0) revert UnsupportedAsset();
-        address pair;
-        if (p.sourceToken == p.asset) {
+        if (assetKind[p.sourceToken] == 0) revert UnsupportedRoute();
+        bool direct = p.sourceToken == p.asset;
+        if (direct) {
             if (p.maxSourceAmount != p.amount) revert DirectAmountMismatch();
         } else {
-            pair = pairFor[p.sourceToken][p.asset];
-            if (pair == address(0)) revert UnsupportedRoute();
+            if (!p.fallbackToSource && pairFor[p.sourceToken][p.asset] == address(0) && !_converterSupports(p)) {
+                revert UnsupportedRoute();
+            }
+            if (p.fallbackToSource && p.amount > p.maxSourceAmount) revert FallbackExceedsMax();
         }
         paymentId = _open(p);
 
         IERC20 source = IERC20(p.sourceToken);
-        IERC20 asset = IERC20(p.asset);
         _requireVerifiedReceive(p.sourceToken);
         uint256 heldBefore = source.balanceOf(address(this));
         IERC3009Receive(p.sourceToken).receiveWithAuthorization(
@@ -139,27 +169,31 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
         );
         if (source.balanceOf(address(this)) != heldBefore + p.maxSourceAmount) revert FundingMismatch();
 
-        uint256 recipientBefore = asset.balanceOf(p.recipient);
-        uint256 spent;
-        if (pair == address(0)) {
-            asset.safeTransfer(p.recipient, p.amount);
-            spent = p.amount;
+        address delivered = p.asset;
+        address provider;
+        uint256 recipientBefore = IERC20(p.asset).balanceOf(p.recipient);
+        if (direct) {
+            IERC20(p.asset).safeTransfer(p.recipient, p.amount);
         } else {
-            address[] memory path = new address[](2);
-            path[0] = p.sourceToken;
-            path[1] = p.asset;
-            source.forceApprove(pair, p.maxSourceAmount);
-            uint256[] memory amounts =
-                IAgoraStableSwapPair(pair).swapTokensForExactTokens(p.amount, p.maxSourceAmount, path, p.recipient, p.deadline);
-            source.forceApprove(pair, 0);
-            // Return what the swap didn't use; this contract keeps nothing.
-            uint256 left = source.balanceOf(address(this)) - heldBefore;
-            spent = p.maxSourceAmount - left;
-            if (amounts[0] != spent) revert SettlementMismatch();
-            if (left > 0) source.safeTransfer(p.sender, left);
+            provider = _tryAgora(p);
+            if (provider == address(0)) provider = _tryConverter(p);
+            if (provider == address(0)) {
+                if (!p.fallbackToSource) revert ConversionUnavailable();
+                // Keep the payer's USDC (or AUSD) as what it is: the recipient gets `amount` of the source asset.
+                delivered = p.sourceToken;
+                recipientBefore = source.balanceOf(p.recipient);
+                source.safeTransfer(p.recipient, p.amount);
+                emit ConversionFallback(paymentId, p.asset, delivered);
+            }
         }
-        if (asset.balanceOf(p.recipient) != recipientBefore + p.amount) revert SettlementMismatch();
-        emit Paid(paymentId, p.ref, p.sender, p.recipient, p.asset, p.amount, p.sourceToken, spent, pair);
+        if (IERC20(delivered).balanceOf(p.recipient) != recipientBefore + p.amount) revert SettlementMismatch();
+
+        // Return what wasn't used; this contract keeps nothing.
+        uint256 left = source.balanceOf(address(this)) - heldBefore;
+        uint256 spent = p.maxSourceAmount - left;
+        if (left > 0) source.safeTransfer(p.sender, left);
+        if (source.balanceOf(address(this)) != heldBefore) revert SettlementMismatch();
+        emit Paid(paymentId, p.ref, p.sender, p.recipient, delivered, p.amount, p.sourceToken, spent, provider);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -170,9 +204,8 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
         return _id(p);
     }
 
-    /// @notice Can `sourceToken` pay exactly `amount` of `asset` right now, and for how much (fees included)?
-    ///         Never reverts: an unknown route, a pair that hasn't approved this contract, or a pair that can't
-    ///         quote all return available = false (the mandate's "unavailable" state).
+    /// @notice Agora route: can `sourceToken` pay exactly `amount` of `asset` through the Agora pair right now, and for
+    ///         how much? Never reverts. (The converter route is quoted off-chain with Uniswap's v4 Quoter.)
     function quote(address sourceToken, address asset, uint256 amount)
         external
         view
@@ -181,12 +214,7 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
         if (assetKind[asset] == 0 || assetKind[sourceToken] == 0 || amount == 0) return (false, 0, address(0));
         if (sourceToken == asset) return (true, amount, address(0));
         pair = pairFor[sourceToken][asset];
-        if (pair == address(0)) return (false, 0, address(0));
-        try IAgoraStableSwapPair(pair).hasRole("APPROVED_SWAPPER", address(this)) returns (bool ok) {
-            if (!ok) return (false, 0, pair);
-        } catch {
-            return (false, 0, pair);
-        }
+        if (pair == address(0) || !_agoraApproved(pair)) return (false, 0, pair);
         address[] memory path = new address[](2);
         path[0] = sourceToken;
         path[1] = asset;
@@ -207,6 +235,48 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
     // Internal
     // ---------------------------------------------------------------------------------------------
 
+    /// @dev Agora first, only when approved. A failed swap is rolled back by the EVM; the approval is reset.
+    function _tryAgora(Payment calldata p) private returns (address) {
+        address pair = pairFor[p.sourceToken][p.asset];
+        if (pair == address(0) || !_agoraApproved(pair)) return address(0);
+        if (gasleft() < MIN_GAS_AGORA) revert InsufficientGas();
+        address[] memory path = new address[](2);
+        path[0] = p.sourceToken;
+        path[1] = p.asset;
+        IERC20(p.sourceToken).forceApprove(pair, p.maxSourceAmount);
+        bool ok;
+        try IAgoraStableSwapPair(pair).swapTokensForExactTokens(p.amount, p.maxSourceAmount, path, p.recipient, p.deadline)
+        returns (uint256[] memory) {
+            ok = true;
+        } catch {}
+        IERC20(p.sourceToken).forceApprove(pair, 0);
+        return ok ? pair : address(0);
+    }
+
+    function _tryConverter(Payment calldata p) private returns (address) {
+        if (!_converterSupports(p)) return address(0);
+        if (gasleft() < MIN_GAS_CONVERTER) revert InsufficientGas();
+        IERC20(p.sourceToken).forceApprove(address(CONVERTER), p.maxSourceAmount);
+        bool ok;
+        try CONVERTER.convertExactOut(p.sourceToken, p.asset, p.amount, p.maxSourceAmount, p.recipient) returns (uint256) {
+            ok = true;
+        } catch {}
+        IERC20(p.sourceToken).forceApprove(address(CONVERTER), 0);
+        return ok ? address(CONVERTER) : address(0);
+    }
+
+    function _converterSupports(Payment calldata p) private view returns (bool) {
+        return address(CONVERTER) != address(0) && CONVERTER.supportsPair(p.sourceToken, p.asset);
+    }
+
+    function _agoraApproved(address pair) private view returns (bool) {
+        try IAgoraStableSwapPair(pair).hasRole("APPROVED_SWAPPER", address(this)) returns (bool ok) {
+            return ok;
+        } catch {
+            return false;
+        }
+    }
+
     function _id(Payment calldata p) private view returns (bytes32) {
         return _hashTypedDataV4(
             keccak256(
@@ -219,7 +289,8 @@ contract EverpiecePayV2 is EIP712, ReentrancyGuard {
                     p.amount,
                     p.sourceToken,
                     p.maxSourceAmount,
-                    p.deadline
+                    p.deadline,
+                    p.fallbackToSource
                 )
             )
         );

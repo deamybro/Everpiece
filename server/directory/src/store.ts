@@ -100,6 +100,10 @@ export class DirectoryStore {
       .run(r.request_id, r.recipient, r.asset, r.amount, r.mode, r.expires_at, r.memo_hash, r.sig, r.created_at);
   }
   /** First proof wins; a request is paid once. */
+  /** A payment id / delivery tx already used to settle some request (one delivery pays one request). */
+  paidBy(paymentId: string): RequestRow | undefined {
+    return this.db.prepare(`SELECT * FROM requests WHERE paid_payment_id = ?`).get(paymentId.toLowerCase()) as RequestRow | undefined;
+  }
   markRequestPaid(id: string, paymentId: string, kind: string, at: number): boolean {
     return Number(this.db.prepare(`UPDATE requests SET paid_payment_id = ?, paid_kind = ?, paid_at = ? WHERE request_id = ? AND paid_payment_id IS NULL`).run(paymentId, kind, at, id).changes) === 1;
   }

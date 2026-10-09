@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Run the indexer's codegen, typecheck and tests in WSL (Envio has no Windows build). Syncs the repo's indexer and
 # shared sources into a WSL-local copy first (installs on /mnt/c are very slow) and fails if any copy differs.
-# Usage from Windows: wsl -d Debian -- bash /mnt/c/monadmetr/indexer/scripts/wsl-test.sh
+# Usage from Windows: wsl -d Debian -- bash -l /mnt/c/Everpiece/indexer/scripts/wsl-test.sh
 set -euo pipefail
-SRC=/mnt/c/monadmetr
+SRC=${SRC:-/mnt/c/Everpiece}
 DST="$HOME/everpiece"
 mkdir -p "$DST/indexer" "$DST/packages"
 
@@ -23,6 +23,7 @@ cd "$DST/indexer"
 [ -d node_modules ] || npm ci --no-audit --no-fund
 ENVIO_ESCROW_START_BLOCK=1 ENVIO_ESCROW_ADDRESS=0x0000000000000000000000000000000000000001 \
   ENVIO_PAY_ADDRESS=0x0000000000000000000000000000000000000002 ENVIO_EARN_ADDRESS=0x0000000000000000000000000000000000000003 \
+  ENVIO_PAY_V2_ADDRESS=0x0000000000000000000000000000000000000004 \
   ENVIO_BLOCK_LAG=0 ENVIO_CHAIN_ID=143 \
   ENVIO_RPC_URL=http://localhost:8545 ENVIO_RPC_FOR=sync npx envio codegen > /tmp/envio-codegen.log 2>&1 \
   || { tail -20 /tmp/envio-codegen.log; exit 1; }

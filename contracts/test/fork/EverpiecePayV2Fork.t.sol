@@ -3,7 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EverpiecePayV2} from "../../src/EverpiecePayV2.sol";
+import {EverpiecePayV2, IStableConverter} from "../../src/EverpiecePayV2.sol";
+import {EverpieceStableConverter, IV4PoolManager} from "../../src/EverpieceStableConverter.sol";
 import {IAgoraStableSwapPair} from "../../src/interfaces/IAgoraStableSwapPair.sol";
 
 interface IDomain {
@@ -26,7 +27,9 @@ contract EverpiecePayV2ForkTest is Test {
         "ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
     );
 
+    address constant V4_POOL_MANAGER = 0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e;
     EverpiecePayV2 pay;
+    EverpieceStableConverter conv;
     uint256 constant PK = 0xA11CE;
     address payer;
     address maris = makeAddr("maris");
@@ -44,7 +47,8 @@ contract EverpiecePayV2ForkTest is Test {
         assets[1] = EverpiecePayV2.Asset({token: AUSD, ausdSemantics: true});
         address[] memory pairs = new address[](1);
         pairs[0] = PAIR;
-        pay = new EverpiecePayV2(assets, pairs);
+        conv = new EverpieceStableConverter(IV4PoolManager(V4_POOL_MANAGER), AUSD, USDC, 9, 1);
+        pay = new EverpiecePayV2(assets, pairs, IStableConverter(address(conv)));
         // Fund the payer without touching the pair (its reserve accounting must stay intact): USDC from the Aave V3
         // aUSDC reserve, AUSD by the verified balance-slot write AusdProbe uses (Erc20AccountData, isFrozen low byte).
         vm.prank(AAVE_AUSDC);
@@ -66,7 +70,8 @@ contract EverpiecePayV2ForkTest is Test {
             amount: amount,
             sourceToken: source,
             maxSourceAmount: maxSource,
-            deadline: block.timestamp + 10 minutes
+            deadline: block.timestamp + 10 minutes,
+            fallbackToSource: false
         });
     }
 
@@ -111,7 +116,41 @@ contract EverpiecePayV2ForkTest is Test {
         assertEq(IERC20(AUSD).balanceOf(maris), 25e6);
     }
 
+    /// No Agora approval: the permissionless Uniswap v4 converter delivers.
+    function test_usdc_to_ausd_via_converter_without_agora() public {
+        (bool ok,,) = pay.quote(USDC, AUSD, 100e6);
+        assertFalse(ok); // Agora route unavailable
+        EverpiecePayV2.Payment memory p = _p(AUSD, 100e6, USDC, 100_300_000); // 30 bps max
+        bytes32 id = pay.paymentIdOf(p);
+        bytes memory sig = _sig(p);
+        uint256 g = gasleft();
+        pay.pay(p, sig);
+        console.log("gas pay USDC->AUSD via v4 converter:", g - gasleft());
+        assertTrue(pay.settled(id));
+        assertEq(IERC20(AUSD).balanceOf(maris), 100e6);
+        console.log("USDC spent:", 500e6 - IERC20(USDC).balanceOf(payer));
+        assertEq(IERC20(USDC).balanceOf(address(pay)), 0);
+        assertEq(IERC20(USDC).balanceOf(address(conv)), 0);
+    }
+
+    function test_ausd_to_usdc_via_converter_without_agora() public {
+        EverpiecePayV2.Payment memory p = _p(USDC, 50e6, AUSD, 50_150_000);
+        pay.pay(p, _sig(p));
+        assertEq(IERC20(USDC).balanceOf(maris), 50e6);
+        console.log("AUSD spent:", 500e6 - IERC20(AUSD).balanceOf(payer));
+    }
+
+    function test_converter_down_with_fallback_delivers_usdc() public {
+        EverpiecePayV2.Payment memory p = _p(AUSD, 100e6, USDC, 100e6);
+        p.fallbackToSource = true;
+        vm.mockCallRevert(address(conv), abi.encodeWithSelector(EverpieceStableConverter.convertExactOut.selector), "down");
+        pay.pay(p, _sig(p));
+        assertEq(IERC20(USDC).balanceOf(maris), 100e6);
+        assertEq(IERC20(AUSD).balanceOf(maris), 0);
+    }
+
     function test_conversion_unavailable_without_agora_approval() public {
+        vm.mockCallRevert(address(conv), abi.encodeWithSelector(EverpieceStableConverter.convertExactOut.selector), "down");
         (bool ok,, address via) = pay.quote(USDC, AUSD, 10e6);
         assertFalse(ok);
         assertEq(via, PAIR);

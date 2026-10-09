@@ -1,5 +1,11 @@
 import { encodeFunctionData, getAddress, recoverTypedDataAddress, type Address, type Hex } from "viem";
 import {
+  everpiecePayV2Abi,
+  paymentV2Authorization,
+  paymentV2Id,
+  paymentV2Problem,
+  routeOf,
+  settlementAsset,
   AUSD_EIP712_NAME,
   PaymentMode,
   PaymentStatus,
@@ -23,7 +29,7 @@ import {
 } from "@everpiece/shared";
 import type { Method, RelayerConfig } from "./config.ts";
 import { readPayment, type Chain } from "./chain.ts";
-import { parseCancel, parseClaimLink, parseClaimUsername, parseCreate, parseEarnDeposit, parseEarnWithdraw, parsePayAusd, parsePayToken, parseRefund } from "./validate.ts";
+import { parseCancel, parseClaimLink, parseClaimUsername, parseCreate, parseEarnDeposit, parseEarnWithdraw, parsePayAusd, parsePayToken, parsePayV2, parseRefund } from "./validate.ts";
 
 /** Refused before any RPC-costly step; `code` is returned to the client. */
 export class PrecheckError extends Error {
@@ -58,7 +64,7 @@ export type Prepared = {
     recipient: Address | null;
     amount: bigint;
     sourceToken: Address;
-    route: "DIRECT_AUSD" | "AGORA_INSTANT_SETTLEMENT" | "ESCROW";
+    route: "DIRECT_AUSD" | "AGORA_INSTANT_SETTLEMENT" | "ESCROW" | "DIRECT" | "CONVERTED";
     mode: "INSTANT" | "PROTECTED";
   };
 };
@@ -75,6 +81,9 @@ function encode(method: Method, args: readonly unknown[]): Hex {
   if (method === "earnDeposit" || method === "earnWithdraw") {
     const functionName = method === "earnDeposit" ? "deposit" : "withdraw";
     return encodeFunctionData({ abi: everpieceEarnAbi, functionName, args } as Parameters<typeof encodeFunctionData>[0]);
+  }
+  if (method === "payV2Direct" || method === "payV2Convert") {
+    return encodeFunctionData({ abi: everpiecePayV2Abi, functionName: "pay", args } as Parameters<typeof encodeFunctionData>[0]);
   }
   const abi = method === "payWithAusd" || method === "payWithToken" ? everpiecePayAbi : everpieceEscrowAbi;
   return encodeFunctionData({ abi, functionName: method, args } as Parameters<typeof encodeFunctionData>[0]);
@@ -187,6 +196,41 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
         method, args, data: encode(method, args), signer: payment.sender, paymentId, idemKey: `${method}:${paymentId}`,
         expectedEvent: "Paid", expectedStatus: 1, target: cfg.pay,
         money: { sender: payment.sender, recipient: payment.recipient, amount: payment.amount, sourceToken: payment.sourceToken, route: "AGORA_INSTANT_SETTLEMENT", mode: "INSTANT" },
+      };
+    }
+
+    // EverpiecePayV2: USDC and AUSD first-class. DIRECT = same asset; CONVERTED = Agora / fixed v4 converter, with an
+    // optional truthful fallback to the source asset. The payer's one signature binds every term (nonce = payment id).
+    case "payV2Direct":
+    case "payV2Convert": {
+      if (!cfg.payV2) throw new PrecheckError(503, "InstantPaymentsUnavailable");
+      const { payment, signature } = parsePayV2(body);
+      const problem = paymentV2Problem(payment, chainId, BigInt(Math.floor(Date.now() / 1000)));
+      if (problem) throw new PrecheckError(422, problem);
+      const route = routeOf(payment.asset, payment.sourceToken);
+      if ((method === "payV2Direct") !== (route === "DIRECT")) throw new PrecheckError(422, "WRONG_ROUTE_ENDPOINT");
+      if (payment.amount < cfg.minPaymentAmount) throw new PrecheckError(422, "BelowMinimumPayment");
+      const assetSymbol = settlementAsset(chainId, payment.asset)?.symbol;
+      const sourceSymbol = settlementAsset(chainId, payment.sourceToken)?.symbol;
+      for (const sym of [assetSymbol, sourceSymbol]) {
+        if (sym === "USDC" && !cfg.flags.USDC_PAYMENTS_ENABLED) throw new PrecheckError(503, "USDC_PAYMENTS_DISABLED");
+        if (sym === "AUSD" && !cfg.flags.AUSD_PAYMENTS_ENABLED) throw new PrecheckError(503, "AUSD_PAYMENTS_DISABLED");
+      }
+      // conversions switched off: only the truthful fallback (deliver the source asset) remains
+      if (route === "CONVERTED" && !cfg.flags.AGORA_SETTLEMENT_ENABLED && !cfg.flags.DEX_AUSD_FALLBACK_ENABLED && !payment.fallbackToSource) {
+        throw new PrecheckError(503, "CONVERSION_DISABLED");
+      }
+      if (route === "CONVERTED" && payment.maxSourceAmount * 10_000n > payment.amount * (10_000n + cfg.maxConvertSlippageBps)) {
+        throw new PrecheckError(422, "SLIPPAGE_ABOVE_LIMIT");
+      }
+      const auth = paymentV2Authorization(cfg.payV2, payment, chainId);
+      if (!(await signedBy(payment.sender, { ...auth, signature }))) throw new PrecheckError(401, "InvalidFundingSignature");
+      const paymentId = paymentV2Id(cfg.payV2, payment, chainId);
+      const args = [payment, signature] as const;
+      return {
+        method, fn: "pay", args, data: encode(method, args), signer: payment.sender, paymentId, idemKey: `payV2:${paymentId}`,
+        expectedEvent: "Paid", expectedStatus: 1, target: cfg.payV2,
+        money: { sender: payment.sender, recipient: payment.recipient, amount: payment.amount, sourceToken: payment.sourceToken, route, mode: "INSTANT" },
       };
     }
 

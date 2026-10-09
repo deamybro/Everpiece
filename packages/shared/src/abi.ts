@@ -2312,9 +2312,27 @@ export const everpiecePayV2Abi = [
         "name": "pairs",
         "type": "address[]",
         "internalType": "address[]"
+      },
+      {
+        "name": "converter",
+        "type": "address",
+        "internalType": "contract IStableConverter"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "CONVERTER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IStableConverter"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -2325,6 +2343,32 @@ export const everpiecePayV2Abi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_GAS_AGORA",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_GAS_CONVERTER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -2476,6 +2520,11 @@ export const everpiecePayV2Abi = [
             "name": "deadline",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "fallbackToSource",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       },
@@ -2542,6 +2591,11 @@ export const everpiecePayV2Abi = [
             "name": "deadline",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "fallbackToSource",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }
@@ -2634,6 +2688,31 @@ export const everpiecePayV2Abi = [
   },
   {
     "type": "event",
+    "name": "ConversionFallback",
+    "inputs": [
+      {
+        "name": "paymentId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "requestedAsset",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "deliveredAsset",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "EIP712DomainChanged",
     "inputs": [],
     "anonymous": false
@@ -2667,7 +2746,7 @@ export const everpiecePayV2Abi = [
         "internalType": "address"
       },
       {
-        "name": "asset",
+        "name": "deliveredAsset",
         "type": "address",
         "indexed": false,
         "internalType": "address"
@@ -2691,7 +2770,7 @@ export const everpiecePayV2Abi = [
         "internalType": "uint256"
       },
       {
-        "name": "pair",
+        "name": "provider",
         "type": "address",
         "indexed": false,
         "internalType": "address"
@@ -2736,6 +2815,11 @@ export const everpiecePayV2Abi = [
   },
   {
     "type": "error",
+    "name": "ConversionUnavailable",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "DirectAmountMismatch",
     "inputs": []
   },
@@ -2756,7 +2840,22 @@ export const everpiecePayV2Abi = [
   },
   {
     "type": "error",
+    "name": "FallbackExceedsMax",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FundingMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientGas",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidConverter",
     "inputs": []
   },
   {

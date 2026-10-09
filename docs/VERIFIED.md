@@ -618,6 +618,47 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - Agora pair quotes at block 111,905,431: exactly 1:1 (100 USDC ↔ 100 AUSD), no fee.
   - A USDC upgrade by Circle could change the receive semantics without any on-chain flag. This is a residual risk; the balance checks bound the damage to a reverted transaction.
 
+### 4.19 AUSD ↔ USDC permissionless conversion: the Uniswap v4 pool Kuru Flow routes through (checked 2026-10-09)
+- **Fact:** where the permissionless AUSD/USDC liquidity on Monad actually is, and that a fixed adapter can use it without relaying aggregator calldata.
+- **Value:**
+  - Uniswap v4 on Monad (developers.uniswap.org "v4 deployments", chain 143):
+    - PoolManager `0x188d586ddcf52439676ca21a244753fa19f9ea8e`;
+    - V4Quoter `0xa222dd357a9076d1091ed6aa2e16c9742dd26891`;
+    - StateView `0x77395f3b2e73ae90843717371294fa97cc419d64`;
+    - Universal Router `0x0d97dc33264bfc1c226207428a79b26757fb9dc3`;
+    - Permit2 `0x000000000022D473030F116dDEE9F6B43aC78BA3`.
+  - AUSD/USDC pool:
+    - key (currency0 AUSD, currency1 USDC, fee 9 = 0.0009%, tickSpacing 1, hooks 0x0);
+    - pool id `0xd112fde908d7342135fc7297cc53d25bf7a11d6c6e21fe7ac3e73c40f70827e8`;
+    - `StateView.getLiquidity` 3,708,640,259,037 at block ≈111.92M.
+  - How it was found: a real Kuru Flow quote (`ws.kuru.io/api/quote`, router `0xb3e6778480b2E488385E8205eA05E20060B813cb`), executed on a fork and traced. It does `PoolManager.unlock` → `swap(key above)` → `take`/`sync`/`settle` through Kuru's adapter `0x2f84FB8982073f39Ba47c7fcC29119aF074AbbcB`. So Kuru Flow's AUSD/USDC price is this pool.
+  - Kuru's own AUSD_USDC **orderbook** (`0x699abc15308156e9a3ab89ec7387e9cfe1c86a3b`) reverted `MarketStateError()` on a 100 USDC market buy through the Kuru Router `anyToAnySwap` (fork, block 111,919,008), so it is not used.
+  - V4Quoter `quoteExactOutputSingle` (live eth_call):
+    - 100 AUSD out = 99.980370 USDC in;
+    - 100 USDC out = 100.025983 AUSD in.
+- **Official source:** https://developers.uniswap.org/docs/protocols/v4/deployments ; Uniswap v4-core IPoolManager (unlock/swap/take/sync/settle, BalanceDelta packing).
+- **Proven on a fork:**
+  - `contracts/test/fork/StableConverterFork.t.sol` (EverpieceStableConverter, exact output):
+    - 100 AUSD for 99.982929 USDC;
+    - 100 USDC for 100.024270 AUSD;
+    - $1 for 0.999803 USDC;
+    - maxIn enforced; the callback can't be driven by others.
+  - `EverpiecePayV2Fork.t.sol`: USDC→AUSD and AUSD→USDC payments with NO Agora approval; the fallback delivers USDC truthfully.
+  - `RelayerGasV2.t.sol`, cold-state transaction gas:
+
+    | Route | Gas |
+    |---|---|
+    | Direct USDC | 307,702 |
+    | Direct AUSD | 271,199 |
+    | v4 conversion | 628,079 |
+    | Agora conversion | 504,294 |
+    | Agora fails, then v4 (worst case) | 664,077 |
+
+    The worst case completes at the 800k relayer limit.
+- **Notes:**
+  - Concentrated liquidity: large conversions cross many ticks and cost more. The converter refuses partial fills (`PartialFill`).
+  - The relayer caps the signed slippage at 50 bps (`MAX_CONVERT_SLIPPAGE_BPS`).
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**

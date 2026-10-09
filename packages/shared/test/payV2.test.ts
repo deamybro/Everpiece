@@ -29,8 +29,9 @@ export const VECTOR_PAYMENT_V2: PaymentV2 = {
   sourceToken: USDC_MAINNET_ADDRESS,
   maxSourceAmount: 25_025_000n,
   deadline: 1_790_700_600n,
+  fallbackToSource: true,
 };
-export const VECTOR_PAYMENT_V2_ID = "0x319990f49f91463a7fa68487ee40c1d804c088d4cf562bea596936e4b7b72df4";
+export const VECTOR_PAYMENT_V2_ID = "0xbbf2d8045d85ca80d9da50e31578985049eca17f4754b1db49ab76f85b0334c7";
 
 test("USDC is the default settlement asset; both are first-class", () => {
   assert.equal(defaultSettlementAsset(MONAD_MAINNET_CHAIN_ID)?.symbol, "USDC");
@@ -61,7 +62,7 @@ test("the authorization is in the SOURCE token's domain, binds the id, and recov
   const sig = await payer.signTypedData(a);
   assert.equal(await recoverTypedDataAddress({ ...a, signature: sig }), payer.address);
   // any changed term → a different id → a different nonce: the signature no longer covers it
-  for (const change of [{ recipient: PAY }, { amount: 25_000_001n }, { asset: USDC_MAINNET_ADDRESS }, { deadline: 1n }] as Partial<PaymentV2>[]) {
+  for (const change of [{ recipient: PAY }, { amount: 25_000_001n }, { asset: USDC_MAINNET_ADDRESS }, { deadline: 1n }, { fallbackToSource: false }] as Partial<PaymentV2>[]) {
     assert.notEqual(paymentV2Id(PAY, { ...VECTOR_PAYMENT_V2, ...change }, MONAD_MAINNET_CHAIN_ID), VECTOR_PAYMENT_V2_ID);
   }
 });
@@ -77,5 +78,6 @@ test("structural problems: no silent substitution, direct = exact", () => {
   assert.equal(paymentV2Problem({ ...VECTOR_PAYMENT_V2, sourceToken: PAY }, MONAD_MAINNET_CHAIN_ID, now), "UNSUPPORTED_ROUTE");
   assert.equal(paymentV2Problem({ ...VECTOR_PAYMENT_V2, amount: 0n }, MONAD_MAINNET_CHAIN_ID, now), "ZERO_AMOUNT");
   assert.equal(paymentV2Problem(VECTOR_PAYMENT_V2, MONAD_MAINNET_CHAIN_ID, VECTOR_PAYMENT_V2.deadline), "EXPIRED");
+  assert.equal(paymentV2Problem({ ...VECTOR_PAYMENT_V2, maxSourceAmount: 24_000_000n }, MONAD_MAINNET_CHAIN_ID, now), "FALLBACK_EXCEEDS_MAX");
   assert.throws(() => paymentV2Authorization(PAY, { ...VECTOR_PAYMENT_V2, sourceToken: PAY }, MONAD_MAINNET_CHAIN_ID));
 });

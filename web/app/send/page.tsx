@@ -18,6 +18,8 @@ import { FlowError, sendByLink, sendToUsername } from "../../lib/flows";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { UsernameError, findRecipient, pin, type Pinning, type Recipient } from "../../lib/username";
 import { PayError, instantAvailable, payInstant, payTokens } from "../../lib/pay";
+import { assetBalances, assetSymbol, defaultAsset, payV2, payV2Available, quoteV2, type PayV2Result, type QuoteV2 } from "../../lib/payV2";
+import type { SettlementAsset } from "@everpiece/shared";
 
 type Step = "amount" | "who" | "review" | "sending" | "done" | "protectedNoInvite";
 type Method = "phone" | "email" | "username";
@@ -46,12 +48,29 @@ export default function Send() {
   /** @username sends: instant by default (owner, 2026-10-06: "it's supposed to send asap"); protected on request. */
   const [speed, setSpeed] = useState<"instant" | "protected">("instant");
   const [sentInstant, setSentInstant] = useState(false);
+  // USDC + AUSD (EverpiecePayV2): what they receive, what you pay from, the live conversion quote, the on-chain outcome
+  const v2 = payV2Available();
+  const [assets, setAssets] = useState<{ asset: SettlementAsset; balance: bigint }[]>([]);
+  const [recvAsset, setRecvAsset] = useState<SettlementAsset | null>(null);
+  const [srcAsset, setSrcAsset] = useState<SettlementAsset | null>(null);
+  const [quote, setQuote] = useState<QuoteV2 | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [allowFallback, setAllowFallback] = useState(false);
+  const [v2Result, setV2Result] = useState<PayV2Result | null>(null);
 
   useEffect(() => {
     const a = loadAccount();
     setAccount(a);
     setLoaded(true);
     if (a) dollarsOf(a.address).then(setBalance).catch(() => {});
+    if (a && payV2Available()) {
+      assetBalances(a.address).then((list) => {
+        setAssets(list);
+        const d = defaultAsset();
+        setRecvAsset(d ?? null);
+        setSrcAsset(d ?? null);
+      }).catch(() => {});
+    }
   }, []);
 
   if (!loaded) return null;
@@ -66,7 +85,25 @@ export default function Send() {
   const canMessage = messagesAvailable() && (method !== "username" || !!found?.recipient.messageKey);
   const withMessage = canMessage && (note !== "" || draft.voice !== null);
   // a message travels with the escrow's on-chain commitment, so a payment with one is always protected
-  const isInstant = method === "username" && speed === "instant" && instantAvailable() && !withMessage;
+  const isInstant = method === "username" && speed === "instant" && (instantAvailable() || v2) && !withMessage;
+  const useV2 = isInstant && v2 && recvAsset !== null && srcAsset !== null;
+  const converted = useV2 && recvAsset!.address !== srcAsset!.address;
+  const srcBalance = srcAsset ? assets.find((x) => x.asset.address === srcAsset.address)?.balance ?? null : null;
+  const sym = (a: SettlementAsset | null) => (a ? a.symbol : "Dollars");
+
+  async function refreshQuote(src = srcAsset, recv = recvAsset) {
+    setQuote(null);
+    setAllowFallback(false);
+    if (!src || !recv || amount === null || src.address === recv.address) return;
+    setQuoting(true);
+    try {
+      setQuote(await quoteV2(src.address, recv.address, amount));
+    } catch (e) {
+      setError(friendlyError(e instanceof PayError ? e.code : undefined));
+    } finally {
+      setQuoting(false);
+    }
+  }
 
   async function lookUp() {
     setLooking(true);
@@ -91,6 +128,32 @@ export default function Send() {
       : undefined;
     if (method === "username") {
       if (!found) return;
+      if (useV2) {
+        try {
+          // a converted quote may have expired while the user read the screen: fetch a fresh one, never reuse a stale one
+          const q = converted ? await quoteV2(srcAsset!.address, recvAsset!.address, amount) : undefined;
+          if (converted && q && !q.available && !allowFallback) {
+            setQuote(q);
+            throw new PayError("NO_ROUTE");
+          }
+          const r = await payV2(
+            account,
+            { recipient: found.recipient.account, asset: recvAsset!.address, amount, sourceToken: srcAsset!.address, quote: q, allowFallback },
+            (st) => setProgress(progressText(st, "Sending")),
+          );
+          pin(found.recipient);
+          setV2Result(r);
+          setSentId(r.paymentId);
+          setSentInstant(true);
+          setStep("done");
+        } catch (e) {
+          setError(e instanceof PayError || e instanceof FlowError ? friendlyError(e.code) : friendlyPasskeyError(e));
+          setStep("review");
+        } finally {
+          setProgress("");
+        }
+        return;
+      }
       if (isInstant) {
         try {
           const dollars = payTokens().find((t) => t.route === "DIRECT_AUSD");
@@ -159,14 +222,47 @@ export default function Send() {
             <span className="sign" aria-hidden="true">$</span>
             <input className="big" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount in Dollars" />
           </div>
-          {balance !== null && <p className="muted center">You have {formatDollars(balance)}</p>}
-          {amount !== null && balance !== null && amount > balance && (
+          {v2 && assets.length > 0 && (
+            <div className="stack">
+              <div>
+                <span className="small muted">They receive</span>
+                <div className="row" role="group" aria-label="Asset they receive">
+                  {assets.map(({ asset }) => (
+                    <button key={asset.address} className={recvAsset?.address === asset.address ? "" : "secondary"} aria-pressed={recvAsset?.address === asset.address} onClick={() => setRecvAsset(asset)}>
+                      {asset.symbol}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="small muted">You pay from</span>
+                <div className="row" role="group" aria-label="Asset you pay from">
+                  {assets.map(({ asset, balance: b }) => (
+                    <button key={asset.address} className={srcAsset?.address === asset.address ? "" : "secondary"} aria-pressed={srcAsset?.address === asset.address} onClick={() => setSrcAsset(asset)}>
+                      {asset.symbol} · {formatDollars(b)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {balance !== null && !v2 && <p className="muted center">You have {formatDollars(balance)}</p>}
+          {amount !== null && balance !== null && !v2 && amount > balance && (
             <div className="status bad">
               You don&apos;t have enough Dollars for this.{" "}
               {fundingAvailable() && <Link href={`/add?amount=${fromBaseUnits(amount - balance, 6)}&return=/send`}>Add money from another chain</Link>}
             </div>
           )}
-          <button disabled={amount === null || amount < 1_000_000n || (balance !== null && amount > balance)} onClick={() => setStep("who")}>
+          {v2 && amount !== null && srcBalance !== null && amount > srcBalance && (
+            <div className="status bad">
+              You don&apos;t have enough {sym(srcAsset)} for this.{" "}
+              {fundingAvailable() && <Link href={`/add?amount=${fromBaseUnits(amount - srcBalance, 6)}&return=/send`}>Add money from another chain</Link>}
+            </div>
+          )}
+          <button
+            disabled={amount === null || amount < 1_000_000n || (!v2 && balance !== null && amount > balance) || (v2 && srcBalance !== null && amount > srcBalance)}
+            onClick={() => setStep("who")}
+          >
             Continue
           </button>
           {amount !== null && amount < 1_000_000n && <p className="muted small center">The minimum is $1.00.</p>}
@@ -241,7 +337,7 @@ export default function Send() {
                   )}
                 </div>
               )}
-              <button disabled={!found || (found.pinning === "new" && !confirmedNew)} onClick={() => setStep("review")}>Continue</button>
+              <button disabled={!found || (found.pinning === "new" && !confirmedNew)} onClick={() => { setStep("review"); void refreshQuote(); }}>Continue</button>
             </>
           )}
           <button className="ghost" onClick={() => setStep("amount")}>Back</button>
@@ -270,13 +366,25 @@ export default function Send() {
           <div className="card review">
             <dl>
               <dt>You send</dt>
-              <dd>{formatDollars(amount)}</dd>
+              <dd>
+                {useV2 && converted
+                  ? quote?.available && quote.sourceAmount !== null
+                    ? `about ${formatDollars(quote.sourceAmount)} ${sym(srcAsset)} (at most ${formatDollars(quote.maxSourceAmount!)})`
+                    : quoting ? "Getting a price…" : `${formatDollars(amount)} ${sym(srcAsset)}`
+                  : `${formatDollars(amount)}${useV2 ? ` ${sym(srcAsset)}` : ""}`}
+              </dd>
+              {useV2 && converted && quote?.available && (
+                <>
+                  <dt>Conversion</dt>
+                  <dd>{sym(srcAsset)} → {sym(recvAsset)} on-chain via {quote.provider === "AGORA" ? "Agora" : "Uniswap v4"}; anything unused comes back</dd>
+                </>
+              )}
               <dt>Funding/provider fee</dt>
               <dd>$0.00</dd>
               <dt>Everpiece fee</dt>
               <dd>$0.00</dd>
               <dt>They receive</dt>
-              <dd>{formatDollars(amount)}</dd>
+              <dd>{formatDollars(amount)}{useV2 ? ` ${sym(recvAsset)}` : ""}</dd>
               <dt>Recipient</dt>
               <dd>{method === "username" && found ? `@${found.recipient.username} (${found.recipient.displayName})` : method === "email" ? email : cleanPhone}</dd>
               {isInstant ? (
@@ -329,9 +437,31 @@ export default function Send() {
             </ol>
             )}
           </div>
+          {useV2 && converted && quote && !quote.available && (
+            <div className="status warn stack">
+              <span>
+                Converting {sym(srcAsset)} to {sym(recvAsset)} isn&apos;t available right now. You can send {formatDollars(amount)} {sym(srcAsset)} instead,
+                or pay from {sym(recvAsset)}.
+              </span>
+              <label className="small">
+                <input type="checkbox" checked={allowFallback} onChange={(e) => setAllowFallback(e.target.checked)} /> Send {sym(srcAsset)} instead
+              </label>
+            </div>
+          )}
+          {useV2 && converted && quote?.available && (
+            <label className="small">
+              <input type="checkbox" checked={allowFallback} onChange={(e) => setAllowFallback(e.target.checked)} /> If the conversion fails at the last
+              moment, send {sym(srcAsset)} instead of cancelling
+            </label>
+          )}
           <Progress text={progress} />
           {error && <div className="status bad">{error}</div>}
-          <button disabled={step === "sending"} onClick={send}>Confirm with fingerprint or screen lock</button>
+          <button
+            disabled={step === "sending" || (useV2 && converted && (quoting || !quote || (!quote.available && !allowFallback)))}
+            onClick={send}
+          >
+            Confirm with fingerprint or screen lock
+          </button>
           {step === "review" && <button className="ghost" onClick={() => setStep("who")}>Back</button>}
         </div>
       )}
@@ -350,7 +480,23 @@ export default function Send() {
       {step === "done" && amount !== null && method === "username" && found && sentInstant && (
         <div className="stack">
           <div className="status ok">Sent to @{found.recipient.username} ✓</div>
-          <p className="muted">{formatDollars(amount)} is in {found.recipient.displayName}&apos;s balance now. Instant payments are final.</p>
+          {v2Result ? (
+            <>
+              <p className="muted">
+                {formatDollars(amount)} {assetSymbol(v2Result.deliveredAsset)} is in {found.recipient.displayName}&apos;s balance now. Instant payments are final.
+              </p>
+              {v2Result.fellBack && (
+                <div className="status warn">
+                  The conversion to {assetSymbol(v2Result.payment.asset)} wasn&apos;t available, so they received {assetSymbol(v2Result.deliveredAsset)}, as you allowed.
+                </div>
+              )}
+              {v2Result.payment.sourceToken !== v2Result.deliveredAsset && (
+                <p className="muted small">You paid {formatDollars(v2Result.sourceSpent)} {assetSymbol(v2Result.payment.sourceToken)}.</p>
+              )}
+            </>
+          ) : (
+            <p className="muted">{formatDollars(amount)} is in {found.recipient.displayName}&apos;s balance now. Instant payments are final.</p>
+          )}
           <Link className="button" href="/">Done</Link>
           {sentId && <Link className="button ghost" href={receiptPath(sentId)}>View receipt</Link>}
         </div>

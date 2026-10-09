@@ -19,7 +19,7 @@ export type PolicyContext = {
   recipient: Address | null;
   amount: bigint; // AUSD base units
   sourceToken: Address;
-  route: "DIRECT_AUSD" | "AGORA_INSTANT_SETTLEMENT" | "ESCROW";
+  route: "DIRECT_AUSD" | "AGORA_INSTANT_SETTLEMENT" | "ESCROW" | "DIRECT" | "CONVERTED";
   mode: "INSTANT" | "PROTECTED";
   /** AUSD already moved by this sender today through Everpiece (from the relayer's records). */
   sentToday: bigint;

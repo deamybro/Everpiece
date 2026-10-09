@@ -1,4 +1,4 @@
-// Feature flags (src/flags.ts): fail closed; NGN payout and the unbuilt DEX fallback can't be switched on.
+// Feature flags (src/flags.ts): fail closed; NGN payout can't be switched on.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FEATURE_FLAGS, readFlags } from "../src/index.ts";
@@ -14,8 +14,8 @@ test("only the exact string 'true' turns a flag on; prefix supported", () => {
   assert.equal(readFlags({ NEXT_PUBLIC_EARN_ENABLED: "true" }, "NEXT_PUBLIC_").EARN_ENABLED, true);
 });
 
-test("forced-off flags stay off", () => {
+test("NGN payout stays off (Coming Soon); the DEX fallback is a normal flag", () => {
   const f = readFlags({ NGN_PAYOUT_ENABLED: "true", DEX_AUSD_FALLBACK_ENABLED: "true" });
   assert.equal(f.NGN_PAYOUT_ENABLED, false);
-  assert.equal(f.DEX_AUSD_FALLBACK_ENABLED, false);
+  assert.equal(f.DEX_AUSD_FALLBACK_ENABLED, true);
 });

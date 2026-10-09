@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EverpiecePayV2} from "../src/EverpiecePayV2.sol";
+import {EverpiecePayV2, IStableConverter} from "../src/EverpiecePayV2.sol";
 import {MockAUSD} from "./utils/MockAUSD.sol";
 
 /// @dev Agora AgoraStableSwapPair semantics (as MockAgoraPair) but between two 6-dp dollars, in BOTH directions, as
@@ -71,6 +71,34 @@ contract MockStablePair {
     }
 }
 
+/// @dev EverpieceStableConverter stand-in: exact output 1:1 plus a fee on the input, with a failure switch.
+contract MockConverter {
+    address public immutable a;
+    address public immutable b;
+    uint256 public feeBps;
+    bool public fail;
+
+    constructor(address _a, address _b) {
+        a = _a;
+        b = _b;
+    }
+
+    function setFeeBps(uint256 f) external { feeBps = f; }
+    function setFail(bool v) external { fail = v; }
+
+    function supportsPair(address tin, address tout) external view returns (bool) {
+        return (tin == a && tout == b) || (tin == b && tout == a);
+    }
+
+    function convertExactOut(address tin, address tout, uint256 out, uint256 maxIn, address to) external returns (uint256 used) {
+        require(!fail, "pool unavailable");
+        used = out + (out * feeBps + 9_999) / 10_000;
+        require(used <= maxIn, "excessive input");
+        IERC20(tin).transferFrom(msg.sender, address(this), used);
+        IERC20(tout).transfer(to, out);
+    }
+}
+
 contract EverpiecePayV2Test is Test {
     bytes32 constant RWA_TYPEHASH = keccak256(
         "ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
@@ -79,6 +107,7 @@ contract EverpiecePayV2Test is Test {
     MockAUSD ausd;
     MockAUSD usdc; // FiatToken-like for these purposes; its AUSD flag read always reverts (USDC has no such flag)
     MockStablePair pair;
+    MockConverter conv;
     EverpiecePayV2 pay;
 
     uint256 constant PK = 0xA11CE;
@@ -91,12 +120,15 @@ contract EverpiecePayV2Test is Test {
         usdc = new MockAUSD();
         usdc.setFlagReadReverts(true);
         pair = new MockStablePair(address(ausd), address(usdc));
-        pay = new EverpiecePayV2(_assets(), _pairs());
+        conv = new MockConverter(address(ausd), address(usdc));
+        pay = new EverpiecePayV2(_assets(), _pairs(), IStableConverter(address(0)));
         pair.setApprovedSwapper(address(pay), true);
         ausd.mint(payer, 1_000e6);
         usdc.mint(payer, 1_000e6);
         ausd.mint(address(pair), 1_000_000e6);
         usdc.mint(address(pair), 1_000_000e6);
+        ausd.mint(address(conv), 1_000_000e6);
+        usdc.mint(address(conv), 1_000_000e6);
     }
 
     function _assets() internal view returns (EverpiecePayV2.Asset[] memory a) {
@@ -123,7 +155,8 @@ contract EverpiecePayV2Test is Test {
             amount: amount,
             sourceToken: source,
             maxSourceAmount: maxSource,
-            deadline: block.timestamp + 10 minutes
+            deadline: block.timestamp + 10 minutes,
+            fallbackToSource: false
         });
     }
 
@@ -200,7 +233,7 @@ contract EverpiecePayV2Test is Test {
         assertFalse(ok);
         EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10e6);
         bytes memory sig = _sig(p);
-        vm.expectRevert(MockStablePair.NotApprovedSwapper.selector);
+        vm.expectRevert(EverpiecePayV2.ConversionUnavailable.selector);
         pay.pay(p, sig);
         // atomic: the authorization is still unused, nothing moved, nothing stranded
         assertFalse(usdc.authorizationState(payer, pay.paymentIdOf(p)));
@@ -213,7 +246,7 @@ contract EverpiecePayV2Test is Test {
         pair.setFeeBps(100);
         EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10_050_000);
         bytes memory sig = _sig(p);
-        vm.expectRevert(MockStablePair.ExcessiveInputAmount.selector);
+        vm.expectRevert(EverpiecePayV2.ConversionUnavailable.selector);
         pay.pay(p, sig);
         assertEq(usdc.balanceOf(payer), 1_000e6);
     }
@@ -290,7 +323,7 @@ contract EverpiecePayV2Test is Test {
     }
 
     function test_no_pair_means_direct_only() public {
-        EverpiecePayV2 directOnly = new EverpiecePayV2(_assets(), new address[](0));
+        EverpiecePayV2 directOnly = new EverpiecePayV2(_assets(), new address[](0), IStableConverter(address(0)));
         (bool ok,,) = directOnly.quote(address(usdc), address(ausd), 1e6);
         assertFalse(ok);
         (bool ok2, uint256 amt,) = directOnly.quote(address(usdc), address(usdc), 1e6);
@@ -347,18 +380,120 @@ contract EverpiecePayV2Test is Test {
         dup[0] = EverpiecePayV2.Asset({token: address(usdc), ausdSemantics: false});
         dup[1] = EverpiecePayV2.Asset({token: address(usdc), ausdSemantics: true});
         vm.expectRevert(EverpiecePayV2.DuplicateAsset.selector);
-        new EverpiecePayV2(dup, new address[](0));
+        new EverpiecePayV2(dup, new address[](0), IStableConverter(address(0)));
 
         EverpiecePayV2.Asset[] memory onlyUsdc = new EverpiecePayV2.Asset[](1);
         onlyUsdc[0] = EverpiecePayV2.Asset({token: address(usdc), ausdSemantics: false});
         vm.expectRevert(EverpiecePayV2.InvalidPair.selector); // a pair token that isn't an asset
-        new EverpiecePayV2(onlyUsdc, _pairs());
+        new EverpiecePayV2(onlyUsdc, _pairs(), IStableConverter(address(0)));
 
         address[] memory twice = new address[](2);
         twice[0] = address(pair);
         twice[1] = address(pair);
         vm.expectRevert(EverpiecePayV2.DuplicatePair.selector);
-        new EverpiecePayV2(_assets(), twice);
+        new EverpiecePayV2(_assets(), twice, IStableConverter(address(0)));
+    }
+
+    // ---- converter & fallback ------------------------------------------------------------------
+
+    function _withConverter() internal {
+        pay = new EverpiecePayV2(_assets(), _pairs(), IStableConverter(address(conv)));
+    }
+
+    function test_converter_used_when_agora_not_approved() public {
+        _withConverter();
+        conv.setFeeBps(1);
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 100e6, address(usdc), 100_500_000);
+        bytes32 id = pay.paymentIdOf(p);
+        bytes memory sig = _sig(p);
+        vm.expectEmit(address(pay));
+        emit EverpiecePayV2.Paid(id, p.ref, payer, maris, address(ausd), 100e6, address(usdc), 100_010_000, address(conv));
+        pay.pay(p, sig);
+        assertEq(ausd.balanceOf(maris), 100e6);
+        assertEq(usdc.balanceOf(payer), 1_000e6 - 100_010_000);
+        _noDust();
+    }
+
+    function test_agora_preferred_when_approved() public {
+        _withConverter();
+        pair.setApprovedSwapper(address(pay), true);
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10e6);
+        bytes32 id = pay.paymentIdOf(p);
+        bytes memory sig = _sig(p);
+        vm.expectEmit(address(pay));
+        emit EverpiecePayV2.Paid(id, p.ref, payer, maris, address(ausd), 10e6, address(usdc), 10e6, address(pair));
+        pay.pay(p, sig);
+    }
+
+    function test_agora_fails_then_converter() public {
+        _withConverter();
+        pair.setApprovedSwapper(address(pay), true);
+        pair.setFeeBps(100); // Agora needs more than the payer allows: caught, the converter tries next
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10_010_000);
+        pay.pay(p, _sig(p));
+        assertEq(ausd.balanceOf(maris), 10e6);
+        _noDust();
+    }
+
+    function test_all_fail_fallback_delivers_source_truthfully() public {
+        _withConverter();
+        conv.setFail(true);
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10_050_000);
+        p.fallbackToSource = true;
+        bytes32 id = pay.paymentIdOf(p);
+        bytes memory sig = _sig(p);
+        vm.expectEmit(address(pay));
+        emit EverpiecePayV2.ConversionFallback(id, address(ausd), address(usdc));
+        vm.expectEmit(address(pay));
+        emit EverpiecePayV2.Paid(id, p.ref, payer, maris, address(usdc), 10e6, address(usdc), 10e6, address(0));
+        pay.pay(p, sig);
+        assertEq(ausd.balanceOf(maris), 0); // never reported or delivered as AUSD
+        assertEq(usdc.balanceOf(maris), 10e6);
+        assertEq(usdc.balanceOf(payer), 990e6); // headroom refunded
+        _noDust();
+    }
+
+    function test_all_fail_without_fallback_reverts_nothing_moves() public {
+        _withConverter();
+        conv.setFail(true);
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10e6);
+        bytes memory sig = _sig(p);
+        vm.expectRevert(EverpiecePayV2.ConversionUnavailable.selector);
+        pay.pay(p, sig);
+        assertEq(usdc.balanceOf(payer), 1_000e6);
+    }
+
+    function test_fallback_amount_must_fit_authorization() public {
+        _withConverter();
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 9e6);
+        p.fallbackToSource = true;
+        vm.expectRevert(EverpiecePayV2.FallbackExceedsMax.selector);
+        pay.pay(p, "");
+    }
+
+    function test_relayer_cannot_starve_conversion_into_fallback() public {
+        _withConverter();
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 10e6, address(usdc), 10e6);
+        p.fallbackToSource = true;
+        bytes memory sig = _sig(p);
+        (bool ok,) = address(pay).call{gas: 300_000}(abi.encodeCall(EverpiecePayV2.pay, (p, sig)));
+        assertFalse(ok);
+        assertEq(usdc.balanceOf(maris), 0);
+        assertEq(ausd.balanceOf(maris), 0);
+        pay.pay(p, sig); // with enough gas the conversion runs
+        assertEq(ausd.balanceOf(maris), 10e6);
+    }
+
+    function test_no_route_no_fallback_is_unsupported() public {
+        EverpiecePayV2 noRoutes = new EverpiecePayV2(_assets(), new address[](0), IStableConverter(address(0)));
+        EverpiecePayV2.Payment memory p = _p(address(ausd), 1e6, address(usdc), 1e6);
+        vm.expectRevert(EverpiecePayV2.UnsupportedRoute.selector);
+        noRoutes.pay(p, "");
+    }
+
+    function test_constructor_rejects_eoa_converter() public {
+        vm.expectRevert(EverpiecePayV2.InvalidConverter.selector);
+        new EverpiecePayV2(_assets(), _pairs(), IStableConverter(address(0xC0FFEE)));
     }
 
     // ---- fuzz ------------------------------------------------------------------------------------
@@ -387,7 +522,7 @@ contract EverpiecePayV2VectorTest is Test {
     function test_paymentId_matchesSharedTypeScript() public {
         vm.chainId(143);
         EverpiecePayV2.Asset[] memory assets = new EverpiecePayV2.Asset[](0);
-        deployCodeTo("EverpiecePayV2.sol:EverpiecePayV2", abi.encode(assets, new address[](0)), address(0x3333333333333333333333333333333333333333));
+        deployCodeTo("EverpiecePayV2.sol:EverpiecePayV2", abi.encode(assets, new address[](0), address(0)), address(0x3333333333333333333333333333333333333333));
         EverpiecePayV2 pay = EverpiecePayV2(address(0x3333333333333333333333333333333333333333));
         EverpiecePayV2.Payment memory p = EverpiecePayV2.Payment({
             ref: bytes32(0x0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e),
@@ -397,8 +532,9 @@ contract EverpiecePayV2VectorTest is Test {
             amount: 25_000_000,
             sourceToken: 0x754704Bc059F8C67012fEd69BC8A327a5aafb603,
             maxSourceAmount: 25_025_000,
-            deadline: 1_790_700_600
+            deadline: 1_790_700_600,
+            fallbackToSource: true
         });
-        assertEq(pay.paymentIdOf(p), 0x319990f49f91463a7fa68487ee40c1d804c088d4cf562bea596936e4b7b72df4);
+        assertEq(pay.paymentIdOf(p), 0xbbf2d8045d85ca80d9da50e31578985049eca17f4754b1db49ab76f85b0334c7);
     }
 }

@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import { AUSD_ADDRESS, AUSD_EIP712_NAME, type DollarToken } from "@everpiece/shared";
+import { AUSD_ADDRESS, AUSD_EIP712_NAME, readFlags, type DollarToken } from "@everpiece/shared";
 
 /** Public runtime config (NEXT_PUBLIC_* are inlined at build time; keep accesses literal). */
 export const config = {
@@ -10,6 +10,8 @@ export const config = {
   directoryDomain: (process.env.NEXT_PUBLIC_DIRECTORY_DOMAIN || process.env.NEXT_PUBLIC_ESCROW_ADDRESS || "") as Address,
   /** EverpiecePay (instant payments). Empty = instant payments unavailable. */
   pay: (process.env.NEXT_PUBLIC_PAY_ADDRESS ?? "") as Address,
+  /** EverpiecePayV2 (USDC + AUSD settlement). Empty = only the v1 AUSD flows. */
+  payV2: (process.env.NEXT_PUBLIC_PAY_V2_ADDRESS ?? "") as Address,
   /** The dollar token: real AUSD unless a deployment sets another (TestDollar on Monad testnet). */
   dollar: {
     address: (process.env.NEXT_PUBLIC_DOLLAR_ADDRESS || AUSD_ADDRESS) as Address,
@@ -41,5 +43,22 @@ export const config = {
   /** Shown on the test-money banner, e.g. "Monad testnet"; default "Local test network" (the fork). */
   networkLabel: process.env.NEXT_PUBLIC_NETWORK_LABEL || "Local test network",
 };
+
+/**
+ * Mainnet feature flags (packages/shared/src/flags.ts): off unless exactly "true"; NGN payout and the unbuilt DEX
+ * fallback are forced off. Each NEXT_PUBLIC_ var is read literally so Next inlines it at build time.
+ */
+export const flags = readFlags({
+  USDC_PAYMENTS_ENABLED: process.env.NEXT_PUBLIC_USDC_PAYMENTS_ENABLED,
+  AUSD_PAYMENTS_ENABLED: process.env.NEXT_PUBLIC_AUSD_PAYMENTS_ENABLED,
+  AGORA_SETTLEMENT_ENABLED: process.env.NEXT_PUBLIC_AGORA_SETTLEMENT_ENABLED,
+  DEX_AUSD_FALLBACK_ENABLED: process.env.NEXT_PUBLIC_DEX_AUSD_FALLBACK_ENABLED,
+  AURORA_LIVE_ENABLED: process.env.NEXT_PUBLIC_AURORA_LIVE_ENABLED,
+  PRIVATE_PAYMENTS_ENABLED: process.env.NEXT_PUBLIC_PRIVATE_PAYMENTS_ENABLED,
+  AUTOMATE_ENABLED: process.env.NEXT_PUBLIC_AUTOMATE_ENABLED,
+  EARN_ENABLED: process.env.NEXT_PUBLIC_EARN_ENABLED,
+  INVEST_ENABLED: process.env.NEXT_PUBLIC_INVEST_ENABLED,
+  NGN_PAYOUT_ENABLED: process.env.NEXT_PUBLIC_NGN_PAYOUT_ENABLED,
+});
 
 export const isDevStack = config.devFaucetUrl !== "";

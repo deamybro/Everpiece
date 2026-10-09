@@ -1,11 +1,12 @@
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, TimeoutError, keccak256, parseEventLogs, type Hex } from "viem";
-import { agoraPairAbi, everpieceEarnAbi, everpieceEscrowAbi, everpiecePayAbi, PaymentStatus, ausdAbi, tokenFor, type RouteQuote } from "@everpiece/shared";
+import { AUSD_USDC_V4_POOL, UNISWAP_V4_MONAD, routeOf, settlementAsset, v4QuoterAbi, type ConversionQuote } from "@everpiece/shared";
+import { agoraPairAbi, everpieceEarnAbi, everpieceEscrowAbi, everpiecePayAbi, everpiecePayV2Abi, PaymentStatus, ausdAbi, tokenFor, type RouteQuote } from "@everpiece/shared";
 import { randomUUID } from "node:crypto";
-import { EARN_METHODS, METHODS, PAY_METHODS, type Method, type RelayerConfig } from "./config.ts";
+import { EARN_METHODS, METHODS, PAY_METHODS, PAY_V2_METHODS, type Method, type RelayerConfig } from "./config.ts";
 import { connect, readPayment, relayAbi, startupChecks, type Chain } from "./chain.ts";
 import { prepare, PrecheckError, type EscrowEvent } from "./actions.ts";
 import { Store, type RequestRow } from "./store.ts";
-import { ValidationError, parseQuote } from "./validate.ts";
+import { ValidationError, parseQuote, parseQuoteV2 } from "./validate.ts";
 import { LocalRulesPolicy, decide, type ComplianceProvider } from "./policy.ts";
 import { log } from "./log.ts";
 import { Funding } from "./funding.ts";
@@ -22,12 +23,17 @@ const EXPECTED: Record<Method, { event: EscrowEvent; status: number }> = {
   payWithToken: { event: "Paid", status: 1 },
   earnDeposit: { event: "EarnDeposited", status: 1 },
   earnWithdraw: { event: "EarnWithdrawn", status: 1 },
+  payV2Direct: { event: "Paid", status: 1 },
+  payV2Convert: { event: "Paid", status: 1 },
 };
 
 const isPay = (m: Method) => PAY_METHODS.includes(m);
 /** EverpiecePay ABI + AUSD errors, so pay simulations decode Agora/AUSD/pay reverts by name. */
 const payRelayAbi = [...everpiecePayAbi, ...ausdAbi.filter((x) => x.type === "error")] as const;
 const isEarn = (m: Method) => EARN_METHODS.includes(m);
+const isPayV2 = (m: Method) => PAY_V2_METHODS.includes(m);
+/** EverpiecePayV2 ABI + AUSD errors (USDC reverts with strings, which viem decodes as Error(string)). */
+const payV2RelayAbi = [...everpiecePayV2Abi, ...ausdAbi.filter((x) => x.type === "error")] as const;
 const earnRelayAbi = [...everpieceEarnAbi, ...ausdAbi.filter((x) => x.type === "error")] as const;
 
 /** Sliding-window limiter (in-memory; per process). */
@@ -97,7 +103,7 @@ export class Relayer {
 
   /** Where a method's transaction goes: fixed by config, never by the client. */
   private targetOf(m: Method) {
-    return isEarn(m) ? this.cfg.earn! : isPay(m) ? this.cfg.pay! : this.cfg.escrow;
+    return isEarn(m) ? this.cfg.earn! : isPay(m) ? this.cfg.pay! : isPayV2(m) ? this.cfg.payV2! : this.cfg.escrow;
   }
 
   private now: () => number;
@@ -209,7 +215,7 @@ export class Relayer {
     try {
       await this.chain.client.simulateContract({
         address: prep.target,
-        abi: isEarn(prep.method) ? earnRelayAbi : isPay(prep.method) ? payRelayAbi : relayAbi,
+        abi: isEarn(prep.method) ? earnRelayAbi : isPay(prep.method) ? payRelayAbi : isPayV2(prep.method) ? payV2RelayAbi : relayAbi,
         functionName: prep.fn ?? prep.method,
         args: prep.args,
         account: this.address,
@@ -352,6 +358,7 @@ export class Relayer {
     if (receipt.blockNumber > finalized) return; // included, maybe executed speculatively — not final yet
 
     if (isPay(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.pay!, everpiecePayAbi, "Paid");
+    if (isPayV2(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.payV2!, everpiecePayV2Abi, "Paid");
     if (isEarn(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.earn!, everpieceEarnAbi, EXPECTED[r.method].event as "EarnDeposited" | "EarnWithdrawn");
     const payment = await readPayment(this.cfg, this.chain, r.payment_id as Hex, "finalized");
     const chainStatus = Number(payment.status);
@@ -390,7 +397,7 @@ export class Relayer {
     r: RequestRow,
     receipt: Awaited<ReturnType<typeof this.chain.client.getTransactionReceipt>>,
     contract: Hex,
-    abi: typeof everpiecePayAbi | typeof everpieceEarnAbi,
+    abi: typeof everpiecePayAbi | typeof everpiecePayV2Abi | typeof everpieceEarnAbi,
     eventName: "Paid" | "EarnDeposited" | "EarnWithdrawn",
   ): Promise<void> {
     const gasUsed = receipt.gasUsed.toString();
@@ -457,6 +464,71 @@ export class Relayer {
       log("warn", "quote.failed", { err: String(e).slice(0, 200) });
       return { httpStatus: reason ? 422 : 503, body: { error: reason ? "NO_ROUTE" : "PROVIDER_UNAVAILABLE" } };
     }
+  }
+
+  /**
+   * EverpiecePayV2 quote: what the payer must authorize so the recipient receives EXACTLY `amount` of `asset`.
+   * DIRECT: the same amount. CONVERTED: live quotes from each provider the contract would try, in its order (Agora only
+   * while approved, then the fixed Uniswap v4 pool through Uniswap's own Quoter); maxSourceAmount covers whichever
+   * executes (unused input is refunded on-chain) and never exceeds the relayer's slippage cap. No provider → available
+   * false: the app offers the truthful fallback (deliver the source asset) or a direct payment, never a fake quote.
+   */
+  async quoteV2(body: unknown, ip = "unknown"): Promise<ApiResult> {
+    if (!this.quoteLimiter.allow(`quote:${ip}`, this.now())) return { httpStatus: 429, body: { error: "RateLimited" } };
+    let q;
+    try {
+      q = parseQuoteV2(body);
+    } catch (e) {
+      return { httpStatus: 400, body: { error: "InvalidRequest", detail: (e as Error).message } };
+    }
+    if (!this.cfg.payV2) return { httpStatus: 503, body: { error: "PROVIDER_UNAVAILABLE" } };
+    const chainId = this.chain.chainId;
+    if (!settlementAsset(chainId, q.asset)) return { httpStatus: 422, body: { error: "UNSUPPORTED_ASSET" } };
+    if (!settlementAsset(chainId, q.sourceToken)) return { httpStatus: 422, body: { error: "UNSUPPORTED_ROUTE" } };
+    if (q.amount < this.cfg.minPaymentAmount) return { httpStatus: 422, body: { error: "BelowMinimumPayment" } };
+    const expiresAt = Math.floor(this.now() / 1000) + this.cfg.quoteTtlSec;
+    const base = { quoteId: randomUUID(), chainId, asset: q.asset, amount: q.amount, sourceToken: q.sourceToken, expiresAt };
+    if (routeOf(q.asset, q.sourceToken) === "DIRECT") {
+      return { httpStatus: 200, body: { quote: { ...base, route: "DIRECT", available: true, provider: null, sourceAmount: q.amount, maxSourceAmount: q.amount, providers: [] } } };
+    }
+    const providers: ConversionQuote[] = [];
+    try {
+      const [ok, need] = (await this.chain.client.readContract({ address: this.cfg.payV2, abi: everpiecePayV2Abi, functionName: "quote", args: [q.sourceToken, q.asset, q.amount] })) as readonly [boolean, bigint, string];
+      providers.push(ok ? { provider: "AGORA", available: true, sourceAmount: need } : { provider: "AGORA", available: false, sourceAmount: null, reason: "NOT_APPROVED_OR_NO_QUOTE" });
+    } catch (e) {
+      providers.push({ provider: "AGORA", available: false, sourceAmount: null, reason: "PROVIDER_UNAVAILABLE" });
+      log("warn", "quoteV2.agora_failed", { err: String(e).slice(0, 200) });
+    }
+    const converter = (await this.chain.client.readContract({ address: this.cfg.payV2, abi: everpiecePayV2Abi, functionName: "CONVERTER" }).catch(() => null)) as string | null;
+    if (converter && !/^0x0{40}$/i.test(converter) && chainId === 143) {
+      try {
+        const zeroForOne = q.sourceToken.toLowerCase() === AUSD_USDC_V4_POOL.currency0.toLowerCase();
+        const { result } = await this.chain.client.simulateContract({
+          address: UNISWAP_V4_MONAD.quoter, abi: v4QuoterAbi, functionName: "quoteExactOutputSingle",
+          args: [{ poolKey: { currency0: AUSD_USDC_V4_POOL.currency0, currency1: AUSD_USDC_V4_POOL.currency1, fee: AUSD_USDC_V4_POOL.fee, tickSpacing: AUSD_USDC_V4_POOL.tickSpacing, hooks: AUSD_USDC_V4_POOL.hooks }, zeroForOne, exactAmount: q.amount, hookData: "0x" }],
+        });
+        providers.push({ provider: "UNISWAP_V4", available: true, sourceAmount: result[0] });
+      } catch (e) {
+        providers.push({ provider: "UNISWAP_V4", available: false, sourceAmount: null, reason: "INSUFFICIENT_LIQUIDITY_OR_UNAVAILABLE" });
+        log("warn", "quoteV2.v4_failed", { err: String(e).slice(0, 200) });
+      }
+    } else {
+      providers.push({ provider: "UNISWAP_V4", available: false, sourceAmount: null, reason: "NOT_CONFIGURED" });
+    }
+    const live = providers.filter((p) => p.available && p.sourceAmount !== null);
+    const cap = (q.amount * (10_000n + this.cfg.maxConvertSlippageBps)) / 10_000n;
+    if (live.length === 0) {
+      return { httpStatus: 200, body: { quote: { ...base, route: "CONVERTED", available: false, provider: null, sourceAmount: null, maxSourceAmount: null, fallbackMaxSourceAmount: q.amount, providers } } };
+    }
+    // the contract tries Agora first when approved, so the expected provider is the first live one in that order
+    const expected = live[0];
+    const worst = live.reduce((m, p) => (p.sourceAmount! > m ? p.sourceAmount! : m), 0n);
+    let maxSourceAmount = worst + (worst * this.cfg.quoteHeadroomBps + 9_999n) / 10_000n;
+    if (maxSourceAmount > cap) maxSourceAmount = cap;
+    if (maxSourceAmount < expected.sourceAmount!) {
+      return { httpStatus: 200, body: { quote: { ...base, route: "CONVERTED", available: false, provider: null, sourceAmount: null, maxSourceAmount: null, fallbackMaxSourceAmount: q.amount, providers, reason: "PRICE_ABOVE_SLIPPAGE_CAP" } } };
+    }
+    return { httpStatus: 200, body: { quote: { ...base, route: "CONVERTED", available: true, provider: expected.provider, sourceAmount: expected.sourceAmount, maxSourceAmount, providers } } };
   }
 
   async health(): Promise<Record<string, unknown>> {

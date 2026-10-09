@@ -1,7 +1,7 @@
 // The event signatures in config.yaml must be exactly the contracts' events (shared ABI is generated from contracts/out).
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { everpieceEarnAbi, everpieceEscrowAbi, everpiecePayAbi } from "../../packages/shared/src/abi.ts";
+import { everpieceEarnAbi, everpieceEscrowAbi, everpiecePayAbi, everpiecePayV2Abi } from "../../packages/shared/src/abi.ts";
 
 type Abi = readonly { type: string; name?: string; inputs?: readonly { type: string; name: string; indexed?: boolean }[] }[];
 const sig = (abi: Abi, name: string) => {
@@ -16,6 +16,8 @@ it("config.yaml indexes the escrow's payment events, EverpiecePay.Paid and Everp
   const fromAbi = [
     ...["PaymentCreated", "PaymentClaimed", "PaymentCancelled", "PaymentRefunded"].map((n) => sig(everpieceEscrowAbi, n)),
     sig(everpiecePayAbi, "Paid"),
+    sig(everpiecePayV2Abi, "Paid"),
+    sig(everpiecePayV2Abi, "ConversionFallback"),
     sig(everpieceEarnAbi, "EarnDeposited"),
     sig(everpieceEarnAbi, "EarnWithdrawn"),
   ];

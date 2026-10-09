@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address, type Hex } from "viem";
-import type { PaymentIntent } from "@everpiece/shared";
+import type { PaymentIntent, PaymentV2 } from "@everpiece/shared";
 
 export class ValidationError extends Error {}
 
@@ -181,6 +181,36 @@ export function parsePayToken(body: unknown): PayTokenParams {
     payerSignature: sig(o.payerSignature, "payerSignature"),
     permit: { deadline: u256(pm.deadline, "permit.deadline"), v: pm.v, r: b32(pm.r, "permit.r"), s: b32(pm.s, "permit.s") },
   };
+}
+
+const PAYMENT_V2_KEYS = ["ref", "sender", "recipient", "asset", "amount", "sourceToken", "maxSourceAmount", "deadline", "fallbackToSource"] as const;
+export type PayV2Params = { payment: PaymentV2; signature: Hex };
+
+/** EverpiecePayV2: the Payment (every field required, no extras) + the ONE ERC-3009 signature in the source domain. */
+export function parsePayV2(body: unknown): PayV2Params {
+  const o = obj(body, "body", ["payment", "signature"]);
+  const p = obj(o.payment, "payment", PAYMENT_V2_KEYS);
+  if (typeof p.fallbackToSource !== "boolean") throw new ValidationError("payment.fallbackToSource: expected boolean");
+  return {
+    payment: {
+      ref: b32(p.ref, "payment.ref"),
+      sender: addr(p.sender, "payment.sender"),
+      recipient: addr(p.recipient, "payment.recipient"),
+      asset: addr(p.asset, "payment.asset"),
+      amount: u256(p.amount, "payment.amount"),
+      sourceToken: addr(p.sourceToken, "payment.sourceToken"),
+      maxSourceAmount: u256(p.maxSourceAmount, "payment.maxSourceAmount"),
+      deadline: u256(p.deadline, "payment.deadline"),
+      fallbackToSource: p.fallbackToSource,
+    },
+    signature: sig(o.signature, "signature"),
+  };
+}
+
+export type QuoteV2Params = { sourceToken: Address; asset: Address; amount: bigint };
+export function parseQuoteV2(body: unknown): QuoteV2Params {
+  const o = obj(body, "body", ["sourceToken", "asset", "amount"]);
+  return { sourceToken: addr(o.sourceToken, "sourceToken"), asset: addr(o.asset, "asset"), amount: u256(o.amount, "amount") };
 }
 
 export type QuoteParams = { sellToken: Address; buyAmount: bigint; recipient: Address; sender: Address };

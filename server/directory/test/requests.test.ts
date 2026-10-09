@@ -109,3 +109,73 @@ test("paid (protected): an escrow payment whose salt is the request id and whose
   assert.equal((await s.requestPaid(proof, "ip")).httpStatus, 200);
   assert.equal(((await s.getRequest({ requestId: r.requestId }, "ip")).body.paid as { kind: string }).kind, "protected");
 });
+
+test("paid (instantV2): USDC or AUSD request, proof recomputed; a fallback delivery is recorded as such, never as paid in the asked asset", async () => {
+  const { USDC_MAINNET_ADDRESS, paymentV2Id } = await import("@everpiece/shared");
+  const PAY_V2 = "0x3333333333333333333333333333333333333333" as Address;
+  const delivered = new Map<string, Address>();
+  const s = new DirectoryService({ ...cfg, payV2Address: PAY_V2 }, {
+    store: new DirectoryStore(":memory:"), now: () => NOW,
+    readDeliveredV2: async (id) => delivered.get(id) ?? null,
+  });
+  await registerMaris(s);
+  const usdcReq = req({ requestId: `0x${"a1".repeat(32)}`, asset: USDC_MAINNET_ADDRESS });
+  assert.equal((await s.createRequest(await signed(usdcReq), "ip")).httpStatus, 201);
+  // protected requests stay in the escrow's asset
+  assert.equal((await s.createRequest(await signed(req({ requestId: `0x${"a2".repeat(32)}`, asset: USDC_MAINNET_ADDRESS, mode: RequestMode.PROTECTED })), "ip")).body.error, "UNSUPPORTED_NETWORK");
+
+  const payment: { ref: Hex; sender: Address; recipient: Address; asset: Address; amount: bigint; sourceToken: Address; maxSourceAmount: bigint; deadline: bigint; fallbackToSource: boolean } = { ref: usdcReq.requestId, sender: pk(7).address, recipient: maris.address, asset: USDC_MAINNET_ADDRESS, amount: usdcReq.amount,
+    sourceToken: AUSD_ADDRESS, maxSourceAmount: 25_100_000n, deadline: 9_999_999_999n, fallbackToSource: true };
+  const w = (p: typeof payment) => ({ ...p, amount: p.amount.toString(), maxSourceAmount: p.maxSourceAmount.toString(), deadline: p.deadline.toString() });
+  const id = paymentV2Id(PAY_V2, payment, 143);
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w(payment) }, "ip")).body.error, "PaymentNotFinalized");
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w({ ...payment, asset: AUSD_ADDRESS }) }, "ip")).body.error, "NotThisRequest");
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2Fallback", payment: w(payment) }, "ip")).httpStatus, 400);
+  delivered.set(id, AUSD_ADDRESS); // conversion unavailable: the payer's AUSD was delivered instead
+  const r = await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w(payment) }, "ip");
+  assert.equal(r.httpStatus, 200);
+  assert.equal((r.body.paid as { kind: string }).kind, "instantV2Fallback");
+
+  const ausdReq = req({ requestId: `0x${"a3".repeat(32)}` });
+  await s.createRequest(await signed(ausdReq), "ip");
+  const p2 = { ...payment, ref: ausdReq.requestId, asset: AUSD_ADDRESS, sourceToken: USDC_MAINNET_ADDRESS };
+  delivered.set(paymentV2Id(PAY_V2, p2, 143), AUSD_ADDRESS);
+  const r2 = await s.requestPaid({ requestId: ausdReq.requestId, kind: "instantV2", payment: w(p2) }, "ip");
+  assert.equal((r2.body.paid as { kind: string }).kind, "instantV2");
+});
+
+test("paid (crossChain): an external wallet paid via Aurora; the finalized USDC delivery to the requester is the proof, usable once", async () => {
+  const { USDC_MAINNET_ADDRESS } = await import("@everpiece/shared");
+  const deliveries = new Map<string, { timestamp: number; transfers: { token: Address; to: Address; value: bigint }[] }>();
+  const s = new DirectoryService({ ...cfg, usdcAddress: USDC_MAINNET_ADDRESS }, {
+    store: new DirectoryStore(":memory:"), now: () => NOW, readDelivery: async (h) => deliveries.get(h) ?? null,
+  });
+  await registerMaris(s);
+  const usdcReq = req({ requestId: `0x${"b1".repeat(32)}`, asset: USDC_MAINNET_ADDRESS });
+  const ausdReq = req({ requestId: `0x${"b2".repeat(32)}` });
+  await s.createRequest(await signed(usdcReq), "ip");
+  await s.createRequest(await signed(ausdReq), "ip");
+  const tx1 = `0x${"c1".repeat(32)}` as Hex;
+  const tx2 = `0x${"c2".repeat(32)}` as Hex;
+  const later = NOW / 1000 + 60;
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "crossChain", txHash: tx1 }, "ip")).body.error, "PaymentNotFinalized");
+  // wrong recipient, too little, wrong token, or a delivery from before the request: not this request
+  deliveries.set(tx1, { timestamp: later, transfers: [{ token: USDC_MAINNET_ADDRESS, to: pk(9).address, value: 25_000_000n }] });
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "crossChain", txHash: tx1 }, "ip")).body.error, "NotThisRequest");
+  deliveries.set(tx1, { timestamp: later, transfers: [{ token: USDC_MAINNET_ADDRESS, to: maris.address, value: 24_999_999n }] });
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "crossChain", txHash: tx1 }, "ip")).body.error, "NotThisRequest");
+  deliveries.set(tx1, { timestamp: later, transfers: [{ token: AUSD_ADDRESS, to: maris.address, value: 25_000_000n }] });
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "crossChain", txHash: tx1 }, "ip")).body.error, "NotThisRequest");
+  deliveries.set(tx1, { timestamp: NOW / 1000 - 3600, transfers: [{ token: USDC_MAINNET_ADDRESS, to: maris.address, value: 25_000_000n }] });
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "crossChain", txHash: tx1 }, "ip")).body.error, "NotThisRequest");
+
+  deliveries.set(tx1, { timestamp: later, transfers: [{ token: USDC_MAINNET_ADDRESS, to: maris.address, value: 25_000_000n }] });
+  const ok = await s.requestPaid({ requestId: usdcReq.requestId, kind: "crossChain", txHash: tx1 }, "ip");
+  assert.equal((ok.body.paid as { kind: string }).kind, "crossChain");
+  // the same delivery can't pay a second request
+  assert.equal((await s.requestPaid({ requestId: ausdReq.requestId, kind: "crossChain", txHash: tx1 }, "ip")).body.error, "DeliveryAlreadyUsed");
+  // an AUSD request paid cross-chain arrives as USDC, and says so
+  deliveries.set(tx2, { timestamp: later, transfers: [{ token: USDC_MAINNET_ADDRESS, to: maris.address, value: 25_000_000n }] });
+  const r2 = await s.requestPaid({ requestId: ausdReq.requestId, kind: "crossChain", txHash: tx2 }, "ip");
+  assert.equal((r2.body.paid as { kind: string }).kind, "crossChainUsdc");
+});

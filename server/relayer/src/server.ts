@@ -12,6 +12,8 @@ const ROUTES: Record<string, Method> = {
   "/v1/payments/refund": "refundExpired",
   "/v1/pay/ausd": "payWithAusd",
   "/v1/pay/token": "payWithToken",
+  "/v1/pay/v2/direct": "payV2Direct",
+  "/v1/pay/v2/convert": "payV2Convert",
   "/v1/earn/deposit": "earnDeposit",
   "/v1/earn/withdraw": "earnWithdraw",
 };
@@ -91,6 +93,11 @@ export function createHttpServer(relayer: Relayer): Server {
         else if (req.method === "POST" && url.pathname === "/v1/funding/quote") out = await f.quote(await readJson(req, relayer.cfg.maxBodyBytes), ip);
         else if (req.method === "POST" && url.pathname === "/v1/funding/deposit") out = await f.deposit(await readJson(req, relayer.cfg.maxBodyBytes), ip);
         else return send(res, 404, { error: "NotFound" }, origin);
+        return send(res, out.httpStatus, out.body, origin);
+      }
+      if (url.pathname === "/v1/quotes/v2") {
+        if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
+        const out = await relayer.quoteV2(await readJson(req, relayer.cfg.maxBodyBytes), clientIp(req));
         return send(res, out.httpStatus, out.body, origin);
       }
       if (url.pathname === "/v1/quotes") {
