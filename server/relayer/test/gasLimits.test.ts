@@ -28,6 +28,11 @@ test("relayer gas limits == the fork-tested limits", () => {
     ["earnWithdraw", "EverpieceEarnFork.t.sol", "LIMIT_EARN_WITHDRAW"],
     ["payV2Direct", "RelayerGasV2.t.sol", "LIMIT_PAY_V2_DIRECT"],
     ["payV2Convert", "RelayerGasV2.t.sol", "LIMIT_PAY_V2_CONVERT"],
+    ["earnUsdcDeposit", "RelayerGasV2.t.sol", "LIMIT_EARN_USDC_DEPOSIT"],
+    ["earnUsdcWithdraw", "RelayerGasV2.t.sol", "LIMIT_EARN_USDC_WITHDRAW"],
+    ["automateActivate", "RelayerGasV2.t.sol", "LIMIT_AUTOMATE_ACTIVATE"],
+    ["automateRevoke", "RelayerGasV2.t.sol", "LIMIT_AUTOMATE_REVOKE"],
+    ["automateExecute", "RelayerGasV2.t.sol", "LIMIT_AUTOMATE_EXECUTE"],
   ];
   assert.deepEqual(Object.keys(c.gasLimits).sort(), pairs.map(([k]) => k).sort(), "every relayer method is fork-tested");
   for (const [method, file, constant] of pairs) assert.equal(c.gasLimits[method], solLimit(file, constant), method);

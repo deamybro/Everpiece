@@ -2,6 +2,8 @@ import { getAddress, hexToSignature, parseAbi, type Address, type Hex } from "vi
 import {
   aaveRates,
   earnAusdAuthorization,
+  earnAuthorization,
+  settlementAsset,
   earnDepositId,
   earnPosition,
   earnWithdrawalTyped,
@@ -30,10 +32,26 @@ import { PayError } from "./pay";
  * always belong to the owner; nothing here is custodial.
  */
 
-export const earnAvailable = () => Boolean(config.earn && config.earnVault);
+export const earnAvailable = () => Boolean(config.earn && config.earnVault) || usdcEarnAvailable();
+const usdcEarnAvailable = () => Boolean(config.earnUsdc) && config.chainId === 143;
+const USDC_OPP = () => EARN_OPPORTUNITIES.find((o) => o.id === "aave-v3-usdc" && o.chainId === config.chainId);
+
+/** Which EverpieceEarn router holds this opportunity: USDC → EverpieceEarnUsdc, AUSD (or the test vault) → EverpieceEarn. */
+export const routerFor = (o: EarnOpportunity): Address => (o.id === "aave-v3-usdc" ? config.earnUsdc : config.earn);
+const isUsdc = (o: EarnOpportunity) => o.id === "aave-v3-usdc";
+
+/** Every Earn opportunity this deployment can use (USDC first when enabled). */
+export function opportunities(): EarnOpportunity[] {
+  const out: EarnOpportunity[] = [];
+  const u = USDC_OPP();
+  if (usdcEarnAvailable() && u) out.push(u);
+  const a = config.earn && config.earnVault ? opportunity() : null;
+  if (a) out.push(a);
+  return out;
+}
 
 export function opportunity(): EarnOpportunity | null {
-  if (!earnAvailable()) return null;
+  if (!(config.earn && config.earnVault)) return USDC_OPP() && usdcEarnAvailable() ? USDC_OPP()! : null;
   const known = EARN_OPPORTUNITIES.find((o) => o.chainId === config.chainId && o.vault.toLowerCase() === config.earnVault.toLowerCase());
   if (known) return known;
   // only the testnet may use a vault outside the verified registry, and it is always labelled SIMULATED
@@ -82,7 +100,7 @@ export async function readPosition(o: EarnOpportunity, owner: Address): Promise<
     client.readContract({ address: o.vault, abi: erc4626Abi, functionName: "convertToAssets", args: [shares] }),
     client.readContract({ address: o.vault, abi: erc4626Abi, functionName: "maxWithdraw", args: [owner] }),
     // the contract's own principal (enforced at harvest), never the possibly-lagging indexed ledger
-    client.readContract({ address: config.earn, abi: everpieceEarnAbi, functionName: "principalOf", args: [owner, o.vault] }),
+    client.readContract({ address: routerFor(o), abi: everpieceEarnAbi, functionName: "principalOf", args: [owner, o.vault] }),
   ]);
   const entries = ledgerFromEvents(history.map((h) => ({ ...h, assets: BigInt(h.assets) })), o.vault);
   return { position: withOnchainPrincipal(earnPosition(o.accounting, entries, redeemable), principal), shares, maxWithdraw, history };
@@ -98,12 +116,17 @@ export async function deposit(account: Account, o: EarnOpportunity, assets: bigi
   ]);
   const d = { ref: ref ?? randomBytes32(), owner: account.address, vault: o.vault, assets, minShares, deadline };
   onStatus("SIGNING");
-  const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(earnAusdAuthorization(config.earn, config.chainId, d, getAddress(config.dollar.address), config.dollar.eip712Name)));
-  const r = await relayer("/v1/earn/deposit", { deposit: d, ausdSignature });
+  const router = routerFor(o);
+  const usdc = isUsdc(o) ? settlementAsset(config.chainId, o.asset) : undefined;
+  const typed = usdc
+    ? earnAuthorization(router, config.chainId, d, { address: usdc.address, eip712Name: usdc.eip712.name, eip712Version: usdc.eip712.version })
+    : earnAusdAuthorization(router, config.chainId, d, getAddress(config.dollar.address), config.dollar.eip712Name);
+  const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(typed));
+  const r = await relayer(usdc ? "/v1/earn/usdc/deposit" : "/v1/earn/deposit", { deposit: d, ausdSignature });
   if (r.status !== 202 && r.status !== 200) throw new PayError(r.body.error ?? "TRANSACTION_REVERTED");
   const done = await waitForRequest(r.body.requestId, onStatus);
   if (done.status !== "CONFIRMED") throw new PayError(done.error ?? "TRANSACTION_REVERTED");
-  return { id: earnDepositId(config.earn, config.chainId, d), txHash: (done.txHash as Hex) ?? null };
+  return { id: earnDepositId(router, config.chainId, d), txHash: (done.txHash as Hex) ?? null };
 }
 
 /**
@@ -126,11 +149,11 @@ export async function withdraw(account: Account, o: EarnOpportunity, assets: big
   const w = { ref, owner: account.address, vault: o.vault, assets, maxShares, deadline };
   onStatus("SIGNING");
   const { ownerSignature, permitSig } = await withSigner(account, async (signer) => ({
-    ownerSignature: await signer.signTypedData(earnWithdrawalTyped(config.earn, config.chainId, w)),
-    permitSig: await signer.signTypedData(sharePermitTyped({ address: o.vault, eip712Name: domain[1] }, config.chainId, account.address, config.earn, maxShares, nonce, deadline)),
+    ownerSignature: await signer.signTypedData(earnWithdrawalTyped(routerFor(o), config.chainId, w)),
+    permitSig: await signer.signTypedData(sharePermitTyped({ address: o.vault, eip712Name: domain[1] }, config.chainId, account.address, routerFor(o), maxShares, nonce, deadline)),
   }));
   const { r: pr, s: ps, v } = hexToSignature(permitSig);
-  const r = await relayer("/v1/earn/withdraw", { withdrawal: w, ownerSignature, permit: { v: Number(v), r: pr, s: ps } });
+  const r = await relayer(isUsdc(o) ? "/v1/earn/usdc/withdraw" : "/v1/earn/withdraw", { withdrawal: w, ownerSignature, permit: { v: Number(v), r: pr, s: ps } });
   if (r.status !== 202 && r.status !== 200) throw new PayError(r.body.error ?? "TRANSACTION_REVERTED");
   const done = await waitForRequest(r.body.requestId, onStatus);
   if (done.status !== "CONFIRMED") throw new PayError(done.error ?? "TRANSACTION_REVERTED");

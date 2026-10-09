@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 import {EverpiecePayV2, IStableConverter} from "../src/EverpiecePayV2.sol";
 import {EverpieceStableConverter, IV4PoolManager} from "../src/EverpieceStableConverter.sol";
+import {EverpieceAutomate} from "../src/EverpieceAutomate.sol";
 import {EverpieceEscrowUsdc, EverpieceEarnUsdc} from "../src/EverpieceUsdc.sol";
 import {IAUSD} from "../src/interfaces/IAUSD.sol";
 
@@ -39,9 +40,10 @@ contract DeployEverpieceMainnetV2 is Script {
     address internal constant V4_POOL_MANAGER = 0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e; // VERIFIED §4.19
     uint24 internal constant V4_FEE = 9; // VERIFIED §4.19 (pool id 0xd112fde9…27e8)
     int24 internal constant V4_TICK_SPACING = 1;
+    address internal constant WA_AUSD = 0x9e1AcC5BFbf34e2E579763cE14042d957719fE76; // VERIFIED §4.17 (Aave AUSD_STATA_TOKEN)
     address internal constant WA_USDC = 0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2; // VERIFIED §4.18 (Aave USDC_STATA_TOKEN)
 
-    function run() external returns (EverpieceStableConverter conv, EverpiecePayV2 pay, EverpieceEscrowUsdc escrow, EverpieceEarnUsdc earn) {
+    function run() external returns (EverpieceStableConverter conv, EverpiecePayV2 pay, EverpieceEscrowUsdc escrow, EverpieceEarnUsdc earn, EverpieceAutomate automate) {
         address owner = vm.envAddress("ESCROW_OWNER");
         address approver = vm.envAddress("CLAIM_APPROVER");
         require(owner != address(0) && approver != address(0), "owner/approver unset");
@@ -55,6 +57,7 @@ contract DeployEverpieceMainnetV2 is Script {
         require(!ITokenView(USDC).paused(), "USDC paused");
         require(IPairView(AUSD_USDC_PAIR).token0() == AUSD && IPairView(AUSD_USDC_PAIR).token1() == USDC, "pair tokens changed");
         require(IVaultView(WA_USDC).asset() == USDC, "vault asset != USDC");
+        require(IVaultView(WA_AUSD).asset() == AUSD, "vault asset != AUSD");
         require(V4_POOL_MANAGER.code.length > 0, "v4 PoolManager has no code");
 
         EverpiecePayV2.Asset[] memory assets = new EverpiecePayV2.Asset[](2);
@@ -70,6 +73,10 @@ contract DeployEverpieceMainnetV2 is Script {
         pay = new EverpiecePayV2(assets, pairs, IStableConverter(address(conv)));
         escrow = new EverpieceEscrowUsdc(USDC, owner, approver);
         earn = new EverpieceEarnUsdc(USDC, vaults);
+        address[] memory autoVaults = new address[](2);
+        autoVaults[0] = WA_USDC;
+        autoVaults[1] = WA_AUSD;
+        automate = new EverpieceAutomate(autoVaults);
         vm.stopBroadcast();
 
         require(pay.assetKind(USDC) == 1 && pay.assetKind(AUSD) == 2, "post: assets");
@@ -81,5 +88,7 @@ contract DeployEverpieceMainnetV2 is Script {
         console.log("EverpiecePayV2", address(pay));
         console.log("EverpieceEscrowUsdc", address(escrow));
         console.log("EverpieceEarnUsdc", address(earn));
+        require(automate.vaultAsset(WA_USDC) == USDC && automate.vaultAsset(WA_AUSD) == AUSD, "post: automate vaults");
+        console.log("EverpieceAutomate", address(automate));
     }
 }

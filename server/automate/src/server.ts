@@ -54,6 +54,7 @@ export function createAutomateServer(svc: AutomateService): Server {
       if (req.method === "GET" && (m = /^\/v1\/automate\/executions\/by-owner\/(0x[0-9a-fA-F]{40})$/.exec(p))) return send(res, svc.executions(m[1]), origin);
       if (req.method === "GET" && (m = /^\/v1\/automate\/executions\/(0x[0-9a-fA-F]{64})$/.exec(p))) return send(res, svc.execution(m[1]), origin);
       if (req.method === "POST" && p === "/v1/automate/legs") return send(res, await svc.reportLeg(await readJson(req)), origin);
+      if (req.method === "POST" && p === "/v1/automate/grants") return send(res, await svc.linkGrant(await readJson(req)), origin);
       return send(res, { httpStatus: 404, body: { error: "NotFound" } }, origin);
     } catch (e) {
       const x = e as { status?: number; code?: string };

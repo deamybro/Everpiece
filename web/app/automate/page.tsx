@@ -7,8 +7,8 @@ import { Welcome } from "../../components/Welcome";
 import { Progress, progressText } from "../../components/status";
 import { friendlyError } from "../../lib/api";
 import { formatDollars, parseDollars, chainTime } from "../../lib/chain";
-import { createRule, listExecutions, listRules, runExecution, setEnabled, targetStatus, automateAvailable, type ExecutionView, type RuleView } from "../../lib/automate";
-import { opportunity } from "../../lib/earn";
+import { authorizeRule, boundedAvailable, createRule, listExecutions, listRules, runExecution, setEnabled, targetStatus, automateAvailable, type ExecutionView, type RuleView } from "../../lib/automate";
+import { opportunities, opportunity } from "../../lib/earn";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { PayError } from "../../lib/pay";
 
@@ -50,6 +50,8 @@ export default function AutomatePage() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  /** "Runs within these limits without asking" (EverpieceAutomate grant) vs. confirm each run with a fingerprint. */
+  const [unattended, setUnattended] = useState(false);
 
   const refresh = useCallback(async (a: Account) => {
     const [r, x] = await Promise.all([listRules(a.address), listExecutions(a.address)]);
@@ -87,6 +89,8 @@ export default function AutomatePage() {
       const actions: Action[] = STOCKS.filter((x) => bps(stocks[x.id] ?? "0") > 0).map((x) => ({ kind: "BUY_STOCK", bps: bps(stocks[x.id]), assetId: x.id }));
       s = { name: "Earn → Invest", trigger: { kind: "YIELD_THRESHOLD", positionId: opp?.id ?? "earn", threshold: max(threshold) }, actions, limits, authorization: "CONFIRM_EACH" };
     }
+    // unattended runs are possible only for Earn deposits (the module can't do anything else)
+    if (unattended && boundedAvailable() && s.actions.every((a) => a.kind !== "BUY_STOCK")) s = { ...s, authorization: "BOUNDED_MODULE" };
     const problem = ruleSpecProblem(s, now);
     if (problem) return setError(PROBLEM[problem] ?? problem);
     setSpec(s);
@@ -97,10 +101,20 @@ export default function AutomatePage() {
     setBusy(true);
     setError("");
     try {
-      await createRule(account, spec);
+      const saved = await createRule(account, spec);
+      if (spec.authorization === "BOUNDED_MODULE") {
+        // second prompt: the on-chain permission itself, bounded to this rule's caps, vault and expiry
+        const rule = ruleFromJson(saved.rule);
+        const earnAction = rule.actions.find((a) => a.kind === "DEPOSIT_YIELD");
+        const o = opportunities().find((x) => earnAction?.kind === "DEPOSIT_YIELD" && x.id === earnAction.opportunityId);
+        if (!o) throw new PayError("EarnUnavailable");
+        await authorizeRule(account, rule, o, (st) => setProgress(progressText(st, "Setting up the permission")));
+      }
       setSpec(null);
       setTemplate(null);
-      setDone("Rule saved ✓ It runs when its trigger happens; you confirm each run.");
+      setDone(spec.authorization === "BOUNDED_MODULE"
+        ? "Rule saved ✓ It runs by itself within your limits. You can stop it any time."
+        : "Rule saved ✓ It runs when its trigger happens; you confirm each run.");
       await refresh(account);
     } catch (e) {
       setError(errText(e));
@@ -186,6 +200,11 @@ export default function AutomatePage() {
             </section>
           )}
 
+          {!spec && template && boundedAvailable() && template !== "earn-invest" && (
+            <label className="small">
+              <input type="checkbox" checked={unattended} onChange={(e) => setUnattended(e.target.checked)} /> Run by itself within these limits (no fingerprint each time)
+            </label>
+          )}
           {spec && (() => {
             const d = describeRule(spec, names);
             return (
@@ -200,6 +219,12 @@ export default function AutomatePage() {
                   </div>
                 )}
                 {opp?.simulated && <div className="dev">Earn on this test site has simulated yield.</div>}
+                <div className="small">
+                  {spec.authorization === "BOUNDED_MODULE"
+                    ? "Runs by itself: Everpiece can only move money from your balance into Earn in your own name, within the limits above, until the rule expires. Nothing else is possible, and you can stop it any time."
+                    : "You confirm each run with your fingerprint."}
+                </div>
+                <Progress text={progress} />
                 <button disabled={busy} onClick={save}>Save rule with fingerprint or screen lock</button>
                 <button className="ghost" onClick={() => setSpec(null)}>Change it</button>
               </section>

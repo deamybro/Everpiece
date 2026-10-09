@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address, type Hex } from "viem";
-import type { PaymentIntent, PaymentV2 } from "@everpiece/shared";
+import type { Grant, PaymentIntent, PaymentV2 } from "@everpiece/shared";
 
 export class ValidationError extends Error {}
 
@@ -205,6 +205,36 @@ export function parsePayV2(body: unknown): PayV2Params {
     },
     signature: sig(o.signature, "signature"),
   };
+}
+
+export type AutomateActivateParams = {
+  grant: Grant;
+  ownerSignature: Hex;
+  permit: { deadline: bigint; v: number; r: Hex; s: Hex };
+};
+const GRANT_KEYS = ["ruleId", "owner", "executor", "vault", "maxPerExecution", "maxPerDay", "total", "expiresAt"] as const;
+export function parseAutomateActivate(body: unknown): AutomateActivateParams {
+  const o = obj(body, "body", ["grant", "ownerSignature", "permit"]);
+  const g = obj(o.grant, "grant", GRANT_KEYS);
+  const pm = obj(o.permit, "permit", ["deadline", "v", "r", "s"]);
+  if (pm.v !== 27 && pm.v !== 28) throw new ValidationError("permit.v: 27 or 28");
+  return {
+    grant: {
+      ruleId: b32(g.ruleId, "grant.ruleId"), owner: addr(g.owner, "grant.owner"), executor: addr(g.executor, "grant.executor"), vault: addr(g.vault, "grant.vault"),
+      maxPerExecution: u256(g.maxPerExecution, "grant.maxPerExecution"), maxPerDay: u256(g.maxPerDay, "grant.maxPerDay"), total: u256(g.total, "grant.total"),
+      expiresAt: u256(g.expiresAt, "grant.expiresAt"),
+    },
+    ownerSignature: sig(o.ownerSignature, "ownerSignature"),
+    permit: { deadline: u256(pm.deadline, "permit.deadline"), v: pm.v, r: b32(pm.r, "permit.r"), s: b32(pm.s, "permit.s") },
+  };
+}
+export function parseAutomateRevoke(body: unknown): { grantId: Hex; ownerSignature: Hex } {
+  const o = obj(body, "body", ["grantId", "ownerSignature"]);
+  return { grantId: b32(o.grantId, "grantId"), ownerSignature: sig(o.ownerSignature, "ownerSignature") };
+}
+export function parseAutomateExecute(body: unknown): { grantId: Hex; executionId: Hex; assets: bigint; minShares: bigint } {
+  const o = obj(body, "body", ["grantId", "executionId", "assets", "minShares"]);
+  return { grantId: b32(o.grantId, "grantId"), executionId: b32(o.executionId, "executionId"), assets: u256(o.assets, "assets"), minShares: u256(o.minShares, "minShares") };
 }
 
 export type QuoteV2Params = { sourceToken: Address; asset: Address; amount: bigint };

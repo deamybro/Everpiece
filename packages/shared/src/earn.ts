@@ -52,6 +52,24 @@ export const EARN_OPPORTUNITIES: readonly EarnOpportunity[] = [
     ],
     source: "https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol",
   },
+  {
+    // VERIFIED §4.18: "Wrapped Aave Monad USDC" (EIP-712 v1, 6 dp), asset() = USDC, aToken 0x35a7…6042.
+    id: "aave-v3-usdc",
+    chainId: MONAD_MAINNET_CHAIN_ID,
+    provider: "Aave V3",
+    name: "Aave · USDC",
+    asset: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    vault: "0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2",
+    accounting: "ERC4626_MONOTONIC",
+    rateSource: { kind: "AAVE_V3_LIQUIDITY_RATE", pool: "0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef", reserve: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603" },
+    simulated: false,
+    risks: [
+      "The rate changes all the time; it is what borrowers pay, minus Aave's share.",
+      "Withdrawals need free liquidity in the market: if most of it is borrowed, a full withdrawal can have to wait.",
+      "Smart-contract and oracle risk of Aave. Not insured, not a bank deposit.",
+    ],
+    source: "https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol",
+  },
 ];
 
 /** The testnet vault is deployed by the test stack; its address comes from config, never guessed. */
@@ -103,6 +121,12 @@ export const earnDepositId = (earn: Address, chainId: number, d: EarnDeposit): H
 export const earnWithdrawalId = (earn: Address, chainId: number, w: EarnWithdrawal): Hex => hashTypedData(earnWithdrawalTyped(earn, chainId, w));
 
 /** What the owner signs to fund a deposit: AUSD ReceiveWithAuthorization to EverpieceEarn, nonce = deposit id. */
+/** The deposit authorization in ANY settlement asset's own domain (USDC "USDC"/"2", AUSD "Agora Dollar"/"1"). */
+export function earnAuthorization(earn: Address, chainId: number, d: EarnDeposit, token: { address: Address; eip712Name: string; eip712Version: string }) {
+  const a = earnAusdAuthorization(earn, chainId, d, token.address, token.eip712Name);
+  return { ...a, domain: { ...a.domain, version: token.eip712Version } } as const;
+}
+
 export function earnAusdAuthorization(earn: Address, chainId: number, d: EarnDeposit, ausd: Address, ausdName: string = AUSD_EIP712_NAME) {
   return {
     domain: { name: ausdName, version: AUSD_EIP712_VERSION, chainId, verifyingContract: ausd },

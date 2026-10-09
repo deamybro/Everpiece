@@ -1,8 +1,9 @@
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, TimeoutError, keccak256, parseEventLogs, type Hex } from "viem";
 import { AUSD_USDC_V4_POOL, UNISWAP_V4_MONAD, routeOf, settlementAsset, v4QuoterAbi, type ConversionQuote } from "@everpiece/shared";
+import { everpieceAutomateAbi } from "@everpiece/shared";
 import { agoraPairAbi, everpieceEarnAbi, everpieceEscrowAbi, everpiecePayAbi, everpiecePayV2Abi, PaymentStatus, ausdAbi, tokenFor, type RouteQuote } from "@everpiece/shared";
 import { randomUUID } from "node:crypto";
-import { EARN_METHODS, METHODS, PAY_METHODS, PAY_V2_METHODS, type Method, type RelayerConfig } from "./config.ts";
+import { AUTOMATE_METHODS, EARN_METHODS, EARN_USDC_METHODS, METHODS, PAY_METHODS, PAY_V2_METHODS, type Method, type RelayerConfig } from "./config.ts";
 import { connect, readPayment, relayAbi, startupChecks, type Chain } from "./chain.ts";
 import { prepare, PrecheckError, type EscrowEvent } from "./actions.ts";
 import { Store, type RequestRow } from "./store.ts";
@@ -23,6 +24,11 @@ const EXPECTED: Record<Method, { event: EscrowEvent; status: number }> = {
   payWithToken: { event: "Paid", status: 1 },
   earnDeposit: { event: "EarnDeposited", status: 1 },
   earnWithdraw: { event: "EarnWithdrawn", status: 1 },
+  earnUsdcDeposit: { event: "EarnDeposited", status: 1 },
+  earnUsdcWithdraw: { event: "EarnWithdrawn", status: 1 },
+  automateActivate: { event: "GrantActivated", status: 1 },
+  automateRevoke: { event: "GrantRevoked", status: 1 },
+  automateExecute: { event: "Executed", status: 1 },
   payV2Direct: { event: "Paid", status: 1 },
   payV2Convert: { event: "Paid", status: 1 },
 };
@@ -103,7 +109,7 @@ export class Relayer {
 
   /** Where a method's transaction goes: fixed by config, never by the client. */
   private targetOf(m: Method) {
-    return isEarn(m) ? this.cfg.earn! : isPay(m) ? this.cfg.pay! : isPayV2(m) ? this.cfg.payV2! : this.cfg.escrow;
+    return AUTOMATE_METHODS.includes(m) ? this.cfg.automate! : EARN_USDC_METHODS.includes(m) ? this.cfg.earnUsdc! : isEarn(m) ? this.cfg.earn! : isPay(m) ? this.cfg.pay! : isPayV2(m) ? this.cfg.payV2! : this.cfg.escrow;
   }
 
   private now: () => number;
@@ -215,7 +221,7 @@ export class Relayer {
     try {
       await this.chain.client.simulateContract({
         address: prep.target,
-        abi: isEarn(prep.method) ? earnRelayAbi : isPay(prep.method) ? payRelayAbi : isPayV2(prep.method) ? payV2RelayAbi : relayAbi,
+        abi: AUTOMATE_METHODS.includes(prep.method) ? everpieceAutomateAbi : isEarn(prep.method) ? earnRelayAbi : isPay(prep.method) ? payRelayAbi : isPayV2(prep.method) ? payV2RelayAbi : relayAbi,
         functionName: prep.fn ?? prep.method,
         args: prep.args,
         account: this.address,
@@ -358,8 +364,9 @@ export class Relayer {
     if (receipt.blockNumber > finalized) return; // included, maybe executed speculatively — not final yet
 
     if (isPay(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.pay!, everpiecePayAbi, "Paid");
+    if (AUTOMATE_METHODS.includes(r.method as Method)) return this.reconcileAutomate(r, receipt);
     if (isPayV2(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.payV2!, everpiecePayV2Abi, "Paid");
-    if (isEarn(r.method)) return this.reconcileSettleOnce(r, receipt, this.cfg.earn!, everpieceEarnAbi, EXPECTED[r.method].event as "EarnDeposited" | "EarnWithdrawn");
+    if (isEarn(r.method)) return this.reconcileSettleOnce(r, receipt, this.targetOf(r.method), everpieceEarnAbi, EXPECTED[r.method].event as "EarnDeposited" | "EarnWithdrawn");
     const payment = await readPayment(this.cfg, this.chain, r.payment_id as Hex, "finalized");
     const chainStatus = Number(payment.status);
     const gasUsed = receipt.gasUsed.toString();
@@ -374,7 +381,7 @@ export class Relayer {
     const events = parseEventLogs({
       abi: everpieceEscrowAbi,
       logs: receipt.logs.filter((l) => l.address.toLowerCase() === this.cfg.escrow.toLowerCase()),
-      eventName: expected.event as Exclude<EscrowEvent, "Paid" | "EarnDeposited" | "EarnWithdrawn">,
+      eventName: expected.event as Exclude<EscrowEvent, "Paid" | "EarnDeposited" | "EarnWithdrawn" | "GrantActivated" | "GrantRevoked" | "Executed">,
     }) as unknown as { args: { paymentId: Hex } }[];
     const eventOk = events.some((ev) => ev.args.paymentId.toLowerCase() === r.payment_id.toLowerCase());
     // create: the payment may already have moved on by finality (claimed/cancelled) — it must at least exist.
@@ -393,6 +400,34 @@ export class Relayer {
    * Settle-once contracts (EverpiecePay, EverpieceEarn): CONFIRMED only with receipt status 1, the expected event for
    * this id from that contract, and settled(id) at "finalized".
    */
+  /** EverpieceAutomate: the expected event for this id AND the matching state at "finalized". */
+  private async reconcileAutomate(r: RequestRow, receipt: Awaited<ReturnType<typeof this.chain.client.getTransactionReceipt>>): Promise<void> {
+    const contract = this.cfg.automate!;
+    const gasUsed = receipt.gasUsed.toString();
+    const id = r.payment_id as Hex;
+    let stateOk = false;
+    if (r.method === "automateExecute") {
+      stateOk = (await this.chain.client.readContract({ address: contract, abi: everpieceAutomateAbi, functionName: "executed", args: [id], blockTag: "finalized" })) as boolean;
+    } else {
+      const st = (await this.chain.client.readContract({ address: contract, abi: everpieceAutomateAbi, functionName: "grants", args: [id], blockTag: "finalized" })) as readonly unknown[];
+      stateOk = r.method === "automateActivate" ? !/^0x0{40}$/i.test(st[0] as string) : st[8] === true;
+    }
+    if (receipt.status !== "success") {
+      this.store.update(r.id, { status: "FAILED", error: "RevertedOnChain", gas_used: gasUsed, chain_status: stateOk ? 1 : 0 });
+      return;
+    }
+    const eventName = EXPECTED[r.method as Method].event;
+    const events = parseEventLogs({ abi: everpieceAutomateAbi, logs: receipt.logs.filter((l) => l.address.toLowerCase() === contract.toLowerCase()), eventName } as Parameters<typeof parseEventLogs>[0]) as unknown as { args: { grantId?: Hex; executionId?: Hex } }[];
+    const eventOk = events.some((ev) => ((r.method === "automateExecute" ? ev.args.executionId : ev.args.grantId) ?? "0x").toLowerCase() === id.toLowerCase());
+    if (eventOk && stateOk) {
+      this.store.update(r.id, { status: "CONFIRMED", error: null, gas_used: gasUsed, chain_status: 1 });
+      log("info", "relayer.confirmed", { id: r.id, method: r.method, hash: r.tx_hash, block: receipt.blockNumber, gasUsed });
+    } else {
+      this.store.update(r.id, { status: "FAILED", error: "ExpectedEventOrStateMissing", gas_used: gasUsed, chain_status: stateOk ? 1 : 0 });
+      log("alert", "relayer.unexpected_outcome", { id: r.id, eventOk, stateOk });
+    }
+  }
+
   private async reconcileSettleOnce(
     r: RequestRow,
     receipt: Awaited<ReturnType<typeof this.chain.client.getTransactionReceipt>>,

@@ -38,8 +38,13 @@ export const config = {
   /** Earn (docs/EARN.md): EverpieceEarn + its vault. Empty = Earn unavailable. Testnet vault = SIMULATED yield. */
   earn: (process.env.NEXT_PUBLIC_EARN_ADDRESS ?? "") as Address,
   earnVault: (process.env.NEXT_PUBLIC_EARN_VAULT_ADDRESS ?? "") as Address,
+  /** EverpieceEarnUsdc (USDC Earn, Aave waMonUSDC). Empty = USDC Earn unavailable. */
+  earnUsdc: (process.env.NEXT_PUBLIC_EARN_USDC_ADDRESS ?? "") as Address,
   /** Automate (docs/AUTOMATE.md): the service, via the app's own origin. Empty = Automate unavailable. */
   automateUrl: process.env.NEXT_PUBLIC_AUTOMATE_URL ?? "",
+  /** EverpieceAutomate (bounded automation grants) and the relayer EOA named as executor. Empty = confirm each run. */
+  automate: (process.env.NEXT_PUBLIC_AUTOMATE_ADDRESS ?? "") as Address,
+  automateExecutor: (process.env.NEXT_PUBLIC_AUTOMATE_EXECUTOR ?? "") as Address,
   /** Shown on the test-money banner, e.g. "Monad testnet"; default "Local test network" (the fork). */
   networkLabel: process.env.NEXT_PUBLIC_NETWORK_LABEL || "Local test network",
 };

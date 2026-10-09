@@ -4,12 +4,16 @@ import { AURORA_API_URL, AUSD_ADDRESS, AUSD_EIP712_NAME, MONAD_MAINNET_CHAIN_ID,
 import type { FundingConfig } from "./funding.ts";
 
 /** The only methods this relayer will ever submit (master §26.2 — no arbitrary calldata): escrow + EverpiecePay. */
-export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken", "earnDeposit", "earnWithdraw", "payV2Direct", "payV2Convert"] as const;
+export const METHODS = ["createPayment", "claimUsernamePayment", "claimLinkPayment", "cancel", "refundExpired", "payWithAusd", "payWithToken", "earnDeposit", "earnWithdraw", "payV2Direct", "payV2Convert", "earnUsdcDeposit", "earnUsdcWithdraw", "automateActivate", "automateRevoke", "automateExecute"] as const;
 export const PAY_METHODS: readonly Method[] = ["payWithAusd", "payWithToken"];
 /** EverpiecePayV2 (USDC + AUSD). Two methods for one contract function so each route has its own tight gas limit. */
 export const PAY_V2_METHODS: readonly Method[] = ["payV2Direct", "payV2Convert"];
 /** EverpieceEarn (docs/EARN.md): gasless deposits/withdrawals into verified AUSD vaults; settle-once like EverpiecePay. */
-export const EARN_METHODS: readonly Method[] = ["earnDeposit", "earnWithdraw"];
+export const EARN_METHODS: readonly Method[] = ["earnDeposit", "earnWithdraw", "earnUsdcDeposit", "earnUsdcWithdraw"];
+/** USDC Earn (EverpieceEarnUsdc): same contract surface, its own router, deposits signed in USDC's own domain. */
+export const EARN_USDC_METHODS: readonly Method[] = ["earnUsdcDeposit", "earnUsdcWithdraw"];
+/** EverpieceAutomate (bounded automation). automateExecute is internal-only: the Automate service, never a browser. */
+export const AUTOMATE_METHODS: readonly Method[] = ["automateActivate", "automateRevoke", "automateExecute"];
 export type Method = (typeof METHODS)[number];
 
 export type RelayerConfig = {
@@ -24,6 +28,12 @@ export type RelayerConfig = {
   maxConvertSlippageBps: bigint;
   /** Mainnet feature flags (packages/shared/src/flags.ts), from this process's env. */
   flags: FeatureFlags;
+  /** EverpieceAutomate (bounded automation grants). Optional. */
+  automate?: Address;
+  /** Shared secret the Automate service presents on /v1/internal/* (x-internal-key). Unset = internal routes off. */
+  internalKey?: string;
+  /** EverpieceEarnUsdc (USDC Earn, Aave waMonUSDC). Optional. */
+  earnUsdc?: Address;
   /** EverpieceEarn (gasless Earn deposits/withdrawals). Optional: without it the earn methods are refused. */
   earn?: Address;
   ausd: Address;
@@ -100,6 +110,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     maxConvertSlippageBps: big(env, "MAX_CONVERT_SLIPPAGE_BPS", 50n),
     flags: readFlags(env),
     earn: env.EARN_ADDRESS ? address(env, "EARN_ADDRESS") : undefined,
+    earnUsdc: env.EARN_USDC_ADDRESS ? address(env, "EARN_USDC_ADDRESS") : undefined,
+    automate: env.AUTOMATE_ADDRESS ? address(env, "AUTOMATE_ADDRESS") : undefined,
+    internalKey: env.RELAYER_INTERNAL_KEY && env.RELAYER_INTERNAL_KEY.length >= 32 ? env.RELAYER_INTERNAL_KEY : undefined,
     ausd: address(env, "AUSD_ADDRESS", AUSD_ADDRESS),
     ausdEip712Name: env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
     relayerPrivateKey: key,
@@ -120,6 +133,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       // EverpieceEarnFork.t.sol, real Aave waMonAUSD, cold state: deposit 660,269, withdraw 595,649
       earnDeposit: big(env, "GAS_LIMIT_EARN_DEPOSIT", 800_000n),
       earnWithdraw: big(env, "GAS_LIMIT_EARN_WITHDRAW", 750_000n),
+      // RelayerGasV2.t.sol, real Aave waMonUSDC, cold state: USDC Earn deposit 765,136, withdraw 643,800
+      earnUsdcDeposit: big(env, "GAS_LIMIT_EARN_USDC_DEPOSIT", 820_000n),
+      earnUsdcWithdraw: big(env, "GAS_LIMIT_EARN_USDC_WITHDRAW", 700_000n),
+      // RelayerGasV2.t.sol AutomateForkTest, real USDC + Aave waMonUSDC, cold: activate 359,751 / execute 770,178
+      automateActivate: big(env, "GAS_LIMIT_AUTOMATE_ACTIVATE", 400_000n),
+      automateRevoke: big(env, "GAS_LIMIT_AUTOMATE_REVOKE", 120_000n),
+      automateExecute: big(env, "GAS_LIMIT_AUTOMATE_EXECUTE", 830_000n),
       // RelayerGasV2.t.sol, real mainnet tokens, cold state: direct USDC 307,702 / AUSD 271,199; conversion worst case
       // (Agora approved but failing, then the v4 converter) 664,077, and that path completes at exactly this limit.
       payV2Direct: big(env, "GAS_LIMIT_PAY_V2_DIRECT", 340_000n),

@@ -2,7 +2,7 @@ import { createPublicClient, defineChain, http, type Address, type Hex } from "v
 import { ausdAbi, everpieceEscrowAbi } from "@everpiece/shared";
 import { config } from "./config";
 
-const chain = defineChain({
+export const chain = defineChain({
   id: config.chainId,
   name: "Monad",
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },

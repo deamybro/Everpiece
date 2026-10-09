@@ -9,9 +9,19 @@ import { log } from "./log.ts";
  * - BALANCE_CHECK / YIELD_CHECK: periodic, one id per owner per time slot (so at most one plan per slot).
  * Money the engine itself moved (Earn withdrawals) is not a "payment received" and is never seen here.
  */
-export type WatcherConfig = { indexerUrl: string; pollMs: number; checkEverySec: number; now?: () => number };
+export type WatcherConfig = {
+  indexerUrl: string;
+  pollMs: number;
+  checkEverySec: number;
+  now?: () => number;
+  /** The asset rules move (USDC first on mainnet): only payments actually DELIVERED in it trigger. v1 rows (no asset) are AUSD. */
+  asset?: string;
+  /** The escrow's asset, so claimed protected payments only count when they are in the automation asset. */
+  escrowAsset?: string;
+};
 
-type Row = { id: string; recipient: string; amount: string; timestamp: number };
+const AUSD = "0x00000000efe302beaa2b3e6e1b18d08d69a9012a";
+type Row = { id: string; recipient: string; amount: string; timestamp: number; asset?: string | null };
 
 export function startWatcher(svc: AutomateService, cfg: WatcherConfig): () => void {
   const now = cfg.now ?? (() => Math.floor(Date.now() / 1000));
@@ -36,14 +46,17 @@ export function startWatcher(svc: AutomateService, cfg: WatcherConfig): () => vo
       // a protected payment's `recipient` is set only when it is claimed (with settledAt), so no enum filter is needed
       const d = await gql<{ instant: Row[]; claimed: { id: string; recipient: string; amount: string; settledAt: number }[] }>(
         `query($owners: [String!]!, $since: Int!) {
-          instant: InstantPayment(where: { recipient: { _in: $owners }, timestamp: { _gte: $since } }, order_by: { timestamp: asc }) { id recipient amount timestamp }
+          instant: InstantPayment(where: { recipient: { _in: $owners }, timestamp: { _gte: $since } }, order_by: { timestamp: asc }) { id recipient amount timestamp asset }
           claimed: Payment(where: { recipient: { _in: $owners }, settledAt: { _gte: $since } }, order_by: { settledAt: asc }) { id recipient amount settledAt }
         }`,
         { owners, since },
       );
+      const want = (cfg.asset ?? AUSD).toLowerCase();
+      const escrowCounts = (cfg.escrowAsset ?? AUSD).toLowerCase() === want;
       const facts = [
-        ...d.instant.map((p) => ({ id: `paid:${p.id}`, recipient: p.recipient, amount: p.amount, at: p.timestamp })),
-        ...d.claimed.map((c) => ({ id: `claimed:${c.id}`, recipient: c.recipient, amount: c.amount, at: c.settledAt })),
+        // only money delivered in the automation asset (a USDC fallback isn't AUSD, and vice versa)
+        ...d.instant.filter((p) => (p.asset ?? AUSD).toLowerCase() === want).map((p) => ({ id: `paid:${p.id}`, recipient: p.recipient, amount: p.amount, at: p.timestamp })),
+        ...(escrowCounts ? d.claimed.map((c) => ({ id: `claimed:${c.id}`, recipient: c.recipient, amount: c.amount, at: c.settledAt })) : []),
       ];
       for (const f of facts) {
         await svc.trigger({ event: { kind: "PAYMENT_RECEIVED", id: f.id, recipient: f.recipient, amount: f.amount, at: String(f.at), origin: "EXTERNAL" } });

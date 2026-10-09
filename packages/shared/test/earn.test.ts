@@ -87,13 +87,19 @@ test("Aave rate conversion: 3.0891e25 ray ≈ 3.09% APR, APY slightly higher; di
   assert.ok(r.apyBps >= 313 && r.apyBps <= 314);
 });
 
-test("registry: the only mainnet opportunity is the verified Aave AUSD wrapper; no APY constant anywhere", () => {
-  assert.equal(EARN_OPPORTUNITIES.length, 1);
-  const a = EARN_OPPORTUNITIES[0];
-  assert.equal(a.vault, "0x9e1AcC5BFbf34e2E579763cE14042d957719fE76");
-  assert.equal(a.asset, "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a");
-  assert.equal(a.rateSource.kind, "AAVE_V3_LIQUIDITY_RATE");
-  assert.ok(!JSON.stringify(a).match(/apy|apr/i));
+test("registry: the mainnet opportunities are exactly the verified Aave AUSD and USDC wrappers; no APY constant anywhere", () => {
+  assert.deepEqual(
+    EARN_OPPORTUNITIES.map((o) => [o.id, o.vault, o.asset]),
+    [
+      ["aave-v3-ausd", "0x9e1AcC5BFbf34e2E579763cE14042d957719fE76", "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a"],
+      ["aave-v3-usdc", "0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2", "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"],
+    ],
+  );
+  for (const o of EARN_OPPORTUNITIES) {
+    assert.equal(o.rateSource.kind, "AAVE_V3_LIQUIDITY_RATE");
+    assert.ok(o.rateSource.kind === "AAVE_V3_LIQUIDITY_RATE" && o.rateSource.reserve === o.asset);
+    assert.ok(!JSON.stringify(o).match(/apy|apr/i));
+  }
 });
 
 // Same struct as contracts/test/EverpieceEarn.t.sol `test_ids_matchSharedVectors` (EIP-712 parity with the contract).

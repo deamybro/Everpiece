@@ -13,6 +13,7 @@ const escrow = artifact("EverpieceEscrow.sol", "EverpieceEscrow");
 const ausd = artifact("IAUSD.sol", "IAUSD");
 const pay = artifact("EverpiecePay.sol", "EverpiecePay");
 const payV2 = artifact("EverpiecePayV2.sol", "EverpiecePayV2");
+const automate = artifact("EverpieceAutomate.sol", "EverpieceAutomate");
 const agoraPair = artifact("IAgoraStableSwapPair.sol", "IAgoraStableSwapPair");
 const agoraWhitelister = artifact("IAgoraStableSwapPair.sol", "IAgoraTestnetWhitelister");
 const earn = artifact("EverpieceEarn.sol", "EverpieceEarn");
@@ -28,6 +29,8 @@ const body =
   `export const everpiecePayAbi = ${JSON.stringify(pay.abi, null, 2)} as const;\n\n` +
   `/** EverpiecePayV2: USDC + AUSD settlement. EverpieceEscrowUsdc / EverpieceEarnUsdc reuse the escrow / Earn ABIs. */\n` +
   `export const everpiecePayV2Abi = ${JSON.stringify(payV2.abi, null, 2)} as const;\n\n` +
+  `/** EverpieceAutomate: bounded automation grants (docs/AUTOMATE.md §5). */\n` +
+  `export const everpieceAutomateAbi = ${JSON.stringify(automate.abi, null, 2)} as const;\n\n` +
   `/** The documented subset of Agora's AgoraStableSwapPair (docs/INTEGRATION_VERIFICATION.md). */\n` +
   `export const agoraPairAbi = ${JSON.stringify(agoraPair.abi, null, 2)} as const;\n\n` +
   `export const agoraWhitelisterAbi = ${JSON.stringify(agoraWhitelister.abi, null, 2)} as const;\n\n` +
