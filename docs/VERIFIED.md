@@ -595,6 +595,29 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - Withdrawals depend on free reserve liquidity (high utilization can delay a full exit).
   - Smart-contract and oracle risk is Aave's; there is no "safe yield" claim.
 
+### 4.18 Monad USDC as a first-class settlement asset; Aave V3 USDC vault (checked 2026-10-09)
+- **Fact:** Monad mainnet USDC supports the same payee-checked ERC-3009 receive Everpiece relies on for AUSD, so it can be settled directly (no conversion). It lacks AUSD's upgrade flag.
+- **Value:**
+  - USDC `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` (Circle FiatToken proxy; implementation `0xbd520ea8CbB4F81b62aFF3c3FfE7AfFD69800b6d` at block 111,905,431).
+    - `name()` "USDC", `version()` "2", 6 dp, `paused()` false.
+    - `DOMAIN_SEPARATOR()` `0xfe22123edc0dd4aeb912eb7948c5f0e531592c2053b3067612f427db342c93c6` = EIP712Domain("USDC", "2", 143, USDC), recomputed with `cast keccak`.
+    - `receiveWithAuthorization`: both the (v,r,s) and the packed-bytes (FiatToken v2.2) overloads work.
+      - Third-party caller → "FiatTokenV2: caller must be the payee".
+      - Replay → "authorization is used or canceled"; changed amount → "invalid signature"; past validBefore → "authorization is expired".
+      - A receive signature is not valid as transferWithAuthorization.
+    - `isReceiveWithAuthorizationUpgraded()` does **not** exist (the call reverts), so the AUSD fail-closed guard cannot be applied to USDC. USDC contracts rely on the balance checks around every pull and payout instead.
+    - `isBlacklisted(address)` exists: Circle can blacklist an address, and a transfer to or from it reverts atomically.
+  - Aave V3 "Wrapped Aave Monad USDC" ERC-4626 `0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2` (address book `USDC_STATA_TOKEN`): `asset()` = USDC. aUSDC (aToken) `0x35a73BAcb179d3740395A3ceCc87FF2e581d6042`.
+- **Official source:** Circle FiatToken v2.2 source (github.com/circlefin/stablecoin-evm); https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol.
+- **Explorer / verified-source reference:** live `cast call`s on rpc.monad.xyz (block 111,907,364).
+- **Proven on a fork:**
+  - `contracts/test/fork/UsdcProbe.t.sol` (9 tests): the receive semantics above.
+  - `contracts/test/fork/EverpiecePayV2Fork.t.sol`: direct USDC and direct AUSD payments on real tokens; USDC↔AUSD through the real Agora pair once APPROVED_SWAPPER is granted (granted in the fork by impersonating the pair's WHITELISTER_ROLE holder); "unavailable" with nothing moved when it is not.
+  - `contracts/test/fork/UsdcVariantsFork.t.sol`: EverpieceEscrowUsdc create/claim/refund; EverpieceEarnUsdc deposit and real accrual on the vault above.
+- **Notes:**
+  - Agora pair quotes at block 111,905,431: exactly 1:1 (100 USDC ↔ 100 AUSD), no fee.
+  - A USDC upgrade by Circle could change the receive semantics without any on-chain flag. This is a residual risk; the balance checks bound the damage to a reverted transaction.
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**

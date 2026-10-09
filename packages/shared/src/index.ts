@@ -8,6 +8,8 @@ export * from "./directory.ts";
 export * from "./voice.ts";
 export * from "./messageKey.ts";
 export * from "./pay.ts";
+export * from "./payV2.ts";
+export * from "./flags.ts";
 export * from "./funding.ts";
 export * from "./payout.ts";
 export * from "./automate.ts";

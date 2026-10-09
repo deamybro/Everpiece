@@ -392,7 +392,8 @@ contract EverpieceEscrow is IEverpieceEscrow, EIP712, Ownable2Step, Pausable, Re
     }
 
     /// @dev Fail closed if AUSD's inline receiveWithAuthorization (payee-checked, fork-verified) has been re-routed.
-    function _requireVerifiedAusdReceiveSemantics() private view {
+    ///      Virtual only so EverpieceEscrowUsdc can drop this AUSD-only read; every other check is unchanged.
+    function _requireVerifiedAusdReceiveSemantics() internal view virtual {
         try AUSD.isReceiveWithAuthorizationUpgraded() returns (bool upgraded) {
             if (upgraded) revert AusdSemanticsChanged();
         } catch {
