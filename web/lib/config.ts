@@ -16,7 +16,7 @@ export const config = {
   dollar: {
     address: (process.env.NEXT_PUBLIC_DOLLAR_ADDRESS || AUSD_ADDRESS) as Address,
     eip712Name: process.env.NEXT_PUBLIC_DOLLAR_EIP712_NAME || AUSD_EIP712_NAME,
-    eip712Version: "1",
+    eip712Version: process.env.NEXT_PUBLIC_DOLLAR_EIP712_VERSION || "1",
   } satisfies DollarToken,
   relayerUrl: process.env.NEXT_PUBLIC_RELAYER_URL ?? "",
   claimsUrl: process.env.NEXT_PUBLIC_CLAIMS_URL ?? "",

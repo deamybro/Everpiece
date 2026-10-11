@@ -33,7 +33,9 @@ export type Account = {
   username?: string;
 };
 
-const rpId = () => window.location.hostname; // production rpId must be everpiece.xyz (VERIFIED §3.5)
+// Passkey accounts are bound to this id: it must never change once users exist. Mainnet pins it to the registrable domain
+// (NEXT_PUBLIC_RP_ID=everpiece.xyz, valid for every subdomain); dev stacks default to the hostname they are served on.
+const rpId = () => process.env.NEXT_PUBLIC_RP_ID || window.location.hostname;
 
 export function loadAccount(): Account | null {
   try {

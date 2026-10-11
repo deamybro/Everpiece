@@ -13,6 +13,7 @@ import { receiptPath } from "../../lib/receipt";
 import type { Hex } from "viem";
 import { dollarsOf, formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
+import { config } from "../../lib/config";
 import { claimLink } from "../../lib/link";
 import { FlowError, sendByLink, sendToUsername } from "../../lib/flows";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
@@ -31,7 +32,10 @@ export default function Send() {
   const [amountText, setAmountText] = useState("");
   const [phone, setPhone] = useState("");
   const [emailInput, setEmailInput] = useState("");
-  const [method, setMethod] = useState<Method>("phone");
+  // Phone/email sends need the claims service (SMS/email codes). Without it they are not offered: money must never be
+  // protected for an invite that can't be delivered.
+  const claimsOn = config.claimsUrl !== "";
+  const [method, setMethod] = useState<Method>(claimsOn ? "phone" : "username");
   const [usernameInput, setUsernameInput] = useState("");
   const [found, setFound] = useState<{ recipient: Recipient; pinning: Pinning } | null>(null);
   const [confirmedNew, setConfirmedNew] = useState(false);
@@ -274,8 +278,8 @@ export default function Send() {
           <StepHint step={2} of={3} />
           <h1>Who is it for?</h1>
           <div className="row" role="group" aria-label="Send to">
-            <button className={method === "phone" ? "" : "secondary"} aria-pressed={method === "phone"} onClick={() => setMethod("phone")}>Phone</button>
-            <button className={method === "email" ? "" : "secondary"} aria-pressed={method === "email"} onClick={() => setMethod("email")}>Email</button>
+            {claimsOn && <button className={method === "phone" ? "" : "secondary"} aria-pressed={method === "phone"} onClick={() => setMethod("phone")}>Phone</button>}
+            {claimsOn && <button className={method === "email" ? "" : "secondary"} aria-pressed={method === "email"} onClick={() => setMethod("email")}>Email</button>}
             <button className={method === "username" ? "" : "secondary"} aria-pressed={method === "username"} onClick={() => setMethod("username")}>@username</button>
           </div>
           {method === "email" && (

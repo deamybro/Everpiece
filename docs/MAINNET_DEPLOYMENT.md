@@ -22,3 +22,23 @@ Read back on-chain: PayV2 converter = the converter above; USDC kind 1, AUSD kin
 escrow token = USDC, owner and approver as above; Earn vault waMonUSDC allow-listed; Automate vault asset = USDC.
 
 Not yet done (each needs its own GO): relayer + services configured with these addresses, feature flags, canaries.
+
+## Public app (2026-10-11) — https://app.everpiece.xyz
+
+All on the VPS under `/opt/everpiece-mainnet`, each a separate systemd service bound to 127.0.0.1, fronted by one Caddy site block
+(`Caddyfile` backup: `/etc/caddy/Caddyfile.bak-everpiece-mainnet-20261011T200655Z`). The testnet stack and every other project are untouched.
+
+| Service | Port | Memory cap | Notes |
+|---|---|---|---|
+| `everpiece-mainnet-relayer` | 47310 | 300M | `/svc/relayer/*`; policy caps $20 per payment, $50 per sender per day (beta) |
+| `everpiece-mainnet-directory` | 47311 | 200M | `/svc/directory/*`; usernames, payment requests, cross-chain proofs |
+| `everpiece-mainnet-web` | 47320 | 400M | Next.js standalone, built on a PC (the VPS is memory-constrained) |
+
+- Passkey RP ID is pinned to `everpiece.xyz` (`NEXT_PUBLIC_RP_ID`): accounts survive any change of subdomain. Never change it once users exist.
+- The web app's dollar is USDC (domain "USDC"/"2"); protected sends use EverpieceEscrowUsdc.
+- Flags on: USDC and AUSD payments, the DEX converter, Earn. Everything else off. Phone/email sends are hidden (no claims service yet).
+- Secrets: only `/opt/everpiece-mainnet/relayer.env` (mode 600): `RELAYER_PRIVATE_KEY`, `RELAYER_INTERNAL_KEY`.
+- Not deployed: claims (needs the approver key + SMS/email providers), the indexer (history falls back to this device), the message store, the Automate service, Aurora, private payments, Invest, NGN.
+
+Canaries on mainnet (all passed, $1 each): AUSD direct, USDC direct, USDC escrow create/claim/forward, AUSD→USDC conversion via Uniswap v4,
+USDC Earn in/out, Automate grant + unattended run + revoke.
