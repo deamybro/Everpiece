@@ -19,6 +19,8 @@ import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "..
 import { friendlyError, type RelayStatus } from "../lib/api";
 import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
 import { earnAvailable } from "../lib/earn";
+import { assetBalances, payV2Available } from "../lib/payV2";
+import { privateAvailable } from "../lib/private";
 import { payoutAvailable } from "../lib/payout";
 import { HomePayouts } from "../components/HomePayouts";
 import { Icon } from "../components/Icon";
@@ -36,6 +38,8 @@ export default function Home() {
   const [account, setAccount] = useState<Account | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [balance, setBalance] = useState<bigint | null>(null);
+  /** USDC + AUSD (EverpiecePayV2): what the account holds in each, shown separately; the headline is their sum. */
+  const [assetRows, setAssetRows] = useState<{ symbol: string; note: string; balance: bigint }[]>([]);
   const [openTopUps, setOpenTopUps] = useState<TopUp[]>([]);
   const [hideBalance, setHideBalance] = useState(false);
   const [holdings, setHoldings] = useState<{ symbol: string; label: string; note: string; amount: string }[]>([]);
@@ -74,7 +78,13 @@ export default function Home() {
   }, []);
 
   const refresh = useCallback(async (a: Account, inboxToo = true) => {
-    setBalance(await dollarsOf(a.address).catch(() => null));
+    if (payV2Available()) {
+      const rows = await assetBalances(a.address).then((l) => l.map((x) => ({ symbol: x.asset.symbol, note: x.asset.symbol === "USDC" ? "USDC · Circle" : "AUSD · Agora", balance: x.balance }))).catch(() => null);
+      if (rows) {
+        setAssetRows(rows);
+        setBalance(rows.reduce((n, r) => n + r.balance, 0n));
+      } else setBalance(null);
+    } else setBalance(await dollarsOf(a.address).catch(() => null));
     setOpenTopUps(activeTopUps());
     // other tokens this account holds (e.g. USDC that arrived from another chain, waiting to become Dollars)
     void Promise.all(
@@ -251,11 +261,19 @@ export default function Home() {
           {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="wa-icon"><Icon name="add" /></span>Add</Link>}
         </nav>
         <ul className="assets" aria-label="What you hold">
-          <li>
-            <span className="asset-icon dollar" aria-hidden="true">$</span>
-            <span className="grow"><strong>Dollars</strong><span className="muted small">AUSD · Agora</span></span>
-            <strong>{balance === null ? "…" : hideBalance ? "••••" : formatDollars(balance)}</strong>
-          </li>
+          {assetRows.length > 0 ? assetRows.map((r) => (
+            <li key={r.symbol}>
+              <span className="asset-icon dollar" aria-hidden="true">$</span>
+              <span className="grow"><strong>{r.symbol}</strong><span className="muted small">{r.note}</span></span>
+              <strong>{hideBalance ? "••••" : formatDollars(r.balance)}</strong>
+            </li>
+          )) : (
+            <li>
+              <span className="asset-icon dollar" aria-hidden="true">$</span>
+              <span className="grow"><strong>Dollars</strong><span className="muted small">AUSD · Agora</span></span>
+              <strong>{balance === null ? "…" : hideBalance ? "••••" : formatDollars(balance)}</strong>
+            </li>
+          )}
           {holdings.map((h) => (
             <li key={h.symbol}>
               <span className="asset-icon" aria-hidden="true">{h.symbol.slice(0, 1)}</span>
@@ -277,6 +295,12 @@ export default function Home() {
           <Link href="/automate" className="card settings-row" aria-label="Automate your money">
             <span className="settings-icon"><Icon name="clock" size={20} /></span>
             <span className="grow"><strong>Automate</strong><span className="muted small">rules for incoming money</span></span>
+          </Link>
+        )}
+        {privateAvailable() && (
+          <Link href="/private" className="card settings-row" aria-label="Private payments">
+            <span className="settings-icon"><Icon name="scan" size={20} /></span>
+            <span className="grow"><strong>Private</strong><span className="muted small">private balance and send</span></span>
           </Link>
         )}
         <Link href="/invest" className="card settings-row" aria-label="Invest in stocks">
