@@ -42,12 +42,12 @@ export async function startupChecks(cfg: RelayerConfig, c: Chain): Promise<void>
   if (chainId !== cfg.expectedChainId) throw new Error(`startup: RPC chainId ${chainId} != expected ${cfg.expectedChainId}`);
   const [escrowCode, ausdCode] = await Promise.all([
     c.client.getCode({ address: cfg.escrow }),
-    c.client.getCode({ address: cfg.ausd }),
+    c.client.getCode({ address: cfg.escrowAsset.address }),
   ]);
   if (!escrowCode || escrowCode === "0x") throw new Error("startup: no code at ESCROW_ADDRESS");
   if (!ausdCode || ausdCode === "0x") throw new Error("startup: no code at AUSD_ADDRESS");
   const token = await c.client.readContract({ address: cfg.escrow, abi: everpieceEscrowAbi, functionName: "AUSD" });
-  if (getAddress(token) !== cfg.ausd) throw new Error(`startup: escrow.AUSD() ${token} != ${cfg.ausd}`);
+  if (getAddress(token) !== getAddress(cfg.escrowAsset.address)) throw new Error(`startup: escrow asset ${token} != ${cfg.escrowAsset.address}`);
   const balance = await c.client.getBalance({ address: c.account.address });
   log("info", "relayer.startup", { chainId, escrow: cfg.escrow, relayer: c.account.address, balanceWei: balance });
   if (balance < cfg.minRelayerBalanceWei) log("alert", "relayer.low_balance", { balanceWei: balance, minWei: cfg.minRelayerBalanceWei });

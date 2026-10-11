@@ -108,7 +108,7 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
     case "createPayment": {
       const { intent, ausdSignature } = parseCreate(body);
       if (intent.amount < cfg.minPaymentAmount) throw new PrecheckError(422, "BelowMinimumPayment");
-      const funding = fundingAuthorization(escrow, intent, chainId, { address: cfg.ausd, eip712Name: cfg.ausdEip712Name ?? AUSD_EIP712_NAME, eip712Version: "1" });
+      const funding = fundingAuthorization(escrow, intent, chainId, { address: cfg.escrowAsset.address, eip712Name: cfg.escrowAsset.eip712Name, eip712Version: cfg.escrowAsset.eip712Version });
       if (!(await signedBy(intent.sender, { ...funding, signature: ausdSignature }))) {
         throw new PrecheckError(401, "InvalidFundingSignature");
       }
@@ -117,7 +117,7 @@ export async function prepare(method: Method, body: unknown, cfg: RelayerConfig,
       return {
         method, args, data: encode(method, args), signer: intent.sender, paymentId,
         idemKey: `${method}:${paymentId}`, expectedEvent: "PaymentCreated", expectedStatus: PaymentStatus.ACTIVE, target: escrow,
-        money: { sender: intent.sender, recipient: null, amount: intent.amount, sourceToken: cfg.ausd, route: "ESCROW", mode: "PROTECTED" },
+        money: { sender: intent.sender, recipient: null, amount: intent.amount, sourceToken: cfg.escrowAsset.address, route: "ESCROW", mode: "PROTECTED" },
       };
     }
 

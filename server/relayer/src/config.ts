@@ -39,6 +39,8 @@ export type RelayerConfig = {
   ausd: Address;
   /** EIP-712 name of the dollar token's domain: "Agora Dollar" (AUSD) by default, "Everpiece Test Dollar" on testnet. */
   ausdEip712Name?: string;
+  /** The asset the protected-send ESCROW holds and its EIP-712 domain (mainnet: USDC "USDC"/"2"; defaults to the dollar above). */
+  escrowAsset: { address: Address; eip712Name: string; eip712Version: string };
   relayerPrivateKey: Hex;
   port: number;
   host: string;
@@ -115,6 +117,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
     internalKey: env.RELAYER_INTERNAL_KEY && env.RELAYER_INTERNAL_KEY.length >= 32 ? env.RELAYER_INTERNAL_KEY : undefined,
     ausd: address(env, "AUSD_ADDRESS", AUSD_ADDRESS),
     ausdEip712Name: env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
+    escrowAsset: {
+      address: address(env, "ESCROW_ASSET_ADDRESS", address(env, "AUSD_ADDRESS", AUSD_ADDRESS)),
+      eip712Name: env.ESCROW_ASSET_EIP712_NAME ?? env.DOLLAR_EIP712_NAME ?? AUSD_EIP712_NAME,
+      eip712Version: env.ESCROW_ASSET_EIP712_VERSION ?? "1",
+    },
     relayerPrivateKey: key,
     port: int(env, "PORT", 8787),
     host: env.HOST ?? "127.0.0.1",
