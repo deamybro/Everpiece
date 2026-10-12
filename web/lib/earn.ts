@@ -129,10 +129,12 @@ export async function readPosition(o: EarnOpportunity, owner: Address): Promise<
 export async function deposit(account: Account, o: EarnOpportunity, assets: bigint, onStatus: (s: RelayStatus | "SIGNING") => void, ref?: Hex): Promise<{ id: Hex; txHash: Hex | null }> {
   if (!earnAvailable()) throw new PayError("PROVIDER_UNAVAILABLE");
   if (assets <= 0n) throw new PayError("INVALID_AMOUNT");
-  const [minShares, deadline] = await Promise.all([
+  // a live vault credits interest as it takes a deposit, so it gives marginally fewer shares than its preview: allow 0.5%
+  const [previewShares, deadline] = await Promise.all([
     client.readContract({ address: o.vault, abi: erc4626Abi, functionName: "previewDeposit", args: [assets] }),
     chainTime().then((t) => t + 600n),
   ]);
+  const minShares = (previewShares * 9_950n) / 10_000n;
   const d = { ref: ref ?? randomBytes32(), owner: account.address, vault: o.vault, assets, minShares, deadline };
   onStatus("SIGNING");
   const router = routerFor(o);

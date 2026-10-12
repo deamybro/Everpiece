@@ -47,7 +47,8 @@ async function relay(path, body) {
 }
 
 const t = (await retry(() => c.getBlock())).timestamp;
-const minShares = await retry(() => c.readContract({ address: VAULT, abi: erc4626Abi, functionName: "previewDeposit", args: [ASSETS] }));
+const previewShares = await retry(() => c.readContract({ address: VAULT, abi: erc4626Abi, functionName: "previewDeposit", args: [ASSETS] }));
+const minShares = (previewShares * 9_950n) / 10_000n; // 0.5%: a live vault credits interest as it takes a deposit
 const dep = { ref: ref("canary-earn-in"), owner: me.address, vault: VAULT, assets: ASSETS, minShares, deadline: t + 600n };
 const depAuth = earnAuthorization(EARN, 143, dep, USDC);
 const depSig = await me.signTypedData(depAuth);
