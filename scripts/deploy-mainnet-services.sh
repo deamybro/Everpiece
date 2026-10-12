@@ -6,8 +6,12 @@ set -euo pipefail
 cd /opt/everpiece-mainnet
 
 # --- sources (extracted by the caller into ./b.tgz) --------------------------------------------------------------------
+# refuse to touch anything unless the new sources are really here: an earlier run consumed b.tgz and a rerun then deleted the code
+[ -s b.tgz ] || { echo "STOP: b.tgz is missing, nothing was changed. Upload it again first."; exit 1; }
+tar -tzf b.tgz >/dev/null || { echo "STOP: b.tgz is damaged, nothing was changed."; exit 1; }
 rm -rf src/packages src/server
-tar -xzf b.tgz -C src && rm b.tgz
+tar -xzf b.tgz -C src
+rm b.tgz
 cat > src/package.json <<'EOF'
 { "name": "everpiece-mainnet", "private": true, "workspaces": ["packages/shared", "server/relayer", "server/directory", "server/voice", "server/automate", "server/claims"] }
 EOF
