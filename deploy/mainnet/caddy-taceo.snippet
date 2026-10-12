@@ -1,0 +1,42 @@
+    # TACEO Merces (private payments): their servers send no CORS headers, so the browser cannot call them directly.
+    # POST only, tiny bodies, nothing stored here; each route forwards to exactly one TACEO host.
+    handle_path /svc/taceo/compliance/* {
+        @notpost not method POST
+        respond @notpost 405
+        request_body {
+            max_size 8KB
+        }
+        reverse_proxy https://compliance.usdc.monad.merces.taceo.network {
+            header_up Host {upstream_hostport}
+        }
+    }
+    handle_path /svc/taceo/n0/* {
+        @notpost not method POST
+        respond @notpost 405
+        request_body {
+            max_size 64KB
+        }
+        reverse_proxy https://query.node0.usdc.monad.merces.taceo.network {
+            header_up Host {upstream_hostport}
+        }
+    }
+    handle_path /svc/taceo/n1/* {
+        @notpost not method POST
+        respond @notpost 405
+        request_body {
+            max_size 64KB
+        }
+        reverse_proxy https://query.node1.usdc.monad.merces.taceo.network {
+            header_up Host {upstream_hostport}
+        }
+    }
+    handle_path /svc/taceo/n2/* {
+        @notpost not method POST
+        respond @notpost 405
+        request_body {
+            max_size 64KB
+        }
+        reverse_proxy https://query.node2.usdc.monad.merces.taceo.network {
+            header_up Host {upstream_hostport}
+        }
+    }

@@ -25,6 +25,12 @@ import { PayError } from "./pay";
  * is derived from the passkey-held key on this device for each action and never stored or sent to Everpiece.
  */
 
+/** TACEO's servers send no CORS headers, so the browser reaches them through our own origin (Caddy forwards, POST only). */
+const taceoUrls = () => ({
+  nodeUrls: [0, 1, 2].map((i) => `${window.location.origin}/svc/taceo/n${i}`),
+  complianceUrl: `${window.location.origin}/svc/taceo/compliance/`,
+});
+
 export const privateAvailable = () => flags.PRIVATE_PAYMENTS_ENABLED && config.chainId === T.chainId;
 
 export type PrivateStatus = { registered: boolean; mon: bigint; usdc: bigint };
@@ -49,8 +55,7 @@ async function withMerces<R>(account: Account, fn: (c: Client, wallet: ReturnTyp
       contractAddress: T.merces,
       erc20Address: T.token,
       authSecret,
-      nodeUrls: [...T.nodeUrls],
-      complianceUrl: T.complianceUrl,
+      ...taceoUrls(),
     });
     try {
       return await fn(c, wallet, authSecret);
@@ -80,7 +85,7 @@ function mapError(e: unknown): Error {
 export async function joinPrivate(account: Account): Promise<void> {
   await withMerces(account, async (_c, wallet, authSecret) => {
     if (await isRegistered({ publicClient: client, idRegistryAddress: T.idRegistry, address: account.address })) return;
-    const complianceData = await fetchComplianceData(T.complianceUrl, account.address);
+    const complianceData = await fetchComplianceData(taceoUrls().complianceUrl, account.address);
     await register({ publicClient: client, walletClient: wallet, idRegistryAddress: T.idRegistry, authSecret, groupId: T.groupId, maxFee: 0n, complianceData });
   });
 }
