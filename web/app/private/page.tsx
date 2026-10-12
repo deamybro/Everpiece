@@ -17,7 +17,13 @@ import { depositPrivate, joinPrivate, privateAvailable, privateBalance, privateS
 const errText = (e: unknown) => {
   if (e instanceof PayError || e instanceof UsernameError) return friendlyError(e.code);
   // an error that is not about the fingerprint (e.g. the private-payments network call) is shown as what it is
-  if (e instanceof Error && !isMeraError(e) && e.message !== "WrongPasskey") return `Private payments: ${e.message.slice(0, 140)}`;
+  if (e instanceof Error && !isMeraError(e) && e.message !== "WrongPasskey") {
+    // viem errors carry a short reason and the request body; show the reason and which RPC method it was
+    const short = (e as { shortMessage?: string }).shortMessage ?? e.message.split("
+")[0];
+    const method = /"method":"([a-zA-Z_]+)"/.exec(e.message)?.[1];
+    return `Private payments: ${short.slice(0, 160)}${method ? ` (during ${method})` : ""}`;
+  }
   return friendlyPasskeyError(e);
 };
 
