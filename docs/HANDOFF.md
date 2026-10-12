@@ -4,6 +4,39 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 38 — 2026-10-12 — Mainnet live: Earn (Aave+Morpho), claims, Copilot, scoped session, encrypted backup
+
+Owner GO given per step; every spend was verified on-chain at the finalized block. Branch `feat/usdc-first-class` is local only (not pushed).
+
+**Deployed and verified (Monad 143)**
+- AUSD Earn `0x4bb7d4ce29f7c8410576cdf084637c790fd44e5a` (Aave waMonAUSD + Morpho Grove x Steakhouse AUSD vault). Deployer `0xB065b91A2aEDe8A51eF9D453e37Fe67164DB781d` (key root-only on the VPS in `/opt/everpiece-mainnet/mainnet-deployer2.txt` path `/root/mainnet-deployer2.txt`). The old deployer `0x519aEBD2…` key was never saved (3.76 MON stranded unless found).
+- Escrow claim approver rotated on-chain (owner tx `0x5f21415a…3936`) to `0x74d858B94fFc306e87c20c48De3c0A4eCa82ab25`; key in `/opt/everpiece-mainnet/approver.txt`, PHONE_ENC_KEY in `phone-enc.key`.
+- Claims service live (`everpiece-mainnet-claims`, port 47314, Caddy `/svc/claims`). Phone/email send flows enabled in the web build; a real phone-claim canary is NOT confirmed by me.
+- TACEO is reached through same-origin Caddy routes `/svc/taceo/{compliance,n0,n1,n2}` (their servers send no CORS). Join private payments retry still unconfirmed.
+- Canaries passed: USDC to AUSD via Uniswap v4 (tx `0x1286fcf6…f5ec2`), Morpho AUSD deposit+withdraw (`0x3cb08c13…bec40`, `0x38508590…8db6`), direct AUSD to the owner's app account (`0x94230dfe…7cf1`), real BNB Chain USDC payment through Aurora ($0.50, delivery `0xc8421567…677a2b`); a second, confidential-ticked $0.50 payment also arrived (hash not recorded).
+
+**Built this session (committed locally, deployed to the VPS only after the owner runs the deploy commands)**
+- Morpho vault in the Earn registry with a live rate from Morpho's API; minShares now allows 0.5% slippage (a live vault rejected exact previews).
+- Get-paid page and public `/to/<username>` page: anyone pays from 8 chains (Base, Ethereum, Arbitrum, Optimism, Polygon, Avalanche, Gnosis, BNB), USDC only.
+- Copilot (local qwen2.5:3b via Ollama on the VPS, one request at a time): sentence to proposed rule; strict parser; owner reviews and signs. Not yet tried against the real model.
+- Scoped in-memory signing session (5 min, $10/$20/$50 cap enforced by the app, not by Mera) for payments and Earn deposits only.
+- Encrypted address book in a Mera Secret Vault with signed writes (voice store `/v1/vault/<account>`).
+- Owner-only page `/owner-set-approver.html` (static, own CSP) used once; can be removed.
+- Docs: `docs/SUBMISSION.md` (Agora, Aurora texts and shot lists), `docs/AGORA_APPROVAL_REQUEST.md` (to send to Agora), `docs/SESSIONS_AND_VAULT.md`.
+
+**Deploy order on the VPS (all files already uploaded)**
+1. `cd /opt/everpiece-mainnet && bash deploy-services.sh` (now refuses to run without a valid b.tgz; wait for it to finish)
+2. `cd /opt/everpiece-mainnet && tar -xzf /tmp/webdist.tgz -C web && systemctl restart everpiece-mainnet-web`
+Relayer tunnel for canaries: `ssh -N -L 47310:127.0.0.1:47310 optiongenome` in its own window; canary scripts run from PowerShell on the PC.
+
+**Open**
+- Agora APPROVED_SWAPPER for EverpiecePayV2 `0x29D15Bb9…8eb5` (request drafted, owner sends; live conversion is Uniswap v4 until then).
+- Unverified: private-payments join after the forwarder fix; Copilot on the real model; session bar, backup/restore and the stateless/cross-device tests on real devices; confidential cross-chain hiding (cannot be verified from Monad); phone/email claim canary.
+- Parked: Anchored stocks, naira payout, WhatsApp (needs a separate Twilio sender), recovery phrase, Safe owner, offsite backups, push to GitHub.
+- Deadline for the three bounties: 2026-10-14 04:59 GMT+1.
+
+---
+
 ## Session 37 — 2026-10-09 — Complete mainnet product (no broadcast)
 
 Current status, blockers and approvals: `docs/MAINNET_AUDIT.md` (rewritten as a short status page).
