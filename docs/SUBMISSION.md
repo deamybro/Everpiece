@@ -10,6 +10,7 @@ Live app: https://app.everpiece.xyz (mobile-first installable web app, Monad mai
 | USDC to AUSD conversion through our fixed Uniswap v4 route, delivered exactly $1.000000 AUSD, spent $0.999844 USDC | tx `0x1286fcf6bae499082850aa34f768bbfabdd662bf3b6c4a88e04d5b89aa4f5ec2` |
 | A real payment from a BNB Chain wallet (USDC, $0.50) arrived as USDC on Monad with no Everpiece account on the sender's side | delivery tx `0xc8421567d3d4b3ecac74ac3049d86649b79385c7bd9010a83859f2c91c677a2b` |
 | AUSD into the Morpho vault and back through the gasless relayer, $1.00 in, $1.00 out | deposit `0x3cb08c1334c57f056d5328122e73f76ce089e30331e61668e6ec6481e3fbec40`, withdraw `0x38508590f5ae80a7129623a544e89e32a0ed79df49f3c24cbe1346812af58db6` |
+| A second $0.50 cross-chain payment from Base with the confidential option ticked; arrived at the same account, delivered by the same Aurora address as the non-confidential one | tx `0xb95216500365fc174f8e6c38f9bcb44ce908ac1d6ed29d0ada25a60a195fe842` |
 | Direct AUSD payment, $1.000000 delivered gaslessly to an app account | tx `0x94230dfe405f01e6e9f7f5555d5dd19ce9c4d7b0cd235720df347be8179f7cf1` |
 | EverpiecePayV2 (payments, conversion) | `0x29D15Bb918589B9dF84EdE5c3B5A7a3Ec89c8eb5` |
 | AUSD Earn (Aave + Morpho vaults) | `0x4bb7d4ce29f7c8410576cdf084637c790fd44e5a` |
