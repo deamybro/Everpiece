@@ -59,7 +59,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|sw.js|icon-).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|sw.js|icon-|owner-set-approver).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },
