@@ -6,6 +6,7 @@ import { chainWorld } from "./world.ts";
 import { moduleExecutor } from "./module.ts";
 import { startWatcher } from "./watcher.ts";
 import { log } from "./log.ts";
+import { Copilot, copilotConfigFromEnv } from "./copilot.ts";
 
 // AUTOMATE_ASSET: the asset rules move (USDC on mainnet, USDC-first); defaults to AUSD_ADDRESS for the v1 test stack.
 // With MONAD_RPC + AUSD_ADDRESS the world is read from the chain at finality (balances, Earn principal/value, leg
@@ -35,8 +36,9 @@ const module = env.MONAD_RPC && env.AUTOMATE_ADDRESS && env.RELAYER_URL && env.R
     })
   : null;
 const svc = new AutomateService(cfg, world, targets, verifier, undefined, module);
-const server = createAutomateServer(svc);
-server.listen(cfg.port, cfg.host, () => log("info", "automate.startup", { host: cfg.host, port: cfg.port, chainId: cfg.expectedChainId, chain: Boolean(fromChain), earn: Boolean(env.EARN_ADDRESS) }));
+const copilotCfg = copilotConfigFromEnv(env);
+const server = createAutomateServer(svc, copilotCfg ? new Copilot(copilotCfg) : null);
+server.listen(cfg.port, cfg.host, () => log("info", "automate.startup", { host: cfg.host, port: cfg.port, chainId: cfg.expectedChainId, chain: Boolean(fromChain), earn: Boolean(env.EARN_ADDRESS), copilot: copilotCfg ? copilotCfg.model : false }));
 const sweeper = setInterval(() => {
   svc.sweep();
   void svc.sweepBounded();

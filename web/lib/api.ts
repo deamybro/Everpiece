@@ -73,6 +73,8 @@ export function friendlyError(code: string | undefined): string {
     PRIVATE_EPOCH_LIMIT: "The private network's limit for this period is reached. Try again later.",
     PRIVATE_OTHER_GROUP: "This account is registered in a different private group.",
     PRIVATE_STILL_PROCESSING: "The private network is still processing. Check your private balance before trying again.",
+    COPILOT_BUSY: "Copilot is busy with someone else. Try again in a moment.",
+    COPILOT_UNAVAILABLE: "Copilot isn't available right now. You can still use the templates.",
     PRIVATE_NEEDS_MON: "Your account needs a little MON for network fees to use private payments.",
     PRIVATE_RECEIVER_NOT_JOINED: "They haven't joined private payments yet.",
     INSUFFICIENT_BALANCE: "You don't have enough for this payment.",

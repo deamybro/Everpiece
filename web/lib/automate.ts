@@ -36,6 +36,20 @@ async function call(path: string, body?: unknown): Promise<{ status: number; bod
   return { status: r.status, body: await r.json().catch(() => ({})) };
 }
 
+/** Copilot (optional): turns a sentence into a PROPOSED rule. It never creates or signs anything; the owner reviews it. */
+export async function copilotAvailable(): Promise<boolean> {
+  if (!automateAvailable()) return false;
+  const r = await call("/v1/automate/copilot").catch(() => null);
+  return r?.status === 200 && r.body?.available === true;
+}
+export async function askCopilot(text: string): Promise<{ proposal: unknown } | { refusal: string }> {
+  const r = await call("/v1/automate/copilot/propose", { text }).catch(() => null);
+  if (!r) throw new PayError("NETWORK_UNAVAILABLE");
+  if (r.status === 429) throw new PayError("COPILOT_BUSY");
+  if (r.status !== 200) throw new PayError("COPILOT_UNAVAILABLE");
+  return r.body;
+}
+
 /** Where each action can run right now, for the preview (the service re-checks at run time). */
 export function targetStatus(a: Exclude<Action, { kind: "KEEP_BALANCE" }>): { status: TargetStatus; reason: string } {
   if (a.kind === "DEPOSIT_YIELD") {

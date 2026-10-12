@@ -132,7 +132,10 @@ export function ExternalPay({ loaded, to }: { loaded?: LoadedRequest; to?: Recip
           Only send {source.symbol} on {source.chainLabel}. Another token or network can&apos;t be delivered. If less than the amount arrives,
           or it arrives late, it&apos;s refunded to {refundTo.slice(0, 6)}…{refundTo.slice(-4)}.
         </div>
-        <Progress text={moving === "MOVING" ? "Received: moving it to Monad…" : moving === "DEPOSIT_TOO_SMALL" ? "Less than the amount arrived: it will be refunded." : "Waiting for your transfer…"} />
+        <Progress text={moving === "MOVING" ? "Received: moving it to Monad. This usually takes a few minutes; you can close this page and come back." : moving === "DEPOSIT_TOO_SMALL" ? "Less than the amount arrived: it will be refunded." : "Waiting for your transfer…"} />
+        <p className="muted small">
+          Cross-chain payments take a few minutes, not seconds{quote.timeEstimateSec > 0 ? " (Aurora estimates about " + Math.max(1, Math.round(quote.timeEstimateSec / 60)) + " min)" : ""}. Payments between Everpiece accounts are instant.
+        </p>
         {source.simulated && <p className="muted small">Test site: this route is simulated and nothing crosses a chain.</p>}
       </div>
     );

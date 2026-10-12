@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { describeRule, ruleFromJson, ruleSpecProblem, type Action, type RuleSpec } from "@everpiece/shared";
+import { describeRule, parseCopilotProposal, proposalToRuleSpec, ruleFromJson, ruleSpecProblem, COPILOT_MAX_INPUT_CHARS, type Action, type RuleSpec } from "@everpiece/shared";
 import { Welcome } from "../../components/Welcome";
 import { Progress, progressText } from "../../components/status";
 import { friendlyError } from "../../lib/api";
 import { formatDollars, parseDollars, chainTime } from "../../lib/chain";
-import { authorizeRule, boundedAvailable, createRule, listExecutions, listRules, runExecution, setEnabled, targetStatus, automateAvailable, type ExecutionView, type RuleView } from "../../lib/automate";
+import { askCopilot, copilotAvailable, authorizeRule, boundedAvailable, createRule, listExecutions, listRules, runExecution, setEnabled, targetStatus, automateAvailable, type ExecutionView, type RuleView } from "../../lib/automate";
 import { opportunities, opportunity } from "../../lib/earn";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { PayError } from "../../lib/pay";
@@ -46,6 +46,11 @@ export default function AutomatePage() {
   const [perMonth, setPerMonth] = useState("1000");
   const [days, setDays] = useState("30");
   const [spec, setSpec] = useState<RuleSpec | null>(null);
+  const [copilotOn, setCopilotOn] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [assumed, setAssumed] = useState<string[]>([]);
+  const [fromCopilot, setFromCopilot] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -63,6 +68,7 @@ export default function AutomatePage() {
     setAccount(a);
     setLoaded(true);
     if (a && automateAvailable()) refresh(a).catch((e) => setError(errText(e)));
+    copilotAvailable().then(setCopilotOn).catch(() => {});
   }, [refresh]);
 
   if (!loaded) return null;
@@ -96,6 +102,36 @@ export default function AutomatePage() {
     setSpec(s);
   }
 
+  /** Copilot only drafts: the draft goes through the same checks, preview and signature as a template. */
+  async function suggest() {
+    setError("");
+    setDone("");
+    setAsking(true);
+    try {
+      const r = await askCopilot(ask.trim());
+      if ("refusal" in r) return setError(r.refusal);
+      // the app re-validates whatever the server returned; nothing from the model is trusted as-is
+      const parsed = parseCopilotProposal(JSON.stringify({
+        understood: true, name: (r.proposal as any)?.name,
+        trigger: (() => { const t = (r.proposal as any)?.trigger ?? {}; return { type: t.type, min_dollars: t.minDollars, keep_dollars: t.keepDollars, threshold_dollars: t.thresholdDollars }; })(),
+        split: ((r.proposal as any)?.split ?? []).map((s: any) => ({ to: s.to, percent: s.percent })),
+        limits: (() => { const l = (r.proposal as any)?.limits ?? {}; return { per_run_dollars: l.perRunDollars, per_day_dollars: l.perDayDollars, per_month_dollars: l.perMonthDollars, days: l.days }; })(),
+      }));
+      if (!parsed.ok) return setError(parsed.reason);
+      const now = await chainTime();
+      const draft = proposalToRuleSpec(parsed.proposal, { nowSec: now, earnOpportunityId: opp?.id, stocksAvailable: false });
+      if (!draft.ok) return setError(draft.reason);
+      setAssumed(draft.assumed);
+      setFromCopilot(true);
+      setTemplate(null);
+      setSpec(draft.spec);
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setAsking(false);
+    }
+  }
+
   async function save() {
     if (!account || !spec) return;
     setBusy(true);
@@ -112,6 +148,7 @@ export default function AutomatePage() {
       }
       setSpec(null);
       setTemplate(null);
+      setFromCopilot(false);
       setDone(spec.authorization === "BOUNDED_MODULE"
         ? "Rule saved ✓ It runs by itself within your limits. You can stop it any time."
         : "Rule saved ✓ It runs when its trigger happens; you confirm each run.");
@@ -165,6 +202,14 @@ export default function AutomatePage() {
       {!automateAvailable() && <div className="status warn">Automate isn&apos;t available here yet.</div>}
       {automateAvailable() && (
         <>
+          {!template && !spec && copilotOn && (
+            <section className="card stack" aria-label="Describe your rule">
+              <strong>Describe what you want</strong>
+              <textarea rows={3} maxLength={COPILOT_MAX_INPUT_CHARS} placeholder="e.g. When I get paid, keep half and put half into Earn" value={ask} onChange={(e) => setAsk(e.target.value)} />
+              <button disabled={asking || ask.trim().length < 4} onClick={suggest}>{asking ? "Thinking… this can take up to a minute" : "Suggest a rule"}</button>
+              <p className="muted small">An AI draft, not advice. It only proposes: you read every limit on the next screen and nothing happens unless you sign.</p>
+            </section>
+          )}
           {!template && !spec && (
             <section className="stack" aria-label="Templates">
               <h2>Templates</h2>
@@ -209,6 +254,12 @@ export default function AutomatePage() {
             const d = describeRule(spec, names);
             return (
               <section className="card stack" aria-label="Rule preview">
+                {fromCopilot && (
+                  <div className="status warn small">
+                    Draft from Copilot. Check every line before you save.
+                    {assumed.length > 0 && <> Not stated in your request, so assumed: {assumed.join("; ")}.</>}
+                  </div>
+                )}
                 <strong>{spec.name}</strong>
                 <span>{d.when}:</span>
                 <ul>{d.then.map((t, i) => <li key={t + i}>{t}</li>)}</ul>
@@ -226,7 +277,7 @@ export default function AutomatePage() {
                 </div>
                 <Progress text={progress} />
                 <button disabled={busy} onClick={save}>Save rule with fingerprint or screen lock</button>
-                <button className="ghost" onClick={() => setSpec(null)}>Change it</button>
+                <button className="ghost" onClick={() => { setSpec(null); setFromCopilot(false); }}>Change it</button>
               </section>
             );
           })()}
