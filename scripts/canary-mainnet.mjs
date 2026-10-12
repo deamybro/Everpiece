@@ -38,7 +38,8 @@ if (route === "CONVERTED") {
 }
 const block = await c.getBlock();
 const payment = {
-  ref: "0x" + Buffer.from(`canary-${Date.now()}`).toString("hex").padEnd(64, "0").slice(0, 64),
+  // --request <id>: pay that payment request (ref = request id, as the app does); otherwise a random canary ref
+  ref: arg("request") ? arg("request") : "0x" + Buffer.from(`canary-${Date.now()}`).toString("hex").padEnd(64, "0").slice(0, 64),
   sender: me.address, recipient: to, asset: asset.address, amount, sourceToken: from.address, maxSourceAmount: maxSource,
   deadline: block.timestamp + 600n, fallbackToSource: has("fallback"),
 };
@@ -82,3 +83,16 @@ const after = { fromBal: await bal(from.address, me.address), toAsset: await bal
 console.log(`Paid event: delivered ${fmt(paid.amount)} of ${getAddress(paid.deliveredAsset) === asset.address ? asset.symbol : "ANOTHER ASSET " + paid.deliveredAsset}, source spent ${fmt(paid.sourceAmount)}, provider ${paid.provider}`);
 console.log(`after:  canary ${from.symbol} ${fmt(after.fromBal)} (spent ${fmt(before.fromBal - after.fromBal)}), recipient ${asset.symbol} ${fmt(after.toAsset)} (+${fmt(after.toAsset - before.toAsset)}), tx ${done.txHash}`);
 if (getAddress(paid.deliveredAsset) !== asset.address) console.log("NOTE: fallback delivered the SOURCE asset, as the payer signed.");
+
+// paying a request: tell the directory, with the self-authenticating proof it checks on-chain (like the app's reportPaid)
+if (arg("request")) {
+  const wirePay = JSON.parse(JSON.stringify(payment, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
+  const DIR = process.env.DIRECTORY_URL ?? "https://app.everpiece.xyz/svc/directory";
+  for (let i = 0; i < 6; i++) {
+    const r = await fetch(`${DIR}/v1/requests/paid`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestId: arg("request"), kind: "instantV2", payment: wirePay, txHash: done.txHash }) });
+    const j = await r.json().catch(() => ({}));
+    console.log("directory:", r.status, JSON.stringify(j.paid ?? j.error ?? j).slice(0, 160));
+    if (r.status === 200) break;
+    await new Promise((res) => setTimeout(res, 3000));
+  }
+}

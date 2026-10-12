@@ -156,7 +156,7 @@ export function PayRequestV2({ loaded, requestId }: { loaded: LoadedRequest; req
         (s) => setProgress(progressText(s, converted ? "Converting and paying" : "Paying")),
       );
       setResult(r);
-      void reportPaid({ requestId: request.requestId, kind: "instantV2", payment: r.payment });
+      void reportPaid({ requestId: request.requestId, kind: "instantV2", payment: r.payment, txHash: r.txHash });
     } catch (e) {
       setError(errText(e));
       if (src) void refresh(src);

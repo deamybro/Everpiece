@@ -116,7 +116,7 @@ test("paid (instantV2): USDC or AUSD request, proof recomputed; a fallback deliv
   const delivered = new Map<string, Address>();
   const s = new DirectoryService({ ...cfg, payV2Address: PAY_V2 }, {
     store: new DirectoryStore(":memory:"), now: () => NOW,
-    readDeliveredV2: async (id) => delivered.get(id) ?? null,
+    readDeliveredV2: async (id, tx) => (tx.startsWith("0xd") ? delivered.get(id) ?? null : null),
   });
   await registerMaris(s);
   const usdcReq = req({ requestId: `0x${"a1".repeat(32)}`, asset: USDC_MAINNET_ADDRESS });
@@ -128,11 +128,11 @@ test("paid (instantV2): USDC or AUSD request, proof recomputed; a fallback deliv
     sourceToken: AUSD_ADDRESS, maxSourceAmount: 25_100_000n, deadline: 9_999_999_999n, fallbackToSource: true };
   const w = (p: typeof payment) => ({ ...p, amount: p.amount.toString(), maxSourceAmount: p.maxSourceAmount.toString(), deadline: p.deadline.toString() });
   const id = paymentV2Id(PAY_V2, payment, 143);
-  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w(payment) }, "ip")).body.error, "PaymentNotFinalized");
-  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w({ ...payment, asset: AUSD_ADDRESS }) }, "ip")).body.error, "NotThisRequest");
-  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2Fallback", payment: w(payment) }, "ip")).httpStatus, 400);
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w(payment), txHash: `0x${"d1".repeat(32)}` }, "ip")).body.error, "PaymentNotFinalized");
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w({ ...payment, asset: AUSD_ADDRESS }), txHash: `0x${"d1".repeat(32)}` }, "ip")).body.error, "NotThisRequest");
+  assert.equal((await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2Fallback", payment: w(payment), txHash: `0x${"d1".repeat(32)}` }, "ip")).httpStatus, 400);
   delivered.set(id, AUSD_ADDRESS); // conversion unavailable: the payer's AUSD was delivered instead
-  const r = await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w(payment) }, "ip");
+  const r = await s.requestPaid({ requestId: usdcReq.requestId, kind: "instantV2", payment: w(payment), txHash: `0x${"d1".repeat(32)}` }, "ip");
   assert.equal(r.httpStatus, 200);
   assert.equal((r.body.paid as { kind: string }).kind, "instantV2Fallback");
 
@@ -140,7 +140,7 @@ test("paid (instantV2): USDC or AUSD request, proof recomputed; a fallback deliv
   await s.createRequest(await signed(ausdReq), "ip");
   const p2 = { ...payment, ref: ausdReq.requestId, asset: AUSD_ADDRESS, sourceToken: USDC_MAINNET_ADDRESS };
   delivered.set(paymentV2Id(PAY_V2, p2, 143), AUSD_ADDRESS);
-  const r2 = await s.requestPaid({ requestId: ausdReq.requestId, kind: "instantV2", payment: w(p2) }, "ip");
+  const r2 = await s.requestPaid({ requestId: ausdReq.requestId, kind: "instantV2", payment: w(p2), txHash: `0x${"d2".repeat(32)}` }, "ip");
   assert.equal((r2.body.paid as { kind: string }).kind, "instantV2");
 });
 
