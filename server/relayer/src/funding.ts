@@ -23,6 +23,8 @@ export type FundingConfig = {
   destinationToken: Address;
   slippageBps: number;
   deadlineMinutes: number;
+  /** Offer Aurora's confidential routing (hides the origin wallet and route; destination stays public). Off unless the operator enables it. */
+  confidential?: boolean;
   /** Largest single top-up, in whole destination tokens. */
   maxWholeTokens: number;
   perIpPerMinute: number;
@@ -115,7 +117,10 @@ export class Funding {
     if (l) return l;
     const o = (body ?? {}) as Record<string, unknown>;
     const keys = Object.keys(o).sort().join(",");
-    if (keys !== "amountOut,originAssetId,recipient,refundTo") return err(400, "InvalidRequest");
+    const wantsConfidential = o.confidential === true;
+    if (keys !== "amountOut,originAssetId,recipient,refundTo" && keys !== "amountOut,confidential,originAssetId,recipient,refundTo") return err(400, "InvalidRequest");
+    if ("confidential" in o && typeof o.confidential !== "boolean") return err(400, "InvalidRequest");
+    if (wantsConfidential && !this.cfg.confidential) return err(422, "CONFIDENTIAL_UNAVAILABLE");
     if (typeof o.originAssetId !== "string" || typeof o.amountOut !== "string" || !/^[1-9][0-9]{0,39}$/.test(o.amountOut)) return err(400, "InvalidRequest");
     if (typeof o.recipient !== "string" || !isAddress(o.recipient) || typeof o.refundTo !== "string" || !isAddress(o.refundTo)) return err(400, "InvalidRequest");
     const r = await this.resolve();
@@ -126,7 +131,7 @@ export class Funding {
     if (amountOut > BigInt(this.cfg.maxWholeTokens) * 10n ** BigInt(r.destinationDecimals)) return err(422, "AMOUNT_TOO_LARGE");
     const asked = {
       origin, destinationAssetId: r.destination, amountOut, recipient: getAddress(o.recipient), refundTo: getAddress(o.refundTo),
-      deadline: new Date(this.now() + this.cfg.deadlineMinutes * 60_000).toISOString(), slippageBps: this.cfg.slippageBps,
+      deadline: new Date(this.now() + this.cfg.deadlineMinutes * 60_000).toISOString(), slippageBps: this.cfg.slippageBps, confidential: wantsConfidential,
     };
     const up = await this.upstream(`quote/${this.cfg.apiKey}`, { method: "POST", body: auroraQuoteRequest(asked) });
     if (up.status === 0 || up.status >= 500) return err(503, "PROVIDER_UNAVAILABLE");

@@ -200,3 +200,26 @@ test("the test site's SIMULATED Aurora (scripts/aurora-sim.mjs) drives the real 
     server.close();
   }
 });
+
+test("confidential routing: refused unless the operator enabled it; when on, exactly one extra field reaches Aurora", async () => {
+  setLogSink(() => {}, "alert");
+  const aurora = await fakeAurora((s) => honest(s));
+  try {
+    const ask = { originAssetId: BASE_USDC, amountOut: "5000000", recipient: ME, refundTo: WALLET, confidential: true };
+    const off = new Funding({ ...cfg(aurora.url) });
+    assert.equal((await off.quote(ask, "ip")).body.error, "CONFIDENTIAL_UNAVAILABLE");
+    assert.equal(aurora.seen.filter((s) => s.url.startsWith("/api/quote/")).length, 0); // nothing was sent upstream
+
+    const on = new Funding({ ...cfg(aurora.url), confidential: true });
+    const r = await on.quote(ask, "ip");
+    assert.equal(r.httpStatus, 200);
+    const sent = aurora.seen.filter((s) => s.url.startsWith("/api/quote/")).at(-1)!.body as Record<string, unknown>;
+    assert.equal(sent.confidentiality, "advanced");
+    assert.equal(sent.amount, "5000000");
+    assert.equal(sent.recipient, ME);
+    // a malformed flag is a bad request, never silently ignored
+    assert.equal((await on.quote({ ...ask, confidential: "yes" }, "ip")).httpStatus, 400);
+  } finally {
+    aurora.close();
+  }
+});

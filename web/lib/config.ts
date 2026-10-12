@@ -31,6 +31,8 @@ export const config = {
   devFaucetUrl: process.env.NEXT_PUBLIC_DEV_FAUCET_URL ?? "",
   /** "Add Dollars from another chain" (Aurora Intents): "live", "simulated" (test site: nothing crosses a chain) or "off". */
   funding: (process.env.NEXT_PUBLIC_FUNDING === "live" || process.env.NEXT_PUBLIC_FUNDING === "simulated" ? process.env.NEXT_PUBLIC_FUNDING : "off") as "live" | "simulated" | "off",
+  /** Offer Aurora's confidential routing on cross-chain payments (needs the relayer's AURORA_CONFIDENTIAL=true). */
+  fundingConfidential: process.env.NEXT_PUBLIC_FUNDING_CONFIDENTIAL === "true",
   /** Last-mile payouts (docs/PAYOUT.md): the payout server, via the app's own origin. Empty = bank payouts unavailable. */
   payoutUrl: process.env.NEXT_PUBLIC_PAYOUT_URL ?? "",
   /** The payout provider is SIMULATED (test site): no bank is paid. */

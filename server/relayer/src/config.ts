@@ -197,6 +197,7 @@ function fundingConfig(env: NodeJS.ProcessEnv): FundingConfig | undefined {
   return {
     apiUrl: (env.AURORA_API_URL || AURORA_API_URL).replace(/\/$/, ""),
     apiKey: env.AURORA_API_KEY,
+    confidential: env.AURORA_CONFIDENTIAL === "true",
     destinationToken: destination,
     slippageBps: int(env, "FUNDING_SLIPPAGE_BPS", 50), // stable → stable; excess input is refunded by Aurora
     deadlineMinutes: int(env, "FUNDING_DEADLINE_MINUTES", 30),

@@ -60,8 +60,8 @@ export async function plan(account: Account, dollars: bigint, destination: Token
   return { conversion, have, needed };
 }
 
-export async function quoteTopUp(origin: FundingSource, amountOut: bigint, recipient: Address, refundTo: Address): Promise<TopUpQuote> {
-  const r = await relayer("/v1/funding/quote", { originAssetId: origin.assetId, amountOut: amountOut.toString(), recipient, refundTo }).catch(() => null);
+export async function quoteTopUp(origin: FundingSource, amountOut: bigint, recipient: Address, refundTo: Address, confidential = false): Promise<TopUpQuote> {
+  const r = await relayer("/v1/funding/quote", { originAssetId: origin.assetId, amountOut: amountOut.toString(), recipient, refundTo, ...(confidential ? { confidential: true } : {}) }).catch(() => null);
   if (!r) throw new PayError("NETWORK_UNAVAILABLE");
   if (r.status !== 200) throw new PayError(r.body.error ?? "PROVIDER_UNAVAILABLE");
   const q = r.body.quote as Record<string, string | number | null>;

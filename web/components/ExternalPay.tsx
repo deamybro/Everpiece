@@ -25,6 +25,7 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
   const [sources, setSources] = useState<FundingSource[]>([]);
   const [source, setSource] = useState<FundingSource | null>(null);
   const [refundTo, setRefundTo] = useState("");
+  const [confidential, setConfidential] = useState(false);
   const [quote, setQuote] = useState<TopUpQuote | null>(null);
   const [phase, setPhase] = useState<Phase>("pick");
   const [moving, setMoving] = useState<FundingPhase | null>(null);
@@ -69,7 +70,7 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
     setPhase("quoting");
     setError("");
     try {
-      setQuote(await quoteTopUp(source, request.amount, request.recipient, getAddress(refundTo) as Address));
+      setQuote(await quoteTopUp(source, request.amount, request.recipient, getAddress(refundTo) as Address, confidential));
       setPhase("deposit");
     } catch (e) {
       setError(friendlyError(e instanceof PayError ? e.code : "PROVIDER_UNAVAILABLE"));
@@ -152,6 +153,12 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
           <input id="refund" autoCapitalize="none" spellCheck={false} placeholder="0x…" value={refundTo} onChange={(e) => setRefundTo(e.target.value.trim())} />
           {refundTo.length > 3 && !isAddress(refundTo) && <p className="muted small">That isn&apos;t a valid address.</p>}
         </div>
+      )}
+      {config.fundingConfidential && (
+        <label className="small">
+          <input type="checkbox" checked={confidential} onChange={(e) => setConfidential(e.target.checked)} /> Hide which wallet I&apos;m paying from (confidential routing)
+          <span className="muted"> Only the sending wallet and the route are hidden. The payment arriving on Monad, its amount and who receives it stay public.</span>
+        </label>
       )}
       {error && <div className="status bad">{error}</div>}
       <button disabled={!source || !isAddress(refundTo) || phase === "quoting"} onClick={getDepositAddress}>

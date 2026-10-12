@@ -66,6 +66,7 @@ export function friendlyError(code: string | undefined): string {
     WRONG_ROUTE_ENDPOINT: "That payment couldn't be prepared. Please try again.",
     RECEIPT_UNAVAILABLE: "The payment went through, but we couldn't read its receipt yet. Check Activity in a moment.",
     ConversionUnavailable: "Converting isn't available right now. Nothing was sent.",
+    CONFIDENTIAL_UNAVAILABLE: "Confidential routing isn't available right now. Pay normally instead.",
     PRIVATE_UNAVAILABLE: "Private payments aren't switched on here.",
     PRIVATE_NOT_COMPLIANT: "The private network's compliance check didn't pass for this account.",
     PRIVATE_LIMIT_1_USDC: "Private payments are limited to $1.00 per action for now.",

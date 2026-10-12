@@ -112,3 +112,13 @@ test("mainnet registry: USDC routes through the verified Agora AUSD/USDC pair", 
   assert.deepEqual(usdc.eip712, { name: "USDC", version: "2" });
   assert.equal(usdc.route, "AGORA_INSTANT_SETTLEMENT");
 });
+
+test("Aurora confidential routing is one extra field on the same quote call, and only when asked for", async () => {
+  const { auroraQuoteRequest } = await import("../src/index.ts");
+  const base = { origin: { assetId: "nep141:base-usdc", chain: "base", chainLabel: "Base", symbol: "USDC", decimals: 6, token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", simulated: false },
+    destinationAssetId: "nep245:monad-usdc", amountOut: 1_000_000n, recipient: "0x0000000000000000000000000000000000000001", refundTo: "0x0000000000000000000000000000000000000002",
+    deadline: "2026-10-12T12:00:00.000Z", slippageBps: 50 } as const;
+  assert.equal("confidentiality" in auroraQuoteRequest(base), false);
+  assert.equal((auroraQuoteRequest({ ...base, confidential: true }) as Record<string, unknown>).confidentiality, "advanced");
+  assert.equal((auroraQuoteRequest({ ...base, confidential: false }) as Record<string, unknown>).confidentiality, undefined);
+});
