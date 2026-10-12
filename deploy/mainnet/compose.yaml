@@ -1,0 +1,79 @@
+# Everpiece MAINNET indexer: its own Postgres + Hasura + Envio, bound to localhost, capped. Secrets come from ./.env
+# (generated on the server by deploy-indexer.sh; never in git). Project name: everpiece-mainnet-indexer.
+name: everpiece-mainnet-indexer
+x-shared: &shared
+  security_opt: ["no-new-privileges:true"]
+  logging: { driver: json-file, options: { max-size: "5m", max-file: "3" } }
+services:
+  db:
+    <<: *shared
+    restart: unless-stopped
+    image: postgres:18.3
+    container_name: everpiece-mainnet-indexer-db
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.5
+    pids_limit: 128
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20", "-c", "work_mem=2MB"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${INDEXER_DB_PASSWORD:?run deploy-indexer.sh}
+      POSTGRES_DB: everpiece_mainnet_indexer
+    volumes: ["db:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "everpiece_mainnet_indexer"]
+      interval: 5s
+      retries: 20
+  hasura:
+    <<: *shared
+    restart: unless-stopped
+    image: hasura/graphql-engine:v2.43.0
+    container_name: everpiece-mainnet-indexer-hasura
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 0.5
+    pids_limit: 256
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:${INDEXER_DB_PASSWORD}@db:5432/everpiece_mainnet_indexer
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?run deploy-indexer.sh}
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: public
+      HASURA_GRAPHQL_STRINGIFY_NUMERIC_TYPES: "true"
+      HASURA_GRAPHQL_NO_OF_RETRIES: "10"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "false"
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup
+      HASURA_GRAPHQL_CORS_DOMAIN: https://app.everpiece.xyz
+    ports: ["127.0.0.1:47316:8080"]
+  indexer:
+    <<: *shared
+    restart: unless-stopped
+    build: { context: ./indexer-ctx, dockerfile: indexer.Dockerfile }
+    image: everpiece-mainnet-indexer:local
+    container_name: everpiece-mainnet-indexer
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpus: 0.5
+    pids_limit: 256
+    depends_on: { db: { condition: service_healthy }, hasura: { condition: service_started } }
+    environment:
+      ENVIO_RPC_URL: https://rpc2.monad.xyz
+      ENVIO_CHAIN_ID: "143"
+      ENVIO_ESCROW_ADDRESS: "0x70ab17cFEe72fFd49F8C766692067D16965F5AA8"
+      ENVIO_PAY_ADDRESS: "0x0000000000000000000000000000000000000000"
+      ENVIO_PAY_V2_ADDRESS: "0x29D15Bb918589B9dF84EdE5c3B5A7a3Ec89c8eb5"
+      ENVIO_EARN_ADDRESS: "0x73e633b0caCCE41cFbB3278F1D100c9e5F7A373D"
+      ENVIO_ESCROW_START_BLOCK: "112548000"
+      ENVIO_PG_HOST: db
+      ENVIO_PG_PORT: "5432"
+      ENVIO_PG_USER: postgres
+      ENVIO_PG_PASSWORD: ${INDEXER_DB_PASSWORD}
+      ENVIO_PG_DATABASE: everpiece_mainnet_indexer
+      ENVIO_PG_SSL_MODE: "false"
+      HASURA_GRAPHQL_ENDPOINT: http://hasura:8080/v1/metadata
+      HASURA_GRAPHQL_ROLE: admin
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
+    volumes: ["state:/state"]
+volumes:
+  db:
+  state:

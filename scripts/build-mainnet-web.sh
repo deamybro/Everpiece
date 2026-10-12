@@ -14,9 +14,13 @@ NEXT_PUBLIC_RELAYER_URL=/svc/relayer NEXT_PUBLIC_DIRECTORY_URL=/svc/directory \
 NEXT_PUBLIC_USDC_PAYMENTS_ENABLED=true NEXT_PUBLIC_AUSD_PAYMENTS_ENABLED=true NEXT_PUBLIC_DEX_AUSD_FALLBACK_ENABLED=true \
 NEXT_PUBLIC_EARN_ENABLED=true NEXT_PUBLIC_PRIVATE_PAYMENTS_ENABLED=true \
 NEXT_PUBLIC_FUNDING=live NEXT_PUBLIC_AURORA_LIVE_ENABLED=true NEXT_PUBLIC_FUNDING_CONFIDENTIAL=true \
+NEXT_PUBLIC_VOICE_URL=/svc/voice NEXT_PUBLIC_INDEXER_URL=/svc/indexer/v1/graphql \
+NEXT_PUBLIC_AUTOMATE_URL=/automate-api NEXT_PUBLIC_AUTOMATE_ENABLED=true \
+NEXT_PUBLIC_AUTOMATE_ADDRESS=0xEC3F0a726Ad4604B20F71CeD79059e0aAA2f3732 NEXT_PUBLIC_AUTOMATE_EXECUTOR=0x8AEDdD970373eB53Dc318f85a7854a444B13F2C6 \
   npx next build
 grep -rhoE 'directoryUrl:"/svc/directory"' .next/static | head -1 | grep -q . || { echo "FAIL: directoryUrl is not /svc/directory"; exit 1; }
 grep -rhoE 'relayerUrl:"/svc/relayer"' .next/static | head -1 | grep -q . || { echo "FAIL: relayerUrl is not /svc/relayer"; exit 1; }
+grep -rhoE 'voiceUrl:"/svc/voice"' .next/static | head -1 | grep -q . || { echo "FAIL: voiceUrl is not /svc/voice"; exit 1; }
 if grep -rlF "Program Files" .next/static .next/server .next/standalone/web 2>/dev/null | grep -q .; then echo "FAIL: a Windows path leaked into the bundle"; exit 1; fi
 rm -rf .next/cache /tmp/webdist
 mkdir -p /tmp/webdist && cp -r .next/standalone/. /tmp/webdist/ && mkdir -p /tmp/webdist/web/.next \
