@@ -86,14 +86,14 @@ export async function payInstant(
   onStatus("SIGNING");
   let r;
   if (direct) {
-    const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(instantAusdAuthorization(config.pay, payment, config.chainId, token.address)));
+    const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(instantAusdAuthorization(config.pay, payment, config.chainId, token.address)), { spend: payment.amount });
     r = await relayer("/v1/pay/ausd", { payment, ausdSignature });
   } else {
     const nonce = await client.readContract({ address: token.address, abi: erc20, functionName: "nonces", args: [account.address] });
     const { permitSig, payerSignature } = await withSigner(account, async (signer) => ({
       permitSig: await signer.signTypedData(permitTyped(token, account.address, config.pay, maxSource, nonce, deadline)),
       payerSignature: await signer.signTypedData(instantPaymentTyped(config.pay, payment, config.chainId)),
-    }));
+    }), { spend: maxSource });
     const { r: pr, s: ps, v } = hexToSignature(permitSig);
     r = await relayer("/v1/pay/token", { payment, payerSignature, permit: { deadline, v: Number(v), r: pr, s: ps } });
   }

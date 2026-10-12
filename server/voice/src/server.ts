@@ -3,6 +3,7 @@ import { MAX_UPLOAD_BYTES, type Result, type VoiceService } from "./voice.ts";
 import { log } from "./log.ts";
 
 const PATH = /^\/v1\/messages\/(0x[0-9a-fA-F]{64})(\/bind)?$/;
+const VAULT_PATH = /^\/v1\/vault\/(0x[0-9a-fA-F]{40})$/;
 
 function send(res: ServerResponse, out: Result, origin?: string): void {
   const common = {
@@ -61,6 +62,13 @@ export function createVoiceServer(svc: VoiceService): Server {
         return void res.end();
       }
       if (req.method === "GET" && url.pathname === "/healthz") return send(res, { httpStatus: 200, body: svc.health() }, origin);
+      const vm = VAULT_PATH.exec(url.pathname);
+      if (vm) {
+        const vip = process.env.TRUST_PROXY === "1" ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || "unknown" : req.socket.remoteAddress ?? "unknown";
+        if (req.method === "GET") return send(res, svc.getVault(vm[1], vip), origin);
+        if (req.method === "PUT") return send(res, await svc.putVault(vm[1], await readJson(req, 100_000), vip), origin);
+        return send(res, { httpStatus: 405, body: { error: "MethodNotAllowed" } }, origin);
+      }
       const m = PATH.exec(url.pathname);
       if (!m) return send(res, { httpStatus: 404, body: { error: "NotFound" } }, origin);
       const locator = m[1].toLowerCase();

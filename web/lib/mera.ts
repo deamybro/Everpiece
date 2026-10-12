@@ -6,6 +6,7 @@ import {
   type PasskeyCredentialTransport,
 } from "@category-labs/mera";
 import { toViemAccount } from "@category-labs/mera/viem";
+import { startSession, takeFromSession } from "./session";
 import { bytesToHex, type Address, type Hex, type LocalAccount } from "viem";
 import { deriveEverpieceAccountV1, deriveEverpieceInboxKeyV1, deriveEverpieceMessageSeedV1 } from "@everpiece/shared";
 
@@ -84,7 +85,17 @@ export async function signIn(): Promise<Account> {
  * (master §22.4 "prompt per financial action"). The same ceremony also yields the inbox key (needed once, when the
  * username is registered).
  */
-export async function withSigner<T>(account: Account, fn: (signer: LocalAccount, inboxKey: Hex, messageSeed: Hex) => Promise<T>): Promise<T> {
+export async function withSigner<T>(account: Account, fn: (signer: LocalAccount, inboxKey: Hex, messageSeed: Hex) => Promise<T>, opts?: { spend?: bigint }): Promise<T> {
+  // An open, scoped session may sign a payment that declares its amount (see lib/session.ts); anything else always asks.
+  const s = opts?.spend !== undefined ? takeFromSession(account.address, opts.spend) : null;
+  if (s) {
+    try {
+      return await fn(s.signer, s.inboxKey, s.messageSeed);
+    } catch (e) {
+      s.refund();
+      throw e;
+    }
+  }
   const r = await getPasskeyPrfOutput({ rpId: rpId(), credential: { credentialId: account.credentialId, transports: account.transports } });
   const { privateKey, address } = deriveEverpieceAccountV1(r.prfOutput);
   const ik = deriveEverpieceInboxKeyV1(r.prfOutput);
@@ -105,6 +116,26 @@ export async function withSigner<T>(account: Account, fn: (signer: LocalAccount,
   } finally {
     session.end();
   }
+}
+
+/** One fingerprint opens a short, capped session: small payments inside it need no further prompt (lib/session.ts). */
+export async function unlockSession(account: Account, opts: { ttlMs: number; cap: bigint }): Promise<void> {
+  const r = await getPasskeyPrfOutput({ rpId: rpId(), credential: { credentialId: account.credentialId, transports: account.transports } });
+  const { privateKey, address } = deriveEverpieceAccountV1(r.prfOutput);
+  const ik = deriveEverpieceInboxKeyV1(r.prfOutput);
+  const inboxKey = bytesToHex(ik);
+  ik.fill(0);
+  const ms = deriveEverpieceMessageSeedV1(r.prfOutput);
+  const messageSeed = bytesToHex(ms);
+  ms.fill(0);
+  r.prfOutput.fill(0);
+  if (address !== account.address) {
+    privateKey.fill(0);
+    throw new Error("WrongPasskey");
+  }
+  const session = createSecp256k1SigningSession({ privateKey });
+  privateKey.fill(0);
+  startSession({ address, signer: toViemAccount(session), end: () => session.end(), inboxKey, messageSeed, ttlMs: opts.ttlMs, cap: opts.cap });
 }
 
 /** This device lacks the message seed (account saved before messages existed): one prompt derives it, nothing is signed. */

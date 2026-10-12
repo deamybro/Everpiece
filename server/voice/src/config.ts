@@ -13,6 +13,8 @@ export type VoiceConfig = {
   allowedOrigin?: string;
   /** Requests (reads + uploads) per IP per minute. */
   perIpPerMinute: number;
+  /** Most address-book vaults kept (each is at most 64 KiB of ciphertext). */
+  maxVaults: number;
   /** New messages per IP per day (abuse brake; not a security boundary). */
   uploadsPerIpPerDay: number;
   /** Stop accepting uploads above this many stored bytes (protects the shared host's disk). */
@@ -50,6 +52,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): VoiceConfig {
     dbPath: env.VOICE_DB_PATH ?? "voice.sqlite",
     allowedOrigin,
     perIpPerMinute: int(env, "PER_IP_PER_MINUTE", 60),
+    maxVaults: int(env, "MAX_VAULTS", 20_000),
     uploadsPerIpPerDay: int(env, "UPLOADS_PER_IP_PER_DAY", 30),
     maxTotalBytes: int(env, "MAX_TOTAL_BYTES", 500 * 1024 * 1024),
     unboundHours: int(env, "UNBOUND_HOURS", 24),

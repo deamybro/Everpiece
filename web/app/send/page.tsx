@@ -18,6 +18,7 @@ import { claimLink } from "../../lib/link";
 import { FlowError, sendByLink, sendToUsername } from "../../lib/flows";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { UsernameError, findRecipient, pin, type Pinning, type Recipient } from "../../lib/username";
+import { SessionBar } from "../../components/SessionBar";
 import { PayError, instantAvailable, payInstant, payTokens } from "../../lib/pay";
 import { assetBalances, assetSymbol, defaultAsset, payV2, payV2Available, quoteV2, type PayV2Result, type QuoteV2 } from "../../lib/payV2";
 import type { SettlementAsset } from "@everpiece/shared";
@@ -352,6 +353,7 @@ export default function Send() {
         <div className="stack">
           <StepHint step={3} of={3} />
           <h1>Check and send</h1>
+          {account && <SessionBar account={account} />}
           {method === "username" && found && instantAvailable() && (
             <>
               <div className="row" role="group" aria-label="How it arrives">

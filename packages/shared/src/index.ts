@@ -16,5 +16,6 @@ export * from "./funding.ts";
 export * from "./payout.ts";
 export * from "./automate.ts";
 export * from "./copilot.ts";
+export * from "./vault.ts";
 export * from "./earn.ts";
 export * from "./invest.ts";

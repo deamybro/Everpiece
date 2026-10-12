@@ -142,7 +142,7 @@ export async function deposit(account: Account, o: EarnOpportunity, assets: bigi
   const typed = usdc
     ? earnAuthorization(router, config.chainId, d, { address: usdc.address, eip712Name: usdc.eip712.name, eip712Version: usdc.eip712.version })
     : earnAusdAuthorization(router, config.chainId, d, getAddress(config.dollar.address), config.dollar.eip712Name);
-  const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(typed));
+  const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(typed), { spend: assets });
   const r = await relayer(usdc ? "/v1/earn/usdc/deposit" : "/v1/earn/deposit", { deposit: d, ausdSignature });
   if (r.status !== 202 && r.status !== 200) throw new PayError(r.body.error ?? "TRANSACTION_REVERTED");
   const done = await waitForRequest(r.body.requestId, onStatus);

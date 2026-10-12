@@ -130,7 +130,7 @@ export async function payV2(
   if (problem) throw new PayError(problem);
   const paymentId = paymentV2Id(config.payV2, payment, config.chainId);
   onStatus("SIGNING");
-  const signature = await withSigner(account, (signer) => signer.signTypedData(paymentV2Authorization(config.payV2, payment, config.chainId)));
+  const signature = await withSigner(account, (signer) => signer.signTypedData(paymentV2Authorization(config.payV2, payment, config.chainId)), { spend: maxSource });
   const r = await relayer(route === "DIRECT" ? "/v1/pay/v2/direct" : "/v1/pay/v2/convert", { payment, signature });
   if (r.status !== 202 && r.status !== 200) throw new PayError(r.body.error ?? "TRANSACTION_REVERTED");
   const done = await waitForRequest(r.body.requestId, onStatus);

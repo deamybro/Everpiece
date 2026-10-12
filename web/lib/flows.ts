@@ -52,6 +52,11 @@ export type SentPayment = {
   messageBind?: { locator: Hex; metadataSalt: Hex; bound: boolean };
 };
 
+/** Restore only: replaces this device's receipt list with the merged one (never touches funds). */
+export function saveSentList(list: SentPayment[]): void {
+  localStorage.setItem(SENT_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
 export function loadSent(): SentPayment[] {
   try {
     return JSON.parse(localStorage.getItem(SENT_KEY) ?? "[]") as SentPayment[];

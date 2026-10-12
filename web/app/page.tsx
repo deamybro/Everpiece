@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { SessionBar } from "../components/SessionBar";
+import { BackupCard } from "../components/BackupCard";
+import { vaultAvailable } from "../lib/vault";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Address, Hex } from "viem";
 import { NO_METADATA, PaymentMode, PaymentStatus } from "@everpiece/shared";
@@ -261,6 +264,7 @@ export default function Home() {
           <Link href="/scan" aria-label="Scan to pay"><span className="wa-icon"><Icon name="scan" /></span>Scan</Link>
           {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="wa-icon"><Icon name="add" /></span>Add</Link>}
         </nav>
+        {payV2Available() && <SessionBar account={account} />}
         <ul className="assets" aria-label="What you hold">
           {assetRows.length > 0 ? assetRows.map((r) => (
             <li key={r.symbol}>
@@ -304,6 +308,7 @@ export default function Home() {
             <span className="grow"><strong>Private</strong><span className="muted small">private balance and send</span></span>
           </Link>
         )}
+        {vaultAvailable() && <BackupCard account={account} />}
         <Link href="/invest" className="card settings-row" aria-label="Invest in stocks">
           <span className="settings-icon"><Icon name="activity" size={20} /></span>
           <span className="grow"><strong>Invest</strong><span className="muted small">tokenized US stocks</span></span>
