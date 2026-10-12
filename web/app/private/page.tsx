@@ -12,7 +12,7 @@ import { isMeraError } from "@category-labs/mera";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { PayError } from "../../lib/pay";
 import { UsernameError, findRecipient } from "../../lib/username";
-import { depositPrivate, joinPrivate, privateAvailable, privateBalance, privateStatus, sendPrivate, withdrawPrivate, type PrivateStatus } from "../../lib/private";
+import { PRIVATE_MIN_MON, depositPrivate, joinPrivate, privateAvailable, privateBalance, privateStatus, sendPrivate, withdrawPrivate, type PrivateStatus } from "../../lib/private";
 
 const errText = (e: unknown) => {
   if (e instanceof PayError || e instanceof UsernameError) return friendlyError(e.code);
@@ -60,7 +60,7 @@ export default function PrivatePage() {
 
   const amount = parseDollars(amountText);
   const over = amount !== null && amount > TACEO_MERCES_MONAD.maxAmountPerTx;
-  const needsMon = status !== null && status.mon === 0n;
+  const needsMon = status !== null && status.mon < PRIVATE_MIN_MON;
 
   async function run(label: string, fn: () => Promise<unknown>, ok: string) {
     if (!account) return;
@@ -108,8 +108,9 @@ export default function PrivatePage() {
       )}
       {needsMon && (
         <div className="status warn small">
-          Private payments are sent from your own account, so it needs a little MON for network fees (TACEO doesn&apos;t support
-          gas-free actions yet). Send a small amount of MON on Monad to {account.address}.
+          Private payments are sent from your own account, so it needs MON for network fees (TACEO doesn&apos;t support
+          gas-free actions yet). Monad requires the account to hold about 0.3 MON before it accepts the transaction, though far less is
+          spent. Send at least {formatEther(PRIVATE_MIN_MON - (status?.mon ?? 0n))} more MON on Monad to {account.address}.
         </div>
       )}
 

@@ -33,6 +33,13 @@ const taceoUrls = () => ({
 
 export const privateAvailable = () => flags.PRIVATE_PAYMENTS_ENABLED && config.chainId === T.chainId;
 
+/**
+ * Monad checks that an account can afford gas limit x max fee BEFORE it accepts a transaction (reproduced: joining asks
+ * for about 1.02 M gas at about 182 gwei, roughly 0.19 MON, even though less is spent). Below this, the network refuses
+ * with "Signer had insufficient balance", which the wallet library mislabels "Missing or invalid parameters".
+ */
+export const PRIVATE_MIN_MON = 300_000_000_000_000_000n; // 0.3 MON, with headroom
+
 export type PrivateStatus = { registered: boolean; mon: bigint; usdc: bigint };
 
 export async function privateStatus(who: Address): Promise<PrivateStatus> {
@@ -77,7 +84,7 @@ function mapError(e: unknown): Error {
   if (e instanceof AlreadyRegisteredInDifferentGroupError) return new PayError("PRIVATE_OTHER_GROUP");
   if (e instanceof ActionTimeoutError) return new PayError("PRIVATE_STILL_PROCESSING");
   const msg = String((e as Error)?.message ?? e);
-  if (/insufficient funds|gas/i.test(msg)) return new PayError("PRIVATE_NEEDS_MON");
+  if (/insufficient funds|insufficient balance|gas/i.test(msg)) return new PayError("PRIVATE_NEEDS_MON");
   return e instanceof Error ? e : new Error(msg);
 }
 

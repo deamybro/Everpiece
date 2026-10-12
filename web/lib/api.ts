@@ -75,7 +75,7 @@ export function friendlyError(code: string | undefined): string {
     PRIVATE_STILL_PROCESSING: "The private network is still processing. Check your private balance before trying again.",
     COPILOT_BUSY: "Copilot is busy with someone else. Try again in a moment.",
     COPILOT_UNAVAILABLE: "Copilot isn't available right now. You can still use the templates.",
-    PRIVATE_NEEDS_MON: "Your account needs a little MON for network fees to use private payments.",
+    PRIVATE_NEEDS_MON: "Your account needs about 0.3 MON on Monad for network fees to use private payments. Add some MON and try again.",
     PRIVATE_RECEIVER_NOT_JOINED: "They haven't joined private payments yet.",
     INSUFFICIENT_BALANCE: "You don't have enough for this payment.",
     PROVIDER_UNAVAILABLE: "Payments in other tokens are unavailable right now. Pay with Dollars instead.",
