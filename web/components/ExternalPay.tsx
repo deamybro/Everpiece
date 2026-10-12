@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getAddress, isAddress, type Address, type Hex } from "viem";
-import { fromBaseUnits, type FundingPhase, type FundingSource } from "@everpiece/shared";
+import { fromBaseUnits, toBaseUnits, type FundingPhase, type FundingSource } from "@everpiece/shared";
+import type { Recipient } from "../lib/username";
 import { QrCode } from "./QrCode";
 import { Progress } from "./status";
 import { config } from "../lib/config";
@@ -20,8 +21,13 @@ type Phase = "pick" | "quoting" | "deposit" | "done" | "refunded" | "failed";
  * address from their own wallet. Aurora delivers USDC to the requester on Monad; we track it to the delivery
  * transaction, which is the proof the directory checks. Nothing is simulated here unless the site says so.
  */
-export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
-  const { request, recipient } = loaded;
+export function ExternalPay({ loaded, to }: { loaded?: LoadedRequest; to?: Recipient }) {
+  const recipient = (loaded?.recipient ?? to) as Recipient;
+  const payTo = (loaded ? loaded.request.recipient : to?.account) as Address;
+  const [amountText, setAmountText] = useState("");
+  const typed = toBaseUnits(amountText, 6);
+  const amount: bigint | null = loaded ? loaded.request.amount : typed;
+  const request = { requestId: loaded?.request.requestId, amount: amount ?? 0n, asset: loaded?.request.asset };
   const [sources, setSources] = useState<FundingSource[]>([]);
   const [source, setSource] = useState<FundingSource | null>(null);
   const [refundTo, setRefundTo] = useState("");
@@ -31,7 +37,7 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
   const [moving, setMoving] = useState<FundingPhase | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
-  const asked = assetSymbol(request.asset);
+  const asked = request.asset ? assetSymbol(request.asset) : "USDC";
 
   useEffect(() => {
     loadExternalSources()
@@ -50,7 +56,7 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
         setMoving(s.phase);
         if (s.phase === "ARRIVED" && s.deliveredTxHash) {
           setPhase("done");
-          void reportPaid({ requestId: request.requestId, kind: "crossChain", txHash: s.deliveredTxHash as Hex });
+          if (request.requestId) void reportPaid({ requestId: request.requestId, kind: "crossChain", txHash: s.deliveredTxHash as Hex });
         } else if (s.phase === "REFUNDED") setPhase("refunded");
         else if (s.phase === "FAILED") setPhase("failed");
       } catch {
@@ -63,14 +69,14 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
       stop = true;
       clearInterval(t);
     };
-  }, [phase, quote, request.requestId]);
+  }, [phase, quote, request.requestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function getDepositAddress() {
-    if (!source || !isAddress(refundTo)) return;
+    if (!source || !isAddress(refundTo) || !amount || amount <= 0n) return;
     setPhase("quoting");
     setError("");
     try {
-      setQuote(await quoteTopUp(source, request.amount, request.recipient, getAddress(refundTo) as Address, confidential));
+      setQuote(await quoteTopUp(source, amount, payTo, getAddress(refundTo) as Address, confidential));
       setPhase("deposit");
     } catch (e) {
       setError(friendlyError(e instanceof PayError ? e.code : "PROVIDER_UNAVAILABLE"));
@@ -147,6 +153,12 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
           </label>
         ))}
       </div>
+      {!loaded && (
+        <div>
+          <label htmlFor="amt">How much {recipient.displayName} should receive (USDC)</label>
+          <input id="amt" inputMode="decimal" placeholder="e.g. 5.00" value={amountText} onChange={(e) => setAmountText(e.target.value.trim())} />
+        </div>
+      )}
       {source && (
         <div>
           <label htmlFor="refund">Your wallet address on {source.chainLabel} (for refunds)</label>
@@ -161,7 +173,7 @@ export function ExternalPay({ loaded }: { loaded: LoadedRequest }) {
         </label>
       )}
       {error && <div className="status bad">{error}</div>}
-      <button disabled={!source || !isAddress(refundTo) || phase === "quoting"} onClick={getDepositAddress}>
+      <button disabled={!source || !isAddress(refundTo) || !amount || amount <= 0n || phase === "quoting"} onClick={getDepositAddress}>
         {phase === "quoting" ? "Getting the deposit address…" : "Get deposit address"}
       </button>
       <p className="muted small">Cross-chain by Aurora Intents{config.funding === "simulated" ? " (simulated on this test site)" : ""}.</p>

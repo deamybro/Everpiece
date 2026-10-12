@@ -256,6 +256,7 @@ export default function Home() {
         {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
         <nav className="wallet-actions" aria-label="Pay and get paid">
           <Link href="/send" aria-label="Send money"><span className="wa-icon"><Icon name="send" /></span>Send</Link>
+          <Link href="/get-paid" aria-label="Get paid: your address and pay link"><span className="wa-icon"><Icon name="add" /></span>Receive</Link>
           <Link href="/request" aria-label="Request"><span className="wa-icon"><Icon name="request" /></span>Request</Link>
           <Link href="/scan" aria-label="Scan to pay"><span className="wa-icon"><Icon name="scan" /></span>Scan</Link>
           {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="wa-icon"><Icon name="add" /></span>Add</Link>}
