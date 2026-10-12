@@ -9,7 +9,7 @@ cd /opt/everpiece-mainnet
 rm -rf src/packages src/server
 tar -xzf b.tgz -C src && rm b.tgz
 cat > src/package.json <<'EOF'
-{ "name": "everpiece-mainnet", "private": true, "workspaces": ["packages/shared", "server/relayer", "server/directory", "server/voice", "server/automate"] }
+{ "name": "everpiece-mainnet", "private": true, "workspaces": ["packages/shared", "server/relayer", "server/directory", "server/voice", "server/automate", "server/claims"] }
 EOF
 (cd src && npm install --omit=dev --no-audit --no-fund 2>&1 | tail -1)
 
@@ -42,7 +42,19 @@ AUTOMATE_EXECUTOR=0x8AEDdD970373eB53Dc318f85a7854a444B13F2C6
 RELAYER_URL=http://127.0.0.1:47310
 TRUST_PROXY=1
 EOF
-chmod 644 voice.env automate.env
+cat > claims.env <<'EOF'
+MONAD_RPC=https://rpc.monad.xyz
+EXPECTED_CHAIN_ID=143
+HOST=127.0.0.1
+PORT=47314
+CLAIMS_DB_PATH=/opt/everpiece-mainnet/claims.sqlite
+ESCROW_ADDRESS=0x70ab17cFEe72fFd49F8C766692067D16965F5AA8
+SMS_PROVIDER=twilio
+EMAIL_PROVIDER=resend
+ALLOWED_ORIGIN=https://app.everpiece.xyz
+TRUST_PROXY=1
+EOF
+chmod 644 voice.env automate.env claims.env
 
 # --- the Automate service gets exactly two secrets, neither ever shown or copied elsewhere ------------------------------
 # automate.key: generated here on first start (gates the internal trigger route); RELAYER_INTERNAL_KEY: read from relayer.env.
@@ -59,6 +71,22 @@ cd src/server/automate
 exec /usr/bin/node src/main.ts
 EOF
 chmod 700 run-automate.sh
+
+# --- the claims service: secrets are read from root-only files at start, never copied into a unit or an env file ----------
+cat > run-claims.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cd /opt/everpiece-mainnet
+export APPROVER_PRIVATE_KEY="$(grep -i '^Private key' approver.txt | awk '{print $NF}')"
+export PHONE_ENC_KEY="$(cat phone-enc.key)"
+# provider credentials shared with the earlier stack; only these names are taken
+for k in TWILIO_API_USER TWILIO_API_SECRET TWILIO_VERIFY_SERVICE_SID RESEND_API_KEY EMAIL_FROM; do
+  export "$k=$(grep "^$k=" /opt/everpiece/.env | head -1 | cut -d= -f2-)"
+done
+cd src/server/claims
+exec /usr/bin/node src/main.ts
+EOF
+chmod 700 run-claims.sh
 
 unit() { # name, description, envfile, workdir, cmd, mem
   cat > "/etc/systemd/system/$1.service" <<EOF
@@ -84,9 +112,10 @@ EOF
 }
 unit everpiece-mainnet-voice "Everpiece MAINNET encrypted message store (localhost only)" /opt/everpiece-mainnet/voice.env /opt/everpiece-mainnet/src/server/voice "/usr/bin/node src/main.ts" 150M
 unit everpiece-mainnet-automate "Everpiece MAINNET Automate service (localhost only)" /opt/everpiece-mainnet/automate.env /opt/everpiece-mainnet/src/server/automate "/opt/everpiece-mainnet/run-automate.sh" 250M
+unit everpiece-mainnet-claims "Everpiece MAINNET claims service (localhost only)" /opt/everpiece-mainnet/claims.env /opt/everpiece-mainnet/src/server/claims "/opt/everpiece-mainnet/run-claims.sh" 200M
 systemctl daemon-reload
-systemctl enable everpiece-mainnet-voice everpiece-mainnet-automate >/dev/null 2>&1
-systemctl restart everpiece-mainnet-voice everpiece-mainnet-automate
+systemctl enable everpiece-mainnet-voice everpiece-mainnet-automate everpiece-mainnet-claims >/dev/null 2>&1
+systemctl restart everpiece-mainnet-voice everpiece-mainnet-automate everpiece-mainnet-claims
 systemctl restart everpiece-mainnet-relayer everpiece-mainnet-directory
 sleep 8
-for s in relayer directory voice automate web; do echo "$s: $(systemctl is-active everpiece-mainnet-$s)"; done
+for s in relayer directory voice automate claims web; do echo "$s: $(systemctl is-active everpiece-mainnet-$s)"; done
