@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { TACEO_MERCES_MONAD } from "@everpiece/shared";
 
 /**
  * Per-request nonce CSP (Next.js 16 `proxy`, docs: 02-guides/content-security-policy.md).
@@ -14,6 +15,8 @@ function origin(u: string | undefined): string {
   }
 }
 
+const PRIVACY_CONNECT = [...TACEO_MERCES_MONAD.nodeUrls.map(origin), origin(TACEO_MERCES_MONAD.complianceUrl)];
+
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
@@ -26,18 +29,20 @@ export function proxy(request: NextRequest) {
     origin(process.env.NEXT_PUBLIC_INDEXER_URL),
     origin(process.env.NEXT_PUBLIC_VOICE_URL),
     origin(process.env.NEXT_PUBLIC_DEV_FAUCET_URL),
+    // TACEO Merces (private payments): compliance check + the three query nodes; only when the feature is on
+    ...(process.env.NEXT_PUBLIC_PRIVATE_PAYMENTS_ENABLED === "true" ? PRIVACY_CONNECT : []),
   ]
     .filter(Boolean)
     .join(" ");
   const csp = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""};
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""};
     style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
     img-src 'self' blob: data:;
     media-src 'self' blob:;
     font-src 'self';
     connect-src ${connect};
-    worker-src 'self';
+    worker-src 'self' blob:;
     manifest-src 'self';
     object-src 'none';
     base-uri 'self';

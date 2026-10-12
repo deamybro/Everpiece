@@ -8,12 +8,18 @@ import { Welcome } from "../../components/Welcome";
 import { Progress } from "../../components/status";
 import { formatDollars, parseDollars } from "../../lib/chain";
 import { friendlyError } from "../../lib/api";
+import { isMeraError } from "@category-labs/mera";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { PayError } from "../../lib/pay";
 import { UsernameError, findRecipient } from "../../lib/username";
 import { depositPrivate, joinPrivate, privateAvailable, privateBalance, privateStatus, sendPrivate, withdrawPrivate, type PrivateStatus } from "../../lib/private";
 
-const errText = (e: unknown) => (e instanceof PayError || e instanceof UsernameError ? friendlyError(e.code) : friendlyPasskeyError(e));
+const errText = (e: unknown) => {
+  if (e instanceof PayError || e instanceof UsernameError) return friendlyError(e.code);
+  // an error that is not about the fingerprint (e.g. the private-payments network call) is shown as what it is
+  if (e instanceof Error && !isMeraError(e) && e.message !== "WrongPasskey") return `Private payments: ${e.message.slice(0, 140)}`;
+  return friendlyPasskeyError(e);
+};
 
 /** Private Balance and Private Send (TACEO Merces): optional, small, and honest about what is and isn't private. */
 export default function PrivatePage() {
