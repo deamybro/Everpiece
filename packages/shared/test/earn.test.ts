@@ -87,17 +87,19 @@ test("Aave rate conversion: 3.0891e25 ray ≈ 3.09% APR, APY slightly higher; di
   assert.ok(r.apyBps >= 313 && r.apyBps <= 314);
 });
 
-test("registry: the mainnet opportunities are exactly the verified Aave AUSD and USDC wrappers; no APY constant anywhere", () => {
+test("registry: the mainnet opportunities are exactly the verified Aave AUSD/USDC wrappers and Morpho's listed AUSD vault; no APY constant anywhere", () => {
   assert.deepEqual(
     EARN_OPPORTUNITIES.map((o) => [o.id, o.vault, o.asset]),
     [
       ["aave-v3-ausd", "0x9e1AcC5BFbf34e2E579763cE14042d957719fE76", "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a"],
+      ["morpho-grove-steakhouse-ausd", "0x32841A8511D5c2c5b253f45668780B99139e476D", "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a"],
       ["aave-v3-usdc", "0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2", "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"],
     ],
   );
   for (const o of EARN_OPPORTUNITIES) {
-    assert.equal(o.rateSource.kind, "AAVE_V3_LIQUIDITY_RATE");
-    assert.ok(o.rateSource.kind === "AAVE_V3_LIQUIDITY_RATE" && o.rateSource.reserve === o.asset);
+    assert.ok(o.rateSource.kind === "AAVE_V3_LIQUIDITY_RATE" || o.rateSource.kind === "MORPHO_API");
+    if (o.rateSource.kind === "AAVE_V3_LIQUIDITY_RATE") assert.equal(o.rateSource.reserve, o.asset);
+    if (o.rateSource.kind === "MORPHO_API") assert.equal(o.rateSource.vault, o.vault);
     assert.ok(!JSON.stringify(o).match(/apy|apr/i));
   }
 });

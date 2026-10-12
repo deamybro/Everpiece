@@ -22,7 +22,7 @@ contract EverpieceEarnMainnetForkTest is Test {
     bytes32 constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     uint256 constant PK = 0xE4A1;
     /// Relayer gas limits (server/relayer config + test/gasLimits.test.ts). Monad charges the full limit.
-    uint256 constant LIMIT_EARN_DEPOSIT = 800_000;
+    uint256 constant LIMIT_EARN_DEPOSIT = 850_000;
     uint256 constant LIMIT_EARN_WITHDRAW = 750_000;
 
     EverpieceEarn earn;

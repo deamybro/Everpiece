@@ -138,7 +138,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayerConfig 
       payWithAusd: big(env, "GAS_LIMIT_PAY_AUSD", 280_000n), // ≤ 255,331 (live testnet: 223,216)
       payWithToken: big(env, "GAS_LIMIT_PAY_TOKEN", 550_000n), // ≤ 520,398 USDC on mainnet; 449,716 CTK on testnet (live: 400,622)
       // EverpieceEarnFork.t.sol, real Aave waMonAUSD, cold state: deposit 660,269, withdraw 595,649
-      earnDeposit: big(env, "GAS_LIMIT_EARN_DEPOSIT", 800_000n),
+      earnDeposit: big(env, "GAS_LIMIT_EARN_DEPOSIT", 850_000n),
       earnWithdraw: big(env, "GAS_LIMIT_EARN_WITHDRAW", 750_000n),
       // RelayerGasV2.t.sol, real Aave waMonUSDC, cold state: USDC Earn deposit 765,136, withdraw 643,800
       earnUsdcDeposit: big(env, "GAS_LIMIT_EARN_USDC_DEPOSIT", 820_000n),

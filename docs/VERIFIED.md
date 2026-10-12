@@ -810,3 +810,9 @@ BODY`, plus headers `x-api-chain-id` and `x-api-p: Anchored`.
 - TODO(VERIFY): Safe UI/Transaction Service on 143 via a test Safe, before transferring escrow ownership (see §4.3).
 - TODO(VERIFY): `@noble/curves` random secp256k1 key API name in the installed version (link package, Oct 4).
 - TODO(VERIFY): USDC / CCTP on Monad — Circle docs (only if cash-out via CCTP is pursued).
+
+### 4.21 Morpho "Grove x Steakhouse High Yield AUSD" vault (Monad mainnet) — checked 2026-10-12
+- Vault `0x32841A8511D5c2c5b253f45668780B99139e476D`: MetaMorpho ERC-4626 + ERC-2612; `asset()` = AUSD; listed by Morpho (api.morpho.org `vaultByAddress`, chain 143).
+- Read on a mainnet fork (`MorphoEarnFork.t.sol`): curator `0x827e8607…eCdB`, timelock 1,209,600 s (14 days), performance fee 0, supply queue length 5.
+- Deposit via AUSD ERC-3009 authorization and withdraw via share permit work through EverpieceEarn with principal intact; measured gas deposit ~739,590, withdraw ~660,258 (relayer earnDeposit limit raised to 850,000).
+- The rate is read live from Morpho's API (`netApy`); no APY constant is stored anywhere.

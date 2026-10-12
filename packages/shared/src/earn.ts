@@ -24,7 +24,11 @@ export type EarnOpportunity = {
   vault: Address;
   accounting: AccountingModel;
   /** Where the live rate comes from (never a hardcoded APY). */
-  rateSource: { kind: "AAVE_V3_LIQUIDITY_RATE"; pool: Address; reserve: Address } | { kind: "SIMULATED" };
+  rateSource:
+    | { kind: "AAVE_V3_LIQUIDITY_RATE"; pool: Address; reserve: Address }
+    /** Morpho's public API reports the vault's net APY (after fees); read live, never a constant. */
+    | { kind: "MORPHO_API"; vault: Address; chainId: number }
+    | { kind: "SIMULATED" };
   simulated: boolean;
   /** Plain-language risks shown before any deposit. */
   risks: string[];
@@ -51,6 +55,25 @@ export const EARN_OPPORTUNITIES: readonly EarnOpportunity[] = [
       "Smart-contract and oracle risk of Aave. Not insured, not a bank deposit.",
     ],
     source: "https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol",
+  },
+  {
+    // VERIFIED §4.21: Morpho MetaMorpho vault, LISTED by Morpho; asset() = AUSD; ERC-4626 + ERC-2612 (EIP-712 name "", v1).
+    id: "morpho-grove-steakhouse-ausd",
+    chainId: MONAD_MAINNET_CHAIN_ID,
+    provider: "Morpho",
+    name: "Morpho · Grove x Steakhouse AUSD",
+    asset: AUSD_MAINNET,
+    vault: "0x32841A8511D5c2c5b253f45668780B99139e476D",
+    accounting: "ERC4626_MONOTONIC",
+    rateSource: { kind: "MORPHO_API", vault: "0x32841A8511D5c2c5b253f45668780B99139e476D", chainId: MONAD_MAINNET_CHAIN_ID },
+    simulated: false,
+    risks: [
+      "The rate changes all the time; it comes from the markets this vault lends into.",
+      "A curator (Steakhouse, with Grove) chooses where the money is lent; changes are delayed by a 14-day timelock.",
+      "Withdrawals depend on free liquidity in those markets. A bad debt in a market can reduce the vault's value.",
+      "Smart-contract risk of Morpho and the markets. Not insured, not a bank deposit.",
+    ],
+    source: "https://app.morpho.org (listed vault); https://docs.morpho.org",
   },
   {
     // VERIFIED §4.18: "Wrapped Aave Monad USDC" (EIP-712 v1, 6 dp), asset() = USDC, aToken 0x35a7…6042.

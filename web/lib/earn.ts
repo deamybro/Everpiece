@@ -32,7 +32,7 @@ import { PayError } from "./pay";
  * always belong to the owner; nothing here is custodial.
  */
 
-export const earnAvailable = () => Boolean(config.earn && config.earnVault) || usdcEarnAvailable();
+export const earnAvailable = () => Boolean(config.earn && (config.earnVault || config.chainId === 143)) || usdcEarnAvailable();
 const usdcEarnAvailable = () => Boolean(config.earnUsdc) && config.chainId === 143;
 const USDC_OPP = () => EARN_OPPORTUNITIES.find((o) => o.id === "aave-v3-usdc" && o.chainId === config.chainId);
 
@@ -45,10 +45,16 @@ export function opportunities(): EarnOpportunity[] {
   const out: EarnOpportunity[] = [];
   const u = USDC_OPP();
   if (usdcEarnAvailable() && u) out.push(u);
-  const a = config.earn && config.earnVault ? opportunity() : null;
-  if (a) out.push(a);
+  if (config.chainId === 143 && config.earn) {
+    // mainnet AUSD Earn: every verified AUSD vault in the registry (Aave and Morpho), all held by the one EverpieceEarn
+    out.push(...EARN_OPPORTUNITIES.filter((o) => o.chainId === 143 && o.asset.toLowerCase() === AUSD_LOWER && o.id !== "aave-v3-usdc"));
+  } else {
+    const a = config.earn && config.earnVault ? opportunity() : null;
+    if (a) out.push(a);
+  }
   return out;
 }
+const AUSD_LOWER = "0x00000000efe302beaa2b3e6e1b18d08d69a9012a";
 
 export function opportunity(): EarnOpportunity | null {
   if (!(config.earn && config.earnVault)) return USDC_OPP() && usdcEarnAvailable() ? USDC_OPP()! : null;
@@ -65,6 +71,19 @@ const aavePool = parseAbi([
 
 /** The live rate, from its source (never a constant). null = simulated or unreadable. */
 export async function currentRate(o: EarnOpportunity): Promise<{ aprBps: number; apyBps: number } | null> {
+  if (o.rateSource.kind === "MORPHO_API") {
+    try {
+      const r = await fetch("https://api.morpho.org/graphql", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query: `{ vaultByAddress(address: "${o.rateSource.vault}", chainId: ${o.rateSource.chainId}) { state { netApy apy } } }` }),
+      });
+      const s = ((await r.json()) as { data?: { vaultByAddress?: { state?: { netApy?: number; apy?: number } } } }).data?.vaultByAddress?.state;
+      if (!s || typeof s.netApy !== "number" || !Number.isFinite(s.netApy) || s.netApy < 0 || s.netApy > 5) return null; // implausible = unavailable
+      return { aprBps: Math.round((s.apy ?? s.netApy) * 10_000), apyBps: Math.round(s.netApy * 10_000) };
+    } catch {
+      return null;
+    }
+  }
   if (o.rateSource.kind !== "AAVE_V3_LIQUIDITY_RATE") return null;
   try {
     const r = await client.readContract({ address: o.rateSource.pool, abi: aavePool, functionName: "getReserveData", args: [o.rateSource.reserve] });

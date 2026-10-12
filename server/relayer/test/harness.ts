@@ -88,7 +88,7 @@ export function baseConfig(rpc: string, escrow: Address, over: Partial<RelayerCo
     port: 0,
     host: "127.0.0.1",
     dbPath: ":memory:",
-    gasLimits: { createPayment: 350_000n, claimUsernamePayment: 215_000n, claimLinkPayment: 240_000n, cancel: 195_000n, refundExpired: 145_000n, payWithAusd: 200_000n, payWithToken: 420_000n, earnDeposit: 800_000n, earnWithdraw: 750_000n, payV2Direct: 340_000n, payV2Convert: 800_000n, earnUsdcDeposit: 820_000n, earnUsdcWithdraw: 700_000n, automateActivate: 400_000n, automateRevoke: 120_000n, automateExecute: 830_000n },
+    gasLimits: { createPayment: 350_000n, claimUsernamePayment: 215_000n, claimLinkPayment: 240_000n, cancel: 195_000n, refundExpired: 145_000n, payWithAusd: 200_000n, payWithToken: 420_000n, earnDeposit: 850_000n, earnWithdraw: 750_000n, payV2Direct: 340_000n, payV2Convert: 800_000n, earnUsdcDeposit: 820_000n, earnUsdcWithdraw: 700_000n, automateActivate: 400_000n, automateRevoke: 120_000n, automateExecute: 830_000n },
     maxConvertSlippageBps: 50n,
     escrowAsset: { address: AUSD_ADDRESS, eip712Name: "Agora Dollar", eip712Version: "1" },
     flags: readFlags({ USDC_PAYMENTS_ENABLED: "true", AUSD_PAYMENTS_ENABLED: "true", AGORA_SETTLEMENT_ENABLED: "true", DEX_AUSD_FALLBACK_ENABLED: "true", EARN_ENABLED: "true", AUTOMATE_ENABLED: "true" }),
