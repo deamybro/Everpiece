@@ -121,6 +121,7 @@ export default function PrivatePage() {
           </button>
         </>
       )}
+      <p className="muted small">build {process.env.NEXT_PUBLIC_BUILD_ID ?? "dev"}</p>
 
       {status?.registered && (
         <>
