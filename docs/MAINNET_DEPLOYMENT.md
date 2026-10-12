@@ -42,3 +42,8 @@ All on the VPS under `/opt/everpiece-mainnet`, each a separate systemd service b
 
 Canaries on mainnet (all passed, $1 each): AUSD direct, USDC direct, USDC escrow create/claim/forward, AUSD→USDC conversion via Uniswap v4,
 USDC Earn in/out, Automate grant + unattended run + revoke.
+
+## AUSD Earn (2026-10-12)
+EverpieceEarn (AUSD) `0x4bb7d4ce29f7c8410576cdf084637c790fd44e5a`, tx `0x1d3f307d…33e6e7`, block 112,736,995 (finalized), deployer `0xB065b91A2aEDe8A51eF9D453e37Fe67164DB781d` (key on the VPS, root-only).
+Vaults allow-listed (read back): Aave waMonAUSD `0x9e1AcC5B…fE76`, Morpho Grove x Steakhouse AUSD `0x32841A85…476D`; AUSD = `0x0000…012a`.
+Not done: relayer `EARN_ADDRESS`, web rebuild, canary (needs a GO).
