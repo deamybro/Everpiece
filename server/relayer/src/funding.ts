@@ -86,9 +86,11 @@ export class Funding {
   private async tokenList(): Promise<unknown[] | null> {
     if (this.tokens && this.now() - this.tokens.at < TOKENS_TTL_MS) return this.tokens.list;
     const r = await this.upstream(`tokens/${this.cfg.apiKey}`);
-    if (r.status !== 200 || !Array.isArray(r.body)) return this.tokens?.list ?? null;
-    this.tokens = { at: this.now(), list: r.body };
-    return r.body;
+    // The live API answers { asset_stats: [...], tokens: [...] } (seen 2026-10-12); a bare array is accepted too.
+    const list = Array.isArray(r.body) ? r.body : Array.isArray((r.body as { tokens?: unknown } | null)?.tokens) ? (r.body as { tokens: unknown[] }).tokens : null;
+    if (r.status !== 200 || !list) return this.tokens?.list ?? null;
+    this.tokens = { at: this.now(), list };
+    return list;
   }
 
   private async resolve(): Promise<{ sources: FundingSource[]; destination: string; destinationDecimals: number } | ApiResult> {

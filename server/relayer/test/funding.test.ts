@@ -41,7 +41,8 @@ function cfg(apiUrl: string): FundingConfig {
 
 /** A well-behaved Aurora: echoes the request and quotes 1% more in than out. */
 function honest(s: Seen, tweak: (q: Record<string, unknown>, r: Record<string, unknown>) => void = () => {}) {
-  if (s.method === "GET" && s.url === `/api/tokens/${KEY}`) return { status: 200, body: TOKENS };
+  // the live API wraps the list (seen 2026-10-12): { asset_stats, tokens }
+  if (s.method === "GET" && s.url === `/api/tokens/${KEY}`) return { status: 200, body: { asset_stats: [], tokens: TOKENS } };
   if (s.method === "POST" && s.url === `/api/quote/${KEY}`) {
     const req = s.body as Record<string, string>;
     const out = BigInt(req.amount);
