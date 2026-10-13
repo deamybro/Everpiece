@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   poweredByHeader: false,
   // A self-contained server bundle: the VPS runs it without installing the workspace (its memory is shared).
-  output: "standalone",
   // @taceo/merces-client (Private Send) has a Node-only branch (fs/promises for file: URLs); the app never takes it.
   turbopack: { resolveAlias: { "fs/promises": "./lib/empty-fs.ts" } },
   reactStrictMode: true,

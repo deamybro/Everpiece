@@ -172,11 +172,11 @@ export default function RequestPage() {
       {payoutAvailable() && (
         <div className="row" role="group" aria-label="Receive as">
           <button className={currency === "USD" ? "" : "secondary"} aria-pressed={currency === "USD"} onClick={() => setCurrency("USD")}>Dollars</button>
-          <button className={currency === "NGN" ? "" : "secondary"} aria-pressed={currency === "NGN"} onClick={() => setCurrency("NGN")}>Naira to my bank</button>
+          <button className={currency === "NGN" ? "" : "secondary"} aria-pressed={currency === "NGN"} onClick={() => setCurrency("NGN")}>Naira · provider tools</button>
         </div>
       )}
-      {currency === "NGN" ? <NairaRequest account={account} /> : <>
-      {!account.username && <div className="status warn">Pick your @username on Home first, so people can see who they&apos;re paying.</div>}
+      {currency === "NGN" ? <><p className="muted small">Local fiat conversion is coming soon. Existing provider tools retain their availability and simulation checks.</p><NairaRequest account={account} /></> : <>
+      {!account.username && <div className="status warn">Pick your @username in <Link href="/profile">Profile</Link> first, so people can see who they&apos;re paying.</div>}
       <div className="money">
         <span className="sign" aria-hidden="true">$</span>
         <input className="big" inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount to request" />

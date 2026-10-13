@@ -1,5 +1,12 @@
 /** Small stroke icons (24px grid, currentColor), drawn here so the app needs no icon library. */
 const PATHS: Record<string, string> = {
+  earn: "M4 13v7h4v-7H4ZM10 9v11h4V9h-4ZM16 4v16h4V4h-4",
+  invest: "M4 20V10M10 20V7M16 20V3M3 7l6-4 5 2 6-4",
+  automate: "M9 15a4 4 0 0 1 0-6l2-2a4 4 0 0 1 6 6M15 9a4 4 0 0 1 0 6l-2 2a4 4 0 0 1-6-6M9 15l6-6",
+  settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Z",
+  lock: "M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5V10ZM12 14v3",
+  copy: "M8 8h12v12H8V8ZM16 8V4H4v12h4",
+  help: "M9 8a3 3 0 0 1 6 0c0 2-3 2-3 4M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
   send: "M7 17 17 7M8 7h9v9",
   request: "M17 7 7 17M16 17H7V8",
   scan: "M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10",
