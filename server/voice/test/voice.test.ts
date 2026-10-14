@@ -16,7 +16,7 @@ const ROOT: Hex = `0x${"ab".repeat(32)}`;
 const cfg: VoiceConfig = {
   rpcUrl: "http://127.0.0.1:1", expectedChainId: 143, escrow: "0x00000000000000000000000000000000000000E5",
   port: 0, host: "127.0.0.1", dbPath: ":memory:", allowedOrigin: "http://localhost:3000",
-  perIpPerMinute: 1000, uploadsPerIpPerDay: 3, maxTotalBytes: 1_000_000, unboundHours: 24, keepAfterExpiryDays: 15,
+  perIpPerMinute: 1000, maxVaults: 2, uploadsPerIpPerDay: 3, maxTotalBytes: 1_000_000, unboundHours: 24, keepAfterExpiryDays: 15,
 };
 /** In-memory chain: paymentId → on-chain payment. */
 const chain = new Map<string, OnchainPayment>();
@@ -166,5 +166,59 @@ test("HTTP: PUT/GET bytes, CORS for the web origin, content-type checks", async 
     assert.equal((await fetch(`${base}/healthz`)).status, 200);
   } finally {
     server.close();
+  }
+});
+
+// ── encrypted address-book vault ──────────────────────────────────────────────────────────────────────────────────────
+import { privateKeyToAccount } from "viem/accounts";
+import { vaultBackupTyped, vaultHashOf } from "@everpiece/shared";
+
+const vaultJson = (tag = "a") => JSON.stringify({ version: 1, credential: { credentialId: "c" }, prfSalt: "s", nonce: "n", ciphertext: tag });
+async function backupBody(pk: Hex, vault: string, seq: number, deadlineOffsetSec = 300) {
+  const acct = privateKeyToAccount(pk);
+  const deadline = BigInt(Math.floor(clock / 1000) + deadlineOffsetSec);
+  const signature = await acct.signTypedData(vaultBackupTyped(cfg.escrow, { account: acct.address, vaultHash: vaultHashOf(vault), seq: BigInt(seq), deadline }, 143));
+  return { account: acct.address, body: { vault, seq: String(seq), deadline: String(deadline), signature } };
+}
+const K1: Hex = `0x${"01".repeat(32)}`;
+const K2: Hex = `0x${"02".repeat(32)}`;
+
+test("vault: the owner can store and read it back; only a higher sequence replaces it", async () => {
+  const s = service();
+  const a = await backupBody(K1, vaultJson("one"), 1);
+  assert.equal((await s.putVault(a.account, a.body, "ip")).httpStatus, 200);
+  const got = s.getVault(a.account, "ip");
+  assert.equal(got.httpStatus, 200);
+  assert.equal((got.body as any).vault, vaultJson("one"));
+  const replay = await s.putVault(a.account, a.body, "ip");
+  assert.equal(replay.httpStatus, 409); // the same or an older sequence never replaces what is stored
+  const b = await backupBody(K1, vaultJson("two"), 2);
+  assert.equal((await s.putVault(b.account, b.body, "ip")).httpStatus, 200);
+  assert.equal((s.getVault(a.account, "ip").body as any).seq, 2);
+  assert.equal(s.getVault("0x" + "00".repeat(20), "ip").httpStatus, 404);
+});
+
+test("vault: nobody else can write someone's vault, and the signature binds the exact vault and a short deadline", async () => {
+  const s = service();
+  const mine = await backupBody(K1, vaultJson("mine"), 1);
+  const stolen = { ...(await backupBody(K2, vaultJson("evil"), 1)).body };
+  assert.equal((await s.putVault(mine.account, stolen, "ip")).httpStatus, 401); // signed by another key
+  assert.equal((await s.putVault(mine.account, { ...mine.body, vault: vaultJson("changed") }, "ip")).httpStatus, 401); // different vault than signed
+  const late = await backupBody(K1, vaultJson("x"), 1, 3600);
+  assert.equal((await s.putVault(late.account, late.body, "ip")).httpStatus, 400); // deadline too far ahead
+  const old = await backupBody(K1, vaultJson("x"), 1, -10);
+  assert.equal((await s.putVault(old.account, old.body, "ip")).httpStatus, 400);
+  assert.equal(s.getVault(mine.account, "ip").httpStatus, 404); // nothing was stored by any of those
+});
+
+test("vault: only things shaped like a Mera secret vault, within the size and count limits", async () => {
+  const s = service();
+  const notVault = await backupBody(K1, JSON.stringify({ hello: "world" }), 1);
+  assert.equal((await s.putVault(notVault.account, notVault.body, "ip")).httpStatus, 400);
+  const huge = await backupBody(K1, vaultJson("x".repeat(70_000)), 1);
+  assert.equal((await s.putVault(huge.account, huge.body, "ip")).httpStatus, 413);
+  for (const [i, pk] of ([K1, K2, `0x${"03".repeat(32)}`] as Hex[]).entries()) {
+    const v = await backupBody(pk, vaultJson(String(i)), 1);
+    assert.equal((await s.putVault(v.account, v.body, "ip")).httpStatus, i < 2 ? 200 : 507); // maxVaults = 2 in this test
   }
 });

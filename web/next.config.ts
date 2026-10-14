@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   poweredByHeader: false,
+  // A self-contained server bundle: the VPS runs it without installing the workspace (its memory is shared).
+  // @taceo/merces-client (Private Send) has a Node-only branch (fs/promises for file: URLs); the app never takes it.
+  turbopack: { resolveAlias: { "fs/promises": "./lib/empty-fs.ts" } },
   reactStrictMode: true,
   // Last-mile payouts (docs/PAYOUT.md): the payout server is reached through the app's own origin on stacks that run
   // it next to the web (PAYOUT_INTERNAL_URL at build time), so no extra public route is needed on the host.
@@ -31,6 +35,11 @@ const nextConfig: NextConfig = {
       },
       // Claim pages and anything secret-adjacent are never cached (master §2.6).
       { source: "/c/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      {
+        // static owner-only page (scripts/styles are same-origin files; no network, no framing)
+        source: "/owner-set-approver.:ext",
+        headers: [{ key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'" }],
+      },
       {
         source: "/sw.js",
         headers: [

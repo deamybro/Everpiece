@@ -41,7 +41,8 @@ test("validation: allocation must be exactly 100%, limits ordered, expiry bounde
   assert.equal(ruleSpecProblem({ ...split, limits: { ...split.limits, maxPerExecution: $(2000) } }, NOW), "INVALID_LIMITS");
   assert.equal(ruleSpecProblem({ ...split, limits: { ...split.limits, expiresAt: NOW } }, NOW), "RULE_EXPIRED");
   assert.equal(ruleSpecProblem({ ...split, limits: { ...split.limits, expiresAt: NOW + 400n * 86_400n } }, NOW), "EXPIRY_TOO_FAR");
-  assert.equal(ruleSpecProblem({ ...split, authorization: "BOUNDED_MODULE" }, NOW), "AUTHORIZATION_NOT_AVAILABLE");
+  // BOUNDED_MODULE is a valid spec; whether it can run depends on a verified on-chain grant (server/automate)
+  assert.equal(ruleSpecProblem({ ...split, authorization: "BOUNDED_MODULE" }, NOW), null);
   assert.equal(ruleSpecProblem({ ...split, actions: [{ kind: "BUY_STOCK", bps: 0, assetId: "aNVDA" }, { kind: "KEEP_BALANCE", bps: 10_000 }] }, NOW), "INVALID_ALLOCATION");
 });
 

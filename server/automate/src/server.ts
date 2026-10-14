@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AutomateService, Result } from "./service.ts";
 import { log } from "./log.ts";
+import type { Copilot } from "./copilot.ts";
 
 const MAX_BODY = 16_384;
 
@@ -28,7 +29,7 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   }
 }
 
-export function createAutomateServer(svc: AutomateService): Server {
+export function createAutomateServer(svc: AutomateService, copilot?: Copilot | null): Server {
   const origin = svc.cfg.allowedOrigin;
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -49,11 +50,17 @@ export function createAutomateServer(svc: AutomateService): Server {
       const limited = svc.limited(ip, req.method === "GET");
       if (limited) return send(res, limited, origin);
       let m: RegExpExecArray | null;
+      if (p === "/v1/automate/copilot/propose" && req.method === "POST") {
+        if (!copilot) return send(res, { httpStatus: 404, body: { error: "NotFound" } }, origin);
+        return send(res, await copilot.propose(await readJson(req), ip), origin);
+      }
+      if (req.method === "GET" && p === "/v1/automate/copilot") return send(res, { httpStatus: 200, body: { available: Boolean(copilot) } }, origin);
       if (req.method === "POST" && p === "/v1/automate/rules") return send(res, await svc.putRule(await readJson(req)), origin);
       if (req.method === "GET" && (m = /^\/v1\/automate\/rules\/(0x[0-9a-fA-F]{40})$/.exec(p))) return send(res, svc.rules(m[1]), origin);
       if (req.method === "GET" && (m = /^\/v1\/automate\/executions\/by-owner\/(0x[0-9a-fA-F]{40})$/.exec(p))) return send(res, svc.executions(m[1]), origin);
       if (req.method === "GET" && (m = /^\/v1\/automate\/executions\/(0x[0-9a-fA-F]{64})$/.exec(p))) return send(res, svc.execution(m[1]), origin);
       if (req.method === "POST" && p === "/v1/automate/legs") return send(res, await svc.reportLeg(await readJson(req)), origin);
+      if (req.method === "POST" && p === "/v1/automate/grants") return send(res, await svc.linkGrant(await readJson(req)), origin);
       return send(res, { httpStatus: 404, body: { error: "NotFound" } }, origin);
     } catch (e) {
       const x = e as { status?: number; code?: string };

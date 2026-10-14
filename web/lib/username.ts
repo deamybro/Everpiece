@@ -57,6 +57,13 @@ async function verified(r: DirectoryRecord): Promise<Recipient> {
 
 // ── TOFU pinning (master §10.2–10.3) ────────────────────────────────────────────────────────────────────────────
 const PINS_KEY = "everpiece.pins.v1";
+/** Contacts this device has pinned (the address book backup reads and, on restore, only ever adds to this). */
+export function loadPins(): Record<string, Address> {
+  return pins();
+}
+export function savePins(p: Record<string, Address>): void {
+  localStorage.setItem(PINS_KEY, JSON.stringify(p));
+}
 function pins(): Record<string, Address> {
   try {
     return JSON.parse(localStorage.getItem(PINS_KEY) ?? "{}") as Record<string, Address>;

@@ -1,5 +1,5 @@
 // The relayer's default gas limits must be exactly the ones the fork tests prove sufficient (measured worst case on
-// real AUSD + headroom): contracts/test/fork/RelayerGas.t.sol (escrow, pay) and EverpieceEarnFork.t.sol (Earn, real
+// real AUSD + headroom): contracts/test/fork/RelayerGas.t.sol (escrow, pay), RelayerGasV2.t.sol (PayV2) and EverpieceEarnFork.t.sol (Earn, real
 // Aave). Changing one without the other fails here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { loadConfig } from "../src/config.ts";
 
 const read = (f: string) => readFileSync(new URL(`../../../contracts/test/fork/${f}`, import.meta.url), "utf8");
-const sources = { "RelayerGas.t.sol": read("RelayerGas.t.sol"), "EverpieceEarnFork.t.sol": read("EverpieceEarnFork.t.sol") };
+const sources = { "RelayerGas.t.sol": read("RelayerGas.t.sol"), "EverpieceEarnFork.t.sol": read("EverpieceEarnFork.t.sol"), "RelayerGasV2.t.sol": read("RelayerGasV2.t.sol") };
 const solLimit = (file: keyof typeof sources, name: string): bigint => {
   const m = new RegExp(`uint256 constant ${name} = ([0-9_]+);`).exec(sources[file]);
   assert.ok(m, `${name} not found in ${file}`);
@@ -26,6 +26,13 @@ test("relayer gas limits == the fork-tested limits", () => {
     ["payWithToken", "RelayerGas.t.sol", "LIMIT_PAY_TOKEN"],
     ["earnDeposit", "EverpieceEarnFork.t.sol", "LIMIT_EARN_DEPOSIT"],
     ["earnWithdraw", "EverpieceEarnFork.t.sol", "LIMIT_EARN_WITHDRAW"],
+    ["payV2Direct", "RelayerGasV2.t.sol", "LIMIT_PAY_V2_DIRECT"],
+    ["payV2Convert", "RelayerGasV2.t.sol", "LIMIT_PAY_V2_CONVERT"],
+    ["earnUsdcDeposit", "RelayerGasV2.t.sol", "LIMIT_EARN_USDC_DEPOSIT"],
+    ["earnUsdcWithdraw", "RelayerGasV2.t.sol", "LIMIT_EARN_USDC_WITHDRAW"],
+    ["automateActivate", "RelayerGasV2.t.sol", "LIMIT_AUTOMATE_ACTIVATE"],
+    ["automateRevoke", "RelayerGasV2.t.sol", "LIMIT_AUTOMATE_REVOKE"],
+    ["automateExecute", "RelayerGasV2.t.sol", "LIMIT_AUTOMATE_EXECUTE"],
   ];
   assert.deepEqual(Object.keys(c.gasLimits).sort(), pairs.map(([k]) => k).sort(), "every relayer method is fork-tested");
   for (const [method, file, constant] of pairs) assert.equal(c.gasLimits[method], solLimit(file, constant), method);

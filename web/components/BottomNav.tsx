@@ -4,23 +4,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 
-/** Slush-style bottom tab bar. Hidden on pages a recipient opens from a link (claim, pay-a-request, receipts). */
+/** Main places only: financial forms and public receipts keep their full viewport. */
 const TABS = [
-  { href: "/", label: "Home", icon: "home" },
-  { href: "/bank", label: "Bank", icon: "bank" },
-  { href: "/scan", label: "Scan", icon: "scan", primary: true },
-  { href: "/#activity", label: "Activity", icon: "activity" },
-  { href: "/receive", label: "Receive", icon: "user" },
+  { href: "/dashboard", label: "Home", icon: "home" },
+  { href: "/earn", label: "Earn", icon: "earn" },
+  { href: "/invest", label: "Invest", icon: "invest" },
+  { href: "/automate", label: "Automate", icon: "automate" },
+  { href: "/profile", label: "Profile", icon: "user" },
 ] as const;
 
 export function BottomNav() {
   const path = usePathname() ?? "/";
-  // only on the app's "places" (like Slush): never over a flow, a claim link, a receipt or a payment screen
-  if (path !== "/" && path !== "/receive" && path !== "/scan") return null;
+  // Keep primary mobile navigation in its own row across the main app screens.
+  if (!["/", "/dashboard", "/send", "/scan", "/request", "/receive", "/earn", "/invest", "/automate", "/activity", "/profile", "/settings", "/get-paid", "/private"].includes(path)) return null;
   return (
     <nav className="tabbar" aria-label="Main">
       {TABS.map((t) => {
-        const active = t.href === "/" ? path === "/" : t.href !== "/#activity" && path.startsWith(t.href);
+        const active = path.startsWith(t.href);
         return (
           <Link key={t.label} href={t.href} className={`tab${active ? " active" : ""}${"primary" in t ? " primary" : ""}`} aria-current={active ? "page" : undefined}>
             <span className="tab-icon"><Icon name={t.icon} size={22} /></span>

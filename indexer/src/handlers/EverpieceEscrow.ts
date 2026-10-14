@@ -129,6 +129,38 @@ indexer.onEvent({ contract: "EverpieceEscrow", event: "PaymentRefunded" }, async
   await settle("REFUNDED", { paymentId: p.paymentId, actor: p.sender, amount: p.amount, sender: p.sender, refundCaller: p.caller }, event, context);
 });
 
+// EverpiecePayV2 (USDC + AUSD). ConversionFallback is emitted before Paid in the same transaction: remember what was
+// asked for, so the Paid row can say "asked AUSD, delivered USDC" instead of implying the requested asset arrived.
+const asked = new Map<string, string>();
+indexer.onEvent({ contract: "EverpiecePayV2", event: "ConversionFallback" }, async ({ event }) => {
+  asked.set(event.params.paymentId, event.params.requestedAsset);
+});
+
+indexer.onEvent({ contract: "EverpiecePayV2", event: "Paid" }, async ({ event, context }) => {
+  const p = event.params;
+  if (await context.InstantPayment.get(p.paymentId)) throw new Error(`Paid twice for ${p.paymentId}`); // the contract forbids it
+  const requestedAsset = asked.get(p.paymentId);
+  asked.delete(p.paymentId);
+  context.InstantPayment.set({
+    id: p.paymentId,
+    ref: p.ref,
+    sender: p.sender,
+    recipient: p.recipient,
+    amount: p.amount,
+    sourceToken: p.sourceToken,
+    sourceAmount: p.sourceAmount,
+    pair: p.provider,
+    asset: p.deliveredAsset,
+    requestedAsset: requestedAsset ?? undefined,
+    block: event.block.number,
+    timestamp: event.block.timestamp,
+    txHash: event.transaction.hash,
+  });
+  let s = await withUser(await context.Stats.getOrCreate(emptyStats(String(event.chainId))), p.sender, event, context);
+  s = await withUser(s, p.recipient, event, context);
+  context.Stats.set({ ...s, instantCount: s.instantCount + 1, instantVolume: s.instantVolume + p.amount });
+});
+
 indexer.onEvent({ contract: "EverpiecePay", event: "Paid" }, async ({ event, context }) => {
   const p = event.params;
   if (await context.InstantPayment.get(p.paymentId)) throw new Error(`Paid twice for ${p.paymentId}`); // the contract forbids it
@@ -141,6 +173,8 @@ indexer.onEvent({ contract: "EverpiecePay", event: "Paid" }, async ({ event, con
     sourceToken: p.sourceToken,
     sourceAmount: p.sourceAmount,
     pair: p.pair,
+    asset: undefined,
+    requestedAsset: undefined,
     block: event.block.number,
     timestamp: event.block.timestamp,
     txHash: event.transaction.hash,

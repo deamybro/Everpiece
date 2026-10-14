@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address } from "viem";
-import { MONAD_MAINNET_CHAIN_ID } from "@everpiece/shared";
+import { MONAD_MAINNET_CHAIN_ID, USDC_MAINNET_ADDRESS } from "@everpiece/shared";
 
 /** The directory holds NO keys: nothing here can move money or sign approvals. */
 export type DirectoryConfig = {
@@ -10,6 +10,10 @@ export type DirectoryConfig = {
   domainAddress: Address;
   /** EverpiecePay, to verify that an instant payment settled a request. Optional. */
   payAddress?: Address;
+  /** EverpiecePayV2 (USDC + AUSD), to verify V2 instant payments. Optional. */
+  payV2Address?: Address;
+  /** Monad USDC: what Aurora delivers for cross-chain request payments (docs/VERIFIED.md §4.14). */
+  usdcAddress?: Address;
   port: number;
   host: string;
   dbPath: string;
@@ -42,12 +46,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DirectoryConfi
   if (!isAddress(escrow, { strict: false })) throw new Error("config: ESCROW_ADDRESS must be an address");
   const allowedOrigin = env.ALLOWED_ORIGIN;
   if (allowedOrigin && new URL(allowedOrigin).origin !== allowedOrigin) throw new Error("config: ALLOWED_ORIGIN must be a bare origin");
+  const expectedChainId = int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID);
   return {
     rpcUrl: req(env, "MONAD_RPC"),
-    expectedChainId: int(env, "EXPECTED_CHAIN_ID", MONAD_MAINNET_CHAIN_ID),
+    expectedChainId,
     escrow: getAddress(escrow),
     domainAddress: getAddress(env.DIRECTORY_DOMAIN_ADDRESS || escrow),
     payAddress: env.PAY_ADDRESS ? getAddress(env.PAY_ADDRESS) : undefined,
+    payV2Address: env.PAY_V2_ADDRESS ? getAddress(env.PAY_V2_ADDRESS) : undefined,
+    usdcAddress: env.USDC_ADDRESS ? getAddress(env.USDC_ADDRESS) : expectedChainId === MONAD_MAINNET_CHAIN_ID ? getAddress(USDC_MAINNET_ADDRESS) : undefined,
     port: int(env, "PORT", 8789),
     host: env.HOST ?? "127.0.0.1",
     dbPath: env.DIRECTORY_DB_PATH ?? "directory.sqlite",

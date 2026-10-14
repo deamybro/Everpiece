@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
-import { createPublicClient, defineChain, http, keccak256, type Hex, type PublicClient } from "viem";
-import { MAX_ENVELOPE_BYTES, MessageError, PaymentStatus, everpieceEscrowAbi, metadataCommitment, parseEnvelopeHeader } from "@everpiece/shared";
+import { createPublicClient, defineChain, getAddress, http, keccak256, recoverTypedDataAddress, type Hex, type PublicClient } from "viem";
+import { VAULT_MAX_BYTES, vaultBackupTyped, vaultHashOf, MAX_ENVELOPE_BYTES, MessageError, PaymentStatus, everpieceEscrowAbi, metadataCommitment, parseEnvelopeHeader } from "@everpiece/shared";
 import type { VoiceConfig } from "./config.ts";
 import { VoiceStore } from "./store.ts";
 import { log } from "./log.ts";
@@ -147,6 +147,56 @@ export class VoiceService {
     const deleteAfter = Number(p.expiresAt) * 1000 + this.cfg.keepAfterExpiryDays * 86_400_000;
     this.store.bind(locator, paymentId, Math.max(deleteAfter, m.delete_after));
     log("info", "message.bound", {}); // never the locator or the payment: the store keeps that link to itself
+    return { httpStatus: 200, body: { ok: true } };
+  }
+
+  // ── encrypted address-book vault ────────────────────────────────────────────────────────────────────────────────
+  // The server stores ciphertext it cannot read (Mera Secret Vault JSON). Reading is open (it is useless without the
+  // passkey); replacing it needs the account's own signature over the exact vault, a higher sequence number and a
+  // short deadline, so nobody else can overwrite or roll back someone's backup.
+  getVault(account: string, ip: string): Result {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(account)) return err(400, "BadAccount");
+    if (!this.limiter.allow(ip, this.now())) return err(429, "RateLimited");
+    const v = this.store.getVault(account.toLowerCase());
+    return v ? { httpStatus: 200, body: { vault: v.vault, seq: v.seq, updatedAt: v.updated_at } } : err(404, "NotFound");
+  }
+
+  async putVault(account: string, body: unknown, ip: string): Promise<Result> {
+    const now = this.now();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(account)) return err(400, "BadAccount");
+    if (!this.limiter.allow(ip, now)) return err(429, "RateLimited");
+    const o = body as Record<string, unknown>;
+    if (typeof o !== "object" || o === null || Object.keys(o).sort().join() !== "deadline,seq,signature,vault") return err(400, "InvalidRequest");
+    if (typeof o.vault !== "string" || o.vault.length === 0 || Buffer.byteLength(o.vault) > VAULT_MAX_BYTES) return err(413, "VaultTooLarge");
+    if (typeof o.seq !== "string" || !/^[0-9]{1,15}$/.test(o.seq) || typeof o.deadline !== "string" || !/^[0-9]{1,12}$/.test(o.deadline) || typeof o.signature !== "string" || !/^0x[0-9a-fA-F]{130}$/.test(o.signature)) return err(400, "InvalidRequest");
+    // it must at least look like a Mera secret vault (we cannot, and must not be able to, look inside)
+    try {
+      const j = JSON.parse(o.vault) as Record<string, unknown>;
+      if (j.version !== 1 || typeof j.ciphertext !== "string" || typeof j.nonce !== "string" || typeof j.prfSalt !== "string") return err(400, "NotAVault");
+    } catch {
+      return err(400, "NotAVault");
+    }
+    const nowSec = Math.floor(now / 1000);
+    const deadline = Number(o.deadline);
+    if (deadline < nowSec || deadline > nowSec + 600) return err(400, "DeadlineInvalid");
+    const acct = getAddress(account);
+    let signer: string;
+    try {
+      signer = getAddress(
+        await recoverTypedDataAddress({
+          ...vaultBackupTyped(this.cfg.escrow, { account: acct, vaultHash: vaultHashOf(o.vault), seq: BigInt(o.seq), deadline: BigInt(o.deadline) }, this.cfg.expectedChainId),
+          signature: o.signature as Hex,
+        }),
+      );
+    } catch {
+      return err(401, "BadSignature");
+    }
+    if (signer !== acct) return err(401, "BadSignature");
+    const existing = this.store.getVault(acct.toLowerCase());
+    if (existing && Number(o.seq) <= existing.seq) return err(409, "StaleSequence");
+    if (!existing && this.store.vaultCount() >= this.cfg.maxVaults) return err(507, "StorageFull");
+    this.store.putVault(acct.toLowerCase(), o.vault, Number(o.seq), now);
+    log("info", "vault.stored", { size: o.vault.length }); // never the account
     return { httpStatus: 200, body: { ok: true } };
   }
 

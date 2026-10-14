@@ -105,6 +105,12 @@ export type FundingQuoteArgs = {
   deadline: string;
   /** Input-side buffer in basis points (EXACT_OUTPUT: excess input is refunded after the swap). */
   slippageBps: number;
+  /**
+   * Aurora "Confidential Intents": `confidentiality: "advanced"` on the same quote call routes the swap through a private
+   * NEAR shard. Hidden: the origin wallet and the route. PUBLIC: the destination transaction, asset, amount and recipient
+   * (docs.intents.aurora.dev/confidential-intents). Never claim more than that.
+   */
+  confidential?: boolean;
 };
 
 /** The POST /quote/{apiKey} body (fields and enums as in the Aurora / 1Click API reference). */
@@ -124,6 +130,7 @@ export function auroraQuoteRequest(a: FundingQuoteArgs) {
     deadline: a.deadline,
     referral: "everpiece",
     quoteWaitingTimeMs: 3000,
+    ...(a.confidential ? ({ confidentiality: "advanced" } as const) : {}),
   } as const;
 }
 

@@ -1,8 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { INVEST_ASSETS, INVEST_AVAILABILITY, INVEST_PROVIDERS, type AssetStatus, type InvestAsset } from "@everpiece/shared";
+import { useEffect, useState } from "react";
+import {
+  ANCHORED_STOCK_ORACLE, INVEST_ASSETS, INVEST_AVAILABILITY, INVEST_PROVIDERS, priceIdOf, referenceFromOracle, stockOracleAbi,
+  type AssetStatus, type InvestAsset, type ReferencePrice,
+} from "@everpiece/shared";
+import { client, formatDollars } from "../../lib/chain";
+import { config } from "../../lib/config";
+
+const SESSION_TEXT: Record<string, string> = {
+  REGULAR: "market open", PRE_MARKET: "pre-market", POST_MARKET: "after hours", OVERNIGHT: "overnight", CLOSED: "market closed", UNKNOWN: "session unknown",
+};
+
+/** The issuer's on-chain reference price (Anchored StockOracle), read live; null = unavailable on this network. */
+async function referencePrice(ticker: string): Promise<ReferencePrice | null> {
+  if (config.chainId !== 143) return null;
+  try {
+    const p = await client.readContract({ address: ANCHORED_STOCK_ORACLE, abi: stockOracleAbi, functionName: "latestPrice", args: [priceIdOf(ticker)] });
+    return referenceFromOracle(ticker, { ...p, price: BigInt(p.price), bestBid: BigInt(p.bestBid), bestAsk: BigInt(p.bestAsk), feedUpdateTimestamp: BigInt(p.feedUpdateTimestamp) }, BigInt(Math.floor(Date.now() / 1000)));
+  } catch {
+    return null;
+  }
+}
 
 const BADGE: Record<AssetStatus, string> = {
   AVAILABLE: "Available", LOW_LIQUIDITY: "Low liquidity", UNAVAILABLE: "Unavailable", COMING_SOON: "Coming soon", RESTRICTED: "Restricted",
@@ -14,6 +34,12 @@ const BADGE: Record<AssetStatus, string> = {
  */
 export default function InvestPage() {
   const [open, setOpen] = useState<InvestAsset | null>(null);
+  const [ref, setRef] = useState<ReferencePrice | null | "loading">(null);
+  useEffect(() => {
+    if (!open) return;
+    setRef("loading");
+    referencePrice(open.referenceTicker).then(setRef);
+  }, [open]);
   const status = (id: string) => INVEST_AVAILABILITY.assets.find((a) => a.assetId === id) ?? { assetId: id, status: "UNAVAILABLE" as AssetStatus, reason: "Not checked yet" };
   const anyAvailable = INVEST_ASSETS.some((a) => status(a.id).status === "AVAILABLE");
 
@@ -58,6 +84,12 @@ export default function InvestPage() {
               <dt>Issuer</dt><dd>{open.issuer}</dd>
               <dt>Tracks</dt><dd>{open.referenceTicker} (US-listed share)</dd>
               <dt>Price</dt><dd>Shown only with a live, verified quote</dd>
+              <dt>Reference price (not a buy price)</dt>
+              <dd aria-label="Reference price">
+                {ref === "loading" ? "…" : ref && !ref.stale
+                  ? `${formatDollars(ref.priceMicroUsd)} per ${open.referenceTicker} share · ${SESSION_TEXT[ref.session]} · ${Math.round(Number(ref.ageSec) / 60)} min old (Anchored oracle)`
+                  : "Unavailable right now"}
+              </dd>
               <dt>Why</dt><dd>{s.reason}</dd>
             </dl>
             <details>

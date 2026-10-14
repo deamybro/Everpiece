@@ -1,5 +1,5 @@
 import { createPublicClient, getAddress, http, parseAbi, parseEventLogs, type Address, type Hex, type PublicClient } from "viem";
-import { everpieceEarnAbi, HARVEST_ROUNDING_MARGIN, type Action } from "@everpiece/shared";
+import { everpieceAutomateAbi, everpieceEarnAbi, HARVEST_ROUNDING_MARGIN, type Action } from "@everpiece/shared";
 import type { LegVerifier, TargetRegistry, WorldReader } from "./service.ts";
 
 /**
@@ -13,6 +13,8 @@ export type WorldConfig = {
   earn?: Address;
   earnVault?: Address;
   earnOpportunityId?: string;
+  /** EverpieceAutomate: principal it deposited counts as principal too (never as harvestable yield). */
+  automate?: Address;
 };
 
 const erc20 = parseAbi(["function balanceOf(address) view returns (uint256)"]);
@@ -28,10 +30,14 @@ export function chainWorld(cfg: WorldConfig, client?: PublicClient): { world: Wo
     reserved: async () => 0n,
     async harvestable(owner, positionId) {
       if (!earnReady || positionId !== cfg.earnOpportunityId) return 0n;
-      const [shares, principal] = await Promise.all([
+      const [shares, earnPrincipal, modulePrincipal] = await Promise.all([
         c.readContract({ address: cfg.earnVault!, abi: erc4626, functionName: "balanceOf", args: [owner], blockTag: "finalized" }),
         c.readContract({ address: cfg.earn!, abi: everpieceEarnAbi, functionName: "principalOf", args: [owner, cfg.earnVault!], blockTag: "finalized" }),
+        cfg.automate
+          ? c.readContract({ address: cfg.automate, abi: everpieceAutomateAbi, functionName: "principalOf", args: [owner, cfg.earnVault!], blockTag: "finalized" })
+          : Promise.resolve(0n),
       ]);
+      const principal = earnPrincipal + modulePrincipal;
       const value = await c.readContract({ address: cfg.earnVault!, abi: erc4626, functionName: "convertToAssets", args: [shares], blockTag: "finalized" });
       const excess = value - principal; // principal from the contract that enforces it at harvest time
       return excess > HARVEST_ROUNDING_MARGIN ? excess - HARVEST_ROUNDING_MARGIN : 0n;
@@ -58,7 +64,11 @@ export function chainWorld(cfg: WorldConfig, client?: PublicClient): { world: Wo
       if (receipt.status !== "success") return "MISMATCH";
       const events = parseEventLogs({ abi: everpieceEarnAbi, eventName: "EarnDeposited", logs: receipt.logs.filter((l) => getAddress(l.address) === getAddress(cfg.earn!)) });
       const ok = events.some((e) => getAddress(e.args.owner) === getAddress(owner) && getAddress(e.args.vault) === getAddress(cfg.earnVault!) && e.args.assets === amount);
-      return ok ? "OK" : "MISMATCH";
+      if (ok) return "OK";
+      // a leg run through the bounded module (EverpieceAutomate.Executed) is the same deposit in the owner's name
+      if (!cfg.automate) return "MISMATCH";
+      const ex = parseEventLogs({ abi: everpieceAutomateAbi, eventName: "Executed", logs: receipt.logs.filter((l) => getAddress(l.address) === getAddress(cfg.automate!)) });
+      return ex.some((e) => getAddress(e.args.owner) === getAddress(owner) && getAddress(e.args.vault) === getAddress(cfg.earnVault!) && e.args.assets === amount) ? "OK" : "MISMATCH";
     },
   };
   return { world, targets, verifier };

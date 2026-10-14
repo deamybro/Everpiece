@@ -55,6 +55,21 @@ const paid = (n: number, amount: bigint, block: number, recipient: Hex = RECIPIE
   params: { paymentId: id(500 + n), ref: id(900 + n), sender: SENDER, recipient, amount, sourceToken: ANYONE, sourceAmount: amount * 10n ** 12n, pair: ANYONE },
 });
 
+const paidV2 = (n: number, amount: bigint, block: number, delivered: Hex, provider: Hex = ANYONE) => ({
+  contract: "EverpiecePayV2" as const,
+  event: "Paid" as const,
+  block: { number: block, timestamp: 1_790_000_000 + block },
+  transaction: { hash: tx(block) },
+  params: { paymentId: id(600 + n), ref: id(950 + n), sender: SENDER, recipient: RECIPIENT, deliveredAsset: delivered, amount, sourceToken: ANYONE, sourceAmount: amount, provider },
+});
+const fallbackV2 = (n: number, block: number, requested: Hex, delivered: Hex) => ({
+  contract: "EverpiecePayV2" as const,
+  event: "ConversionFallback" as const,
+  block: { number: block, timestamp: 1_790_000_000 + block },
+  transaction: { hash: tx(block) },
+  params: { paymentId: id(600 + n), requestedAsset: requested, deliveredAsset: delivered },
+});
+
 describe("EverpieceEscrow history", () => {
   it("created → claimed: status, recipient, timeline, metrics", async () => {
     const indexer = createTestIndexer();
@@ -116,6 +131,17 @@ describe("EverpieceEscrow history", () => {
     expect(await indexer.Stats.getOrThrow("143")).toMatchObject({ instantCount: 2, instantVolume: 30_000_000n, users: 2, created: 0, activeLiability: 0n });
     expect((await indexer.InstantPayment.getWhere({ recipient: { _eq: RECIPIENT } })).length).toBe(2);
     await expect(createTestIndexer().process({ chains: { 143: { simulate: [paid(1, 1n, 10), paid(1, 1n, 11)] } } })).rejects.toThrow(/Paid twice/);
+  });
+
+  it("EverpiecePayV2: the delivered asset is recorded; a fallback keeps what was asked for", async () => {
+    const USDC = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603" as Hex;
+    const AUSD = "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a" as Hex;
+    const indexer = createTestIndexer();
+    await indexer.process({ chains: { 143: { simulate: [paidV2(1, 5_000_000n, 10, USDC), fallbackV2(2, 11, AUSD, USDC), paidV2(2, 7_000_000n, 11, USDC)] } } });
+    expect(await indexer.InstantPayment.getOrThrow(id(601))).toMatchObject({ asset: USDC, amount: 5_000_000n });
+    expect((await indexer.InstantPayment.getOrThrow(id(601))).requestedAsset ?? null).toBeNull();
+    expect(await indexer.InstantPayment.getOrThrow(id(602))).toMatchObject({ asset: USDC, requestedAsset: AUSD });
+    expect(await indexer.Stats.getOrThrow("143")).toMatchObject({ instantCount: 2, instantVolume: 12_000_000n });
   });
 
   it("Earn (EverpieceEarn): deposits and withdrawals recorded once per id, queryable by owner (the principal/yield ledger)", async () => {

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import {
+  parseEventLogs,
   createPublicClient,
   defineChain,
   getAddress,
@@ -18,6 +19,8 @@ import {
   MESSAGE_WRAP_BYTES,
   everpieceEscrowAbi,
   everpiecePayAbi,
+  everpiecePayV2Abi,
+  paymentV2Id,
   instantPaymentId,
   paymentIdOf,
   paymentRequestTyped,
@@ -37,6 +40,10 @@ export type Result = { httpStatus: number; body: Record<string, unknown> };
 const err = (httpStatus: number, error: string, extra: Record<string, unknown> = {}): Result => ({ httpStatus, body: { error, ...extra } });
 
 class Bad extends Error {}
+
+/** keccak256("Transfer(address,address,uint256)") */
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+export type Delivery = { timestamp: number; transfers: { token: Address; to: Address; value: bigint }[] };
 type Obj = Record<string, unknown>;
 function fields(v: unknown, keys: readonly string[]): Obj {
   if (typeof v !== "object" || v === null || Array.isArray(v)) throw new Bad("expected object");
@@ -124,10 +131,14 @@ export class DirectoryService {
   readonly client: PublicClient;
   readonly readPayment: PaymentReader;
   readonly readSettled: SettledReader;
+  /** EverpiecePayV2: the asset its finalized Paid event says was delivered, or null if not settled/finalized. */
+  readonly readDeliveredV2: (paymentId: Hex, txHash: Hex) => Promise<Address | null>;
+  /** A Monad transaction's finalized outcome: ERC-20 transfers it made (for cross-chain deliveries by Aurora). */
+  readonly readDelivery: (txHash: Hex) => Promise<Delivery | null>;
   private readonly ipLimiter: Limiter;
   readonly now: () => number;
 
-  constructor(cfg: DirectoryConfig, opts: { store?: DirectoryStore; now?: () => number; readPayment?: PaymentReader; readSettled?: SettledReader } = {}) {
+  constructor(cfg: DirectoryConfig, opts: { store?: DirectoryStore; now?: () => number; readPayment?: PaymentReader; readSettled?: SettledReader; readDeliveredV2?: (paymentId: Hex, txHash: Hex) => Promise<Address | null>; readDelivery?: (txHash: Hex) => Promise<Delivery | null> } = {}) {
     this.cfg = cfg;
     this.store = opts.store ?? new DirectoryStore(cfg.dbPath);
     this.now = opts.now ?? Date.now;
@@ -155,6 +166,36 @@ export class DirectoryService {
         cfg.payAddress
           ? Boolean(await this.client.readContract({ address: cfg.payAddress, abi: everpiecePayAbi, functionName: "settled", args: [paymentId], blockTag: "finalized" }))
           : false);
+    this.readDelivery =
+      opts.readDelivery ??
+      (async (txHash) => {
+        const receipt = await this.client.getTransactionReceipt({ hash: txHash }).catch(() => null);
+        if (!receipt || receipt.status !== "success") return null;
+        const finalized = await this.client.getBlock({ blockTag: "finalized" });
+        if (receipt.blockNumber > finalized.number) return null; // inclusion ≠ success (VERIFIED §1.14)
+        const block = await this.client.getBlock({ blockNumber: receipt.blockNumber });
+        const transfers = receipt.logs
+          .filter((l) => l.topics[0] === TRANSFER_TOPIC && l.topics.length === 3)
+          .map((l) => ({ token: getAddress(l.address), to: getAddress(`0x${l.topics[2]!.slice(26)}`), value: BigInt(l.data) }));
+        return { timestamp: Number(block.timestamp), transfers };
+      });
+    this.readDeliveredV2 =
+      opts.readDeliveredV2 ??
+      // The payer names the transaction; the directory trusts nothing in it except what the chain shows at finality: a
+      // successful receipt with a Paid event from EverpiecePayV2 for exactly this payment id, and settled(id). (No log
+      // scans: public RPCs reject wide ranges.)
+      (async (paymentId, txHash) => {
+        if (!cfg.payV2Address) return null;
+        const receipt = await this.client.getTransactionReceipt({ hash: txHash }).catch(() => null);
+        if (!receipt || receipt.status !== "success") return null;
+        const finalized = await this.client.getBlock({ blockTag: "finalized" });
+        if (receipt.blockNumber > finalized.number) return null; // inclusion ≠ success (VERIFIED §1.14)
+        const settled = await this.client.readContract({ address: cfg.payV2Address, abi: everpiecePayV2Abi, functionName: "settled", args: [paymentId], blockTag: "finalized" });
+        if (!settled) return null;
+        const paid = parseEventLogs({ abi: everpiecePayV2Abi, eventName: "Paid", logs: receipt.logs.filter((l) => getAddress(l.address) === cfg.payV2Address) });
+        const ev = paid.find((e) => e.args.paymentId.toLowerCase() === paymentId.toLowerCase());
+        return ev ? getAddress(ev.args.deliveredAsset) : null;
+      });
   }
 
   async start(): Promise<void> {
@@ -443,6 +484,13 @@ DirectoryService.prototype.myRequests = async function (this: DirectoryService, 
  * "This request is paid": accepted only with a self-authenticating proof. The payer sends the payment's own terms;
  * the directory recomputes its id and checks the chain at "finalized":
  *   instant   — EverpiecePay Payment with ref = requestId, recipient and amount = the request's; settled(id) = true
+ *   instantV2 — EverpiecePayV2 Payment with ref = requestId, recipient, amount and asset = the request's; settled at
+ *               finality. If the on-chain Paid event shows another asset was delivered (truthful fallback), the
+ *               request is recorded as "instantV2Fallback" — never as paid in the requested asset.
+ *   crossChain — an external wallet paid from another chain through Aurora Intents: the finalized Monad delivery
+ *               transaction moved at least the request's amount of USDC to the requester, after the request was made,
+ *               and was not used for another request. A USDC request is "crossChain"; an AUSD request delivered as
+ *               USDC is "crossChainUsdc" (AUSD isn't available cross-chain; the requester converts on-chain).
  *   protected — escrow PaymentIntent with salt = requestId, USERNAME mode, amount = the request's, the recipient
  *               commitment opening to the request's recipient; getPayment(id) exists
  */
@@ -453,7 +501,8 @@ DirectoryService.prototype.requestPaid = async function (this: DirectoryService,
   let requestId: Hex;
   try {
     const kind = (body as { kind?: unknown })?.kind;
-    o = fields(body, kind === "protected" ? ["requestId", "kind", "intent", "recipientSalt"] : ["requestId", "kind", "payment"]);
+    o = fields(body, kind === "protected" ? ["requestId", "kind", "intent", "recipientSalt"] : kind === "crossChain" ? ["requestId", "kind", "txHash"] : kind === "instantV2" ? ["requestId", "kind", "payment", "txHash"] : ["requestId", "kind", "payment"]);
+    if (kind === "instantV2Fallback") throw new Bad("kind");
     requestId = hex(o.requestId, 32, "requestId");
   } catch (e) {
     return err(400, "InvalidRequest", { detail: (e as Error).message });
@@ -471,6 +520,31 @@ DirectoryService.prototype.requestPaid = async function (this: DirectoryService,
       if (payment.ref !== requestId || payment.recipient !== getAddress(r.recipient) || payment.amount !== BigInt(r.amount)) return err(422, "NotThisRequest");
       paymentId = instantPaymentId(this.cfg.payAddress, payment, this.cfg.expectedChainId);
       if (!(await this.readSettled(paymentId))) return err(422, "PaymentNotFinalized");
+    } else if (o.kind === "instantV2") {
+      if (r.mode !== RequestMode.INSTANT || !this.cfg.payV2Address) return err(422, "WrongKind");
+      const p = fields(o.payment, ["ref", "sender", "recipient", "asset", "amount", "sourceToken", "maxSourceAmount", "deadline", "fallbackToSource"]);
+      if (typeof p.fallbackToSource !== "boolean") throw new Bad("fallbackToSource");
+      const payment = { ref: hex(p.ref, 32, "ref"), sender: addr(p.sender, "sender"), recipient: addr(p.recipient, "recipient"), asset: addr(p.asset, "asset"),
+        amount: dec(p.amount, "amount"), sourceToken: addr(p.sourceToken, "sourceToken"), maxSourceAmount: dec(p.maxSourceAmount, "maxSourceAmount"),
+        deadline: dec(p.deadline, "deadline"), fallbackToSource: p.fallbackToSource };
+      if (payment.ref !== requestId || payment.recipient !== getAddress(r.recipient) || payment.amount !== BigInt(r.amount) || payment.asset !== getAddress(r.asset)) {
+        return err(422, "NotThisRequest");
+      }
+      paymentId = paymentV2Id(this.cfg.payV2Address, payment, this.cfg.expectedChainId);
+      const delivered = await this.readDeliveredV2(paymentId, hex(o.txHash, 32, "txHash"));
+      if (!delivered) return err(422, "PaymentNotFinalized");
+      if (delivered !== payment.asset) o.kind = "instantV2Fallback";
+    } else if (o.kind === "crossChain") {
+      if (r.mode !== RequestMode.INSTANT || !this.cfg.usdcAddress) return err(422, "WrongKind");
+      const txHash = hex(o.txHash, 32, "txHash");
+      if (this.store.paidBy(txHash)) return err(422, "DeliveryAlreadyUsed");
+      const d = await this.readDelivery(txHash);
+      if (!d) return err(422, "PaymentNotFinalized");
+      if (d.timestamp * 1000 < r.created_at) return err(422, "NotThisRequest"); // a delivery older than the request
+      const paid = d.transfers.some((t) => t.token === this.cfg.usdcAddress && t.to === getAddress(r.recipient) && t.value >= BigInt(r.amount));
+      if (!paid) return err(422, "NotThisRequest");
+      paymentId = txHash;
+      o.kind = getAddress(r.asset) === this.cfg.usdcAddress ? "crossChain" : "crossChainUsdc";
     } else if (o.kind === "protected") {
       if (r.mode !== RequestMode.PROTECTED) return err(422, "WrongKind");
       const i = fields(o.intent, ["sender", "mode", "recipientCommitment", "metadataCommitment", "approver", "amount", "expiresAt", "validAfter", "validBefore", "salt"]);

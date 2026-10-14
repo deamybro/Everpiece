@@ -1,30 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Address, Hex } from "viem";
 import { NO_METADATA, PaymentMode, PaymentStatus } from "@everpiece/shared";
-import { Welcome } from "../components/Welcome";
-import { UsernameSetup } from "../components/UsernameSetup";
+import { AccountSummary } from "../components/AccountSummary";
+import { SessionBar } from "../components/SessionBar";
+import { assetBalances, payV2Available } from "../lib/payV2";
+import { earnAvailable } from "../lib/earn";
+import { fundingAvailable } from "../lib/funding";
+import { privateAvailable } from "../lib/private";
+import { EmptyState, LoadingSkeleton, TransactionRow } from "../components/DashboardUI";
 import { MessageCard } from "../components/MessageCard";
-import { HowItWorks, day } from "../components/HowItWorks";
+import { day } from "../components/HowItWorks";
 import { Progress, progressText } from "../components/status";
 import { config, isDevStack } from "../lib/config";
 import { chainTime, dollarsOf, formatDollars, paymentOf } from "../lib/chain";
 import { cancelPayment, claimUsernamePayment, deliver, retryMessageBinds, returnExpired, FlowError } from "../lib/flows";
 import { loadHistory, type HistoryItem, type HistoryState } from "../lib/history";
 import { receiptPath } from "../lib/receipt";
-import { forgetAccount, friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
-import { loadUsernameMessage, messagesAvailable, type IncomingMessage } from "../lib/message";
+import { friendlyPasskeyError, loadAccount, unlockMessages, type Account } from "../lib/mera";
+import { loadUsernameMessage, type IncomingMessage } from "../lib/message";
 import { friendlyError, type RelayStatus } from "../lib/api";
-import { activeTopUps, fundingAvailable, type TopUp } from "../lib/funding";
-import { earnAvailable } from "../lib/earn";
+import { activeTopUps, type TopUp } from "../lib/funding";
 import { payoutAvailable } from "../lib/payout";
 import { HomePayouts } from "../components/HomePayouts";
 import { Icon } from "../components/Icon";
 import { balanceOfToken, payTokens } from "../lib/pay";
 import { fromBaseUnits } from "@everpiece/shared";
-import { enableMessages, messageKeyPublished, readInbox, syncUsername, usernameOf } from "../lib/username";
+import { readInbox, syncUsername, usernameOf } from "../lib/username";
+import { LandingPage } from "../components/LandingPage";
 
 /** message: decrypted and verified; locked: there is one, but this device needs one prompt to derive its message key. */
 type Incoming = { paymentId: Hex; recipientSalt: Hex; amount: bigint; from: string; expiresAt: bigint; messageWrap?: Hex; message: IncomingMessage | undefined; locked: boolean };
@@ -33,9 +39,14 @@ const short = (a: Address) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const fromCache = new Map<Address, string>();
 
 export default function Home() {
+  const path = usePathname();
   const [account, setAccount] = useState<Account | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [balance, setBalance] = useState<bigint | null>(null);
+  /** USDC and AUSD (EverpiecePayV2): what the account holds in each; the headline is their sum. */
+  const [assetRows, setAssetRows] = useState<{ symbol: string; balance: bigint }[]>([]);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+  const [balanceStale, setBalanceStale] = useState(false);
   const [openTopUps, setOpenTopUps] = useState<TopUp[]>([]);
   const [hideBalance, setHideBalance] = useState(false);
   const [holdings, setHoldings] = useState<{ symbol: string; label: string; note: string; amount: string }[]>([]);
@@ -57,11 +68,11 @@ export default function Home() {
     });
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historySource, setHistorySource] = useState<"indexer" | "device" | null>(null);
+  const [historyError, setHistoryError] = useState(false);
   const [incoming, setIncoming] = useState<Incoming[]>([]);
   const [busyId, setBusyId] = useState<Hex | null>(null);
   const [progress, setProgress] = useState("");
   const [message, setMessage] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
-  const [messagesOn, setMessagesOn] = useState<boolean | null>(null);
   // Cancels/returns this page saw CONFIRMED (final on-chain) that the indexer may not show yet: never offer them again.
   const settled = useRef(new Map<string, HistoryState>());
 
@@ -74,7 +85,15 @@ export default function Home() {
   }, []);
 
   const refresh = useCallback(async (a: Account, inboxToo = true) => {
-    setBalance(await dollarsOf(a.address).catch(() => null));
+    try {
+      if (payV2Available()) {
+        const rows = (await assetBalances(a.address)).map((x) => ({ symbol: x.asset.symbol, balance: x.balance }));
+        setAssetRows(rows);
+        setBalance(rows.reduce((n, r) => n + r.balance, 0n));
+      } else setBalance(await dollarsOf(a.address));
+      setBalanceStale(false);
+    } catch { setBalanceStale(true); }
+    finally { setBalanceLoading(false); }
     setOpenTopUps(activeTopUps());
     // other tokens this account holds (e.g. USDC that arrived from another chain, waiting to become Dollars)
     void Promise.all(
@@ -92,6 +111,7 @@ export default function Home() {
     const now = await chainTime().catch(() => BigInt(Math.floor(Date.now() / 1000)));
     // History from the indexer (source of truth); this browser's sent list only adds labels / not-yet-indexed sends.
     const h = await loadHistory(a).catch(() => null);
+    setHistoryError(h === null);
     if (h) {
       setHistory(
         h.items.map((i) => {
@@ -131,11 +151,6 @@ export default function Home() {
     );
     setIncoming(waiting.filter((x): x is Incoming => x !== null));
   }, []);
-
-  // Can others send this account messages? (Accounts from before messages publish their key with one prompt.)
-  useEffect(() => {
-    if (account?.username && messagesAvailable()) messageKeyPublished(account).then(setMessagesOn).catch(() => {});
-  }, [account]);
 
   useEffect(() => {
     if (!account) return;
@@ -191,18 +206,6 @@ export default function Home() {
     }
   }
 
-  async function onEnableMessages() {
-    if (!account) return;
-    setMessage(null);
-    try {
-      setAccount(await enableMessages(account));
-      setMessagesOn(true);
-      setMessage({ kind: "ok", text: "Voice messages are on ✓" });
-    } catch (e) {
-      setMessage({ kind: "bad", text: friendlyPasskeyError(e) });
-    }
-  }
-
   async function onUnlock() {
     if (!account) return;
     try {
@@ -219,94 +222,21 @@ export default function Home() {
     refresh(account);
   }
 
-  if (!loaded) return null;
-  if (!account) return <Welcome onReady={setAccount} />;
+  if (!loaded) return <LoadingSkeleton label="Loading your account" />;
+  if (!account && path === "/") return <LandingPage />;
 
   return (
-    <div className="stack">
-      <div className="row topbar">
-        <span className="who">
-          <span className="avatar" aria-hidden="true">{(account.name || account.username || "E").slice(0, 1).toUpperCase()}</span>
-          <span className="brand">Everpiece</span>
-        </span>
-        <button className="ghost small" onClick={() => { forgetAccount(); setAccount(null); }}>Sign out</button>
-      </div>
-
-      <section className="wallet" aria-label="Your balance">
-        <div className="wallet-top">
-          <span className="muted">{account.name ? `Hi ${account.name}, your Dollars` : "Your Dollars"}</span>
-          <span className="wallet-tools">
-            {isDevStack && <span className="hero-tag">Test money</span>}
-            <button className="eye" aria-label={hideBalance ? "Show balance" : "Hide balance"} aria-pressed={hideBalance} onClick={toggleHide}>
-              <Icon name={hideBalance ? "eyeOff" : "eye"} size={18} />
-            </button>
-          </span>
-        </div>
-        <div className="balance" aria-label={hideBalance ? "Balance hidden" : undefined}>{balance === null ? "…" : hideBalance ? "$••••" : formatDollars(balance)}</div>
-        {account.username && <div className="muted small">Your username: <strong>@{account.username}</strong></div>}
-        <nav className="wallet-actions" aria-label="Pay and get paid">
-          <Link href="/send" aria-label="Send money"><span className="wa-icon"><Icon name="send" /></span>Send</Link>
-          <Link href="/request" aria-label="Request"><span className="wa-icon"><Icon name="request" /></span>Request</Link>
-          <Link href="/scan" aria-label="Scan to pay"><span className="wa-icon"><Icon name="scan" /></span>Scan</Link>
-          {fundingAvailable() && <Link href="/add" aria-label="Add money from another chain"><span className="wa-icon"><Icon name="add" /></span>Add</Link>}
-        </nav>
-        <ul className="assets" aria-label="What you hold">
-          <li>
-            <span className="asset-icon dollar" aria-hidden="true">$</span>
-            <span className="grow"><strong>Dollars</strong><span className="muted small">AUSD · Agora</span></span>
-            <strong>{balance === null ? "…" : hideBalance ? "••••" : formatDollars(balance)}</strong>
-          </li>
-          {holdings.map((h) => (
-            <li key={h.symbol}>
-              <span className="asset-icon" aria-hidden="true">{h.symbol.slice(0, 1)}</span>
-              <span className="grow"><strong>{h.label}</strong><span className="muted small">{h.note}</span></span>
-              <strong>{hideBalance ? "••••" : h.amount}</strong>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <div className="bank-actions" role="group" aria-label="Grow">
-        {earnAvailable() && (
-          <Link href="/earn" className="card settings-row" aria-label="Earn on your Dollars">
-            <span className="settings-icon"><Icon name="spark" size={20} /></span>
-            <span className="grow"><strong>Earn</strong><span className="muted small">put Dollars to work</span></span>
-          </Link>
-        )}
-        {config.automateUrl && (
-          <Link href="/automate" className="card settings-row" aria-label="Automate your money">
-            <span className="settings-icon"><Icon name="clock" size={20} /></span>
-            <span className="grow"><strong>Automate</strong><span className="muted small">rules for incoming money</span></span>
-          </Link>
-        )}
-        <Link href="/invest" className="card settings-row" aria-label="Invest in stocks">
-          <span className="settings-icon"><Icon name="activity" size={20} /></span>
-          <span className="grow"><strong>Invest</strong><span className="muted small">tokenized US stocks</span></span>
-        </Link>
-      </div>
-      {payoutAvailable() && (
-        <div className="bank-actions" role="group" aria-label="Bank">
-          <Link href="/bank" className="card settings-row" aria-label="Cash out to my bank">
-            <span className="settings-icon"><Icon name="cashout" size={20} /></span>
-            <span className="grow"><strong>Cash out</strong><span className="muted small">to your bank</span></span>
-          </Link>
-          <Link href="/bank?to=them" className="card settings-row" aria-label="Send to a bank">
-            <span className="settings-icon"><Icon name="bank" size={20} /></span>
-            <span className="grow"><strong>To a bank</strong><span className="muted small">naira, by @username</span></span>
-          </Link>
-        </div>
+    <div className="stack dashboard dashboard-new">
+      <AccountSummary account={account} balance={balance} assetRows={assetRows} balanceLoading={balanceLoading} balanceStale={balanceStale} hideBalance={hideBalance} toggleHide={toggleHide} />
+      {account && payV2Available() && <SessionBar account={account} />}
+      {account && (
+        <section className="stack" aria-label="More">
+          <Link href="/get-paid" className="card settings-row"><span className="settings-icon"><Icon name="add" size={20} /></span><span className="grow"><strong>Get paid from any chain</strong><span className="muted small">Your pay link and address</span></span><Icon name="chevron" size={18} /></Link>
+          {privateAvailable() && <Link href="/private" className="card settings-row"><span className="settings-icon"><Icon name="scan" size={20} /></span><span className="grow"><strong>Private balance</strong><span className="muted small">private balance and send</span></span><Icon name="chevron" size={18} /></Link>}
+          {fundingAvailable() && <Link href="/add" className="card settings-row"><span className="settings-icon"><Icon name="add" size={20} /></span><span className="grow"><strong>Add money from another chain</strong><span className="muted small">fund your own account</span></span><Icon name="chevron" size={18} /></Link>}
+        </section>
       )}
-      {payoutAvailable() && (
-        <Link href="/receive" className="card settings-row" aria-label="How you receive money">
-          <span className="settings-icon"><Icon name="user" size={20} /></span>
-          <span className="grow">
-            <strong>How you receive money</strong>
-            <span className="muted small">In Dollars, or straight to your Nigerian bank</span>
-          </span>
-          <span className="chev"><Icon name="chevron" size={20} /></span>
-        </Link>
-      )}
-
+      {holdings.filter(h => h.symbol !== "USDC").length > 0 && <details className="card"><summary>Other supported assets</summary><ul className="assets">{holdings.filter(h => h.symbol !== "USDC").map(h => <li key={h.symbol}><strong>{h.label}</strong><span>{hideBalance ? "••••" : h.amount}</span></li>)}</ul></details>}
       {payoutAvailable() && <HomePayouts />}
 
       {openTopUps.map((t) => (
@@ -323,15 +253,7 @@ export default function Home() {
         </div>
       )}
 
-      {!account.username && <UsernameSetup account={account} onDone={setAccount} />}
-
-      {account.username && messagesOn === false && (
-        <div className="card stack">
-          <strong>Get voice messages</strong>
-          <p className="muted small">Let people who pay you @{account.username} attach a voice note or a message. Only your account can open them.</p>
-          <button className="secondary" disabled={busyId !== null} onClick={onEnableMessages}>Turn on with fingerprint or screen lock</button>
-        </div>
-      )}
+      {account && !account.username && <Link href="/profile" className="card settings-row"><Icon name="user" /><span className="grow"><strong>Choose your @username</strong><span className="muted small">Make it easier for people to pay you.</span></span><Icon name="chevron" size={16} /></Link>}
 
       <Progress text={progress} />
       {message && <div className={`status ${message.kind}`}>{message.text}</div>}
@@ -360,44 +282,12 @@ export default function Home() {
         </>
       )}
 
-      <h2 id="activity">Activity</h2>
-      {historySource === "device" && config.indexerUrl && (
-        <p className="muted small">Payment history is temporarily unavailable. Showing payments sent from this device.</p>
-      )}
-      {historySource !== null && history.length === 0 && (
-        <>
-          <p className="muted">Payments you send and receive will show here.</p>
-          <HowItWorks />
-        </>
-      )}
-      <ul className={`list${history.length ? " card" : ""}`} aria-label="Activity">
-        {history.map((r) => (
-          <li key={`${r.direction}-${r.paymentId}`} className="stack" data-payment-id={r.paymentId}>
-            <div className="row">
-              <div>
-                <strong>{r.direction === "received" ? "+" : ""}{formatDollars(r.amount)}</strong>{" "}
-                <span className="muted">{r.direction === "received" ? "from" : "to"} {r.counterparty}</span>
-                <div className="muted small">
-                  {when(r.at)}
-                  {r.tx && <> · <a href={`${config.explorerUrl}/tx/${r.tx}`} target="_blank" rel="noopener noreferrer">See it on Monad</a></>}
-                  {" · "}<Link href={receiptPath(r.paymentId)}>Receipt</Link>
-                </div>
-              </div>
-              <StatusPill item={r} />
-            </div>
-            <p className="muted small explain">{explain(r)}</p>
-            {r.direction === "sent" && r.state === "protected" && r.delivery && !r.delivery.delivered && (
-              <p className="muted small">Your money is protected. We&apos;re still letting {r.counterparty} know; this retries automatically.</p>
-            )}
-            {r.direction === "sent" && (r.state === "protected" || r.state === "expired") && (
-              <button className="danger" disabled={busyId !== null} onClick={() => onCancel(r)}>
-                {r.state === "expired" ? "Return my money" : "Cancel and get my money back"}
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-
+      {history.some(r => r.direction === "sent" && (r.state === "protected" || r.state === "expired")) && <section className="stack protected-payments"><h2>Protected payments</h2><p className="muted small">You can cancel payments awaiting claim, or return expired payments.</p><ul className="list card">{history.filter(r => r.direction === "sent" && (r.state === "protected" || r.state === "expired")).map(r => <li key={r.paymentId} className="stack" data-payment-id={r.paymentId}><div className="row"><strong>{formatDollars(r.amount)} to {r.counterparty}</strong><StatusPill item={r} /></div><p className="muted small">{explain(r)}</p>{r.delivery && !r.delivery.delivered && <p className="muted small">Your money is protected. We’re still letting {r.counterparty} know; this retries automatically.</p>}<Link href={receiptPath(r.paymentId)}>View receipt</Link><button className="danger" disabled={busyId !== null} onClick={() => onCancel(r)}>{r.state === "expired" ? "Return my money" : "Cancel and get my money back"}</button></li>)}</ul></section>}
+      <section className="recent-activity" aria-labelledby="activity"><div className="section-title"><h2 id="activity">Recent Activity</h2><Link href="/activity">See all</Link></div>
+      {historySource === "device" && <p className="muted small">{config.indexerUrl ? "Full history is temporarily unavailable. Showing verified payments from this device." : "Showing verified payments from this device."}</p>}
+      {historyError && <p className="status warn" role="status">Couldn’t refresh your history. {historySource ? "Showing the last loaded payments." : "Try Activity to reload it."}</p>}
+      {historySource === null ? historyError ? null : <LoadingSkeleton label="Loading payment history" /> : history.length === 0 ? <EmptyState title="Your story starts here" description="Payments you send and receive will appear here." /> : <ul className="transaction-list" aria-label="Activity">{history.slice(0, 5).map(r => <TransactionRow key={r.direction + r.paymentId} item={r} />)}</ul>}
+      </section>
       <p className="muted small center"><Link href="/proof">Everpiece in numbers</Link></p>
     </div>
   );
@@ -420,8 +310,6 @@ function explain(r: HistoryItem): string {
       return `Protected until they take it. You can cancel until then. If it isn't taken by ${day(r.expiresAt)}, it comes back to you.`;
   }
 }
-
-const when = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 function StatusPill({ item }: { item: HistoryItem }) {
   if (item.direction === "received") return <span className="pill ok">Received</span>;

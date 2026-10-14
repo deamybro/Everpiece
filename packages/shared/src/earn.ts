@@ -24,7 +24,11 @@ export type EarnOpportunity = {
   vault: Address;
   accounting: AccountingModel;
   /** Where the live rate comes from (never a hardcoded APY). */
-  rateSource: { kind: "AAVE_V3_LIQUIDITY_RATE"; pool: Address; reserve: Address } | { kind: "SIMULATED" };
+  rateSource:
+    | { kind: "AAVE_V3_LIQUIDITY_RATE"; pool: Address; reserve: Address }
+    /** Morpho's public API reports the vault's net APY (after fees); read live, never a constant. */
+    | { kind: "MORPHO_API"; vault: Address; chainId: number }
+    | { kind: "SIMULATED" };
   simulated: boolean;
   /** Plain-language risks shown before any deposit. */
   risks: string[];
@@ -44,6 +48,43 @@ export const EARN_OPPORTUNITIES: readonly EarnOpportunity[] = [
     vault: "0x9e1AcC5BFbf34e2E579763cE14042d957719fE76",
     accounting: "ERC4626_MONOTONIC",
     rateSource: { kind: "AAVE_V3_LIQUIDITY_RATE", pool: "0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef", reserve: AUSD_MAINNET },
+    simulated: false,
+    risks: [
+      "The rate changes all the time; it is what borrowers pay, minus Aave's share.",
+      "Withdrawals need free liquidity in the market: if most of it is borrowed, a full withdrawal can have to wait.",
+      "Smart-contract and oracle risk of Aave. Not insured, not a bank deposit.",
+    ],
+    source: "https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol",
+  },
+  {
+    // VERIFIED §4.21: Morpho MetaMorpho vault, LISTED by Morpho; asset() = AUSD; ERC-4626 + ERC-2612 (EIP-712 name "", v1).
+    id: "morpho-grove-steakhouse-ausd",
+    chainId: MONAD_MAINNET_CHAIN_ID,
+    provider: "Morpho",
+    name: "Morpho · Grove x Steakhouse AUSD",
+    asset: AUSD_MAINNET,
+    vault: "0x32841A8511D5c2c5b253f45668780B99139e476D",
+    accounting: "ERC4626_MONOTONIC",
+    rateSource: { kind: "MORPHO_API", vault: "0x32841A8511D5c2c5b253f45668780B99139e476D", chainId: MONAD_MAINNET_CHAIN_ID },
+    simulated: false,
+    risks: [
+      "The rate changes all the time; it comes from the markets this vault lends into.",
+      "A curator (Steakhouse, with Grove) chooses where the money is lent; changes are delayed by a 14-day timelock.",
+      "Withdrawals depend on free liquidity in those markets. A bad debt in a market can reduce the vault's value.",
+      "Smart-contract risk of Morpho and the markets. Not insured, not a bank deposit.",
+    ],
+    source: "https://app.morpho.org (listed vault); https://docs.morpho.org",
+  },
+  {
+    // VERIFIED §4.18: "Wrapped Aave Monad USDC" (EIP-712 v1, 6 dp), asset() = USDC, aToken 0x35a7…6042.
+    id: "aave-v3-usdc",
+    chainId: MONAD_MAINNET_CHAIN_ID,
+    provider: "Aave V3",
+    name: "Aave · USDC",
+    asset: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+    vault: "0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2",
+    accounting: "ERC4626_MONOTONIC",
+    rateSource: { kind: "AAVE_V3_LIQUIDITY_RATE", pool: "0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef", reserve: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603" },
     simulated: false,
     risks: [
       "The rate changes all the time; it is what borrowers pay, minus Aave's share.",
@@ -103,6 +144,12 @@ export const earnDepositId = (earn: Address, chainId: number, d: EarnDeposit): H
 export const earnWithdrawalId = (earn: Address, chainId: number, w: EarnWithdrawal): Hex => hashTypedData(earnWithdrawalTyped(earn, chainId, w));
 
 /** What the owner signs to fund a deposit: AUSD ReceiveWithAuthorization to EverpieceEarn, nonce = deposit id. */
+/** The deposit authorization in ANY settlement asset's own domain (USDC "USDC"/"2", AUSD "Agora Dollar"/"1"). */
+export function earnAuthorization(earn: Address, chainId: number, d: EarnDeposit, token: { address: Address; eip712Name: string; eip712Version: string }) {
+  const a = earnAusdAuthorization(earn, chainId, d, token.address, token.eip712Name);
+  return { ...a, domain: { ...a.domain, version: token.eip712Version } } as const;
+}
+
 export function earnAusdAuthorization(earn: Address, chainId: number, d: EarnDeposit, ausd: Address, ausdName: string = AUSD_EIP712_NAME) {
   return {
     domain: { name: ausdName, version: AUSD_EIP712_VERSION, chainId, verifyingContract: ausd },

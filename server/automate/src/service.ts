@@ -3,7 +3,7 @@ import { getAddress, isAddress, recoverTypedDataAddress, type Address, type Hex 
 import {
   automationRuleTyped, dayOf, executionIdOf, legReportTyped, legRunnable, LegOutcome, monthOf, outcomeOf, plan, ruleFromJson,
   ruleSpecProblem, ruleToJson, AUTOMATE_VERSION, type Action, type AutomationRule, type ExecutionState, type LegReport, type LegStatus,
-  type PlanLeg, type TargetStatus, type TriggerEvent,
+  type PlanLeg, type TargetStatus, type TriggerEvent, type Grant,
 } from "@everpiece/shared";
 import type { AutomateConfig } from "./config.ts";
 import { AutomateStore, type ExecutionRow, type LegRow } from "./store.ts";
@@ -26,6 +26,17 @@ export interface WorldReader {
 export interface TargetRegistry {
   availability(a: Exclude<Action, { kind: "KEEP_BALANCE" }>): { status: TargetStatus; reason?: string };
 }
+/**
+ * BOUNDED_MODULE (EverpieceAutomate): verifies an owner's on-chain grant for a rule, and executes one leg through the
+ * relayer's internal route. The contract bounds every execution (vault, caps, expiry); this side never holds keys.
+ */
+export interface ModuleExecutor {
+  /** null = OK: the grant exists on-chain, isn't revoked, names our executor, and matches the rule. */
+  verifyGrant(rule: AutomationRule, grant: Grant): Promise<{ grantId: Hex; vault: Address } | { problem: string }>;
+  /** Execute and wait for the relayer's CONFIRMED (event + state at finality). Never throws. */
+  execute(grantId: Hex, legKey: string, assets: bigint, vault: Address): Promise<{ ok: true; txHash: Hex } | { ok: false; reason: string }>;
+}
+
 /** Proves a reported transaction did exactly this leg (receipt success, expected event, owner as beneficiary, final). */
 export interface LegVerifier {
   verify(owner: Address, action: Action, amount: bigint, txHash: Hex): Promise<"OK" | "NOT_FINAL" | "MISMATCH">;
@@ -54,10 +65,15 @@ export class AutomateService {
   private world: WorldReader;
   private targets: TargetRegistry;
   private verifier: LegVerifier;
+  private module: ModuleExecutor | null;
   private clock: () => number;
   private writes: Limiter;
   private reads: Limiter;
-  constructor(cfg: AutomateConfig, world: WorldReader, targets: TargetRegistry, verifier: LegVerifier, clock: () => number = () => Math.floor(Date.now() / 1000)) {
+  constructor(
+    cfg: AutomateConfig, world: WorldReader, targets: TargetRegistry, verifier: LegVerifier,
+    clock: () => number = () => Math.floor(Date.now() / 1000), module: ModuleExecutor | null = null,
+  ) {
+    this.module = module;
     this.cfg = cfg;
     this.world = world;
     this.targets = targets;
@@ -124,6 +140,64 @@ export class AutomateService {
     return { rule: ruleToJson(rule), state, targets, lastExecution: last ? this.execView(last) : null };
   }
 
+  // ── bounded module grants ────────────────────────────────────────────────────────────────────────────────────────
+
+  /** Link the owner's activated on-chain grant to their BOUNDED_MODULE rule (anyone may submit; the chain decides). */
+  async linkGrant(body: unknown): Promise<Result> {
+    if (!this.module) return bad("AUTHORIZATION_NOT_AVAILABLE", 503);
+    const b = body as { ruleId?: unknown; grant?: Record<string, unknown> };
+    if (typeof b?.ruleId !== "string" || !b.grant) return bad("INVALID_GRANT");
+    const row = this.store.getRule(b.ruleId);
+    if (!row) return bad("NOT_FOUND", 404);
+    const rule = ruleFromJson(JSON.parse(row.record));
+    if (rule.authorization !== "BOUNDED_MODULE") return bad("NOT_A_BOUNDED_RULE");
+    let grant: Grant;
+    try {
+      const g = b.grant;
+      grant = { ruleId: String(g.ruleId) as Hex, owner: addr(g.owner), executor: addr(g.executor), vault: addr(g.vault), maxPerExecution: u(g.maxPerExecution), maxPerDay: u(g.maxPerDay), total: u(g.total), expiresAt: u(g.expiresAt) };
+      if (!/^0x[0-9a-fA-F]{64}$/.test(grant.ruleId)) throw new Error("bad");
+    } catch {
+      return bad("INVALID_GRANT");
+    }
+    const v = await this.module.verifyGrant(rule, grant);
+    if ("problem" in v) return bad(v.problem, 422);
+    try {
+      this.store.putGrant({ rule_id: rule.id, grant_id: v.grantId, owner: rule.owner, vault: v.vault, linked_at: this.clock() });
+    } catch {
+      return bad("GRANT_ALREADY_LINKED", 409); // one grant serves exactly one rule
+    }
+    log("info", "grant.linked", { rule: rule.id, grant: v.grantId });
+    return ok({ ruleId: rule.id, grantId: v.grantId });
+  }
+
+  /**
+   * Run a READY execution of a BOUNDED_MODULE rule without the owner: each Earn leg goes through the on-chain grant.
+   * A leg that can't run is FAILED with its money still in the balance (never moved elsewhere); the run's outcome says so.
+   */
+  private async runBounded(executionId: string, rule: AutomationRule): Promise<void> {
+    const link = this.store.grantOf(rule.id);
+    if (!this.module || !link) return; // stays READY: the owner can still confirm it by hand within the window
+    for (const l of this.store.legsOf(executionId)) {
+      const action = JSON.parse(l.action) as Action;
+      const retry = l.status === "EXECUTING"; // a previous attempt didn't reach finality in time
+      if (!retry && !legRunnable({ status: l.status as LegStatus, amount: BigInt(l.amount) })) continue;
+      if (action.kind !== "DEPOSIT_YIELD") continue; // only Earn deposits are possible through the module
+      const now = this.clock();
+      this.store.setLeg(executionId, l.leg_index, "EXECUTING", null, null, now);
+      const r = await this.module.execute(link.grant_id as Hex, l.idempotency_key, BigInt(l.amount), getAddress(link.vault));
+      try {
+        if (r.ok) this.store.setLeg(executionId, l.leg_index, "DONE", r.txHash.toLowerCase(), null, this.clock());
+        // not final yet: stays EXECUTING (never reported failed while it may still settle); the sweep retries it
+        else if (r.reason === "EXECUTION_STILL_PENDING") continue;
+        else this.store.setLeg(executionId, l.leg_index, "FAILED", null, r.reason, this.clock());
+      } catch {
+        this.store.setLeg(executionId, l.leg_index, "FAILED", null, "TX_ALREADY_USED", this.clock());
+      }
+      log("info", "execution.bounded_leg", { execution: executionId, leg: l.leg_index, ok: r.ok, reason: r.ok ? undefined : r.reason });
+    }
+    this.refreshState(executionId, this.clock());
+  }
+
   // ── triggers → plans (internal: the indexer watcher) ─────────────────────────────────────────────────────────────
 
   authorizedInternal(header: string | undefined): boolean {
@@ -171,6 +245,7 @@ export class AutomateService {
       );
       results.push({ ruleId: rule.id, executionId, planned: inserted, reason: inserted ? undefined : "DUPLICATE_EVENT" });
       if (inserted) log("info", "execution.planned", { rule: rule.id, execution: executionId, moving: p.moving.toString(), state: initial });
+      if (inserted && initial === "READY" && rule.authorization === "BOUNDED_MODULE") await this.runBounded(executionId.toLowerCase(), rule);
     }
     return ok({ event: ev.id, results });
   }
@@ -241,6 +316,16 @@ export class AutomateService {
     const legs = this.store.legsOf(id).map(toPlanLeg);
     const s = outcomeOf(legs);
     this.store.setExecutionState(id, s === "EXECUTING" ? "EXECUTING" : s, now);
+  }
+
+  /** Bounded executions with legs still EXECUTING (not final when last checked): check again (idempotent on-chain). */
+  async sweepBounded(): Promise<void> {
+    for (const e of this.store.executionsInState("EXECUTING")) {
+      const row = this.store.getRule(e.rule_id);
+      if (!row) continue;
+      const rule = ruleFromJson(JSON.parse(row.record));
+      if (rule.authorization === "BOUNDED_MODULE") await this.runBounded(e.execution_id, rule);
+    }
   }
 
   /** Lapse executions the owner didn't confirm in time: their unexecuted legs fail, the money never left the balance. */

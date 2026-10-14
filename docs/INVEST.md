@@ -15,7 +15,20 @@ An asset is `AVAILABLE` only when **all** of these hold:
 Otherwise the asset is `LOW_LIQUIDITY` (a route exists but its market quality fails), `UNAVAILABLE`, `COMING_SOON` or `RESTRICTED`.
 The app never shows a price without a live, verified quote, and never offers a buy for an asset that is not `AVAILABLE`.
 
-## Current state (2026-10-08): nothing is offered
+## Current state (2026-10-09): nothing is offered
+
+- **Reference price:** Anchored's own on-chain StockOracle on Monad (VERIFIED §4.20) — live, with session and staleness, shown in the app as "not a buy price".
+- **DEX route vs reference (Kuru Flow, 2026-10-09):** $1 → $255.79 per aNVDA (+11.4% over the oracle's $229.52), $5 → $269.04 (+17.2%). The policy limit is 3%, so it is LOW_LIQUIDITY and never executable.
+- **Issuer route (Anchored RWA API):** the only fair-price route. What is missing, precisely, is listed in `INVEST_PROVIDERS`:
+  - a KYC'd professional/qualified investor per wallet (no US or China residents);
+  - an API key bound to that wallet's address;
+  - our egress IP whitelisted on each key;
+  - One Click delegation for gasless orders;
+  - or a partner arrangement only Anchored can offer.
+
+  The HMAC client is built (`server/relayer/src/anchored.ts`), but Everpiece holds no key.
+
+## Earlier scan (2026-10-08)
 
 Read-only Kuru Flow scan of 10 aStocks from USDC, AUSD and MON at $1–$25, at block 111501031. Nothing was signed or sent.
 Evidence: `evidence/kuru-astocks-2026-10-08/` (`discover.mjs`, `discovery.json`).

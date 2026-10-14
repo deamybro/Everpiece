@@ -14,6 +14,8 @@ import { friendlyPasskeyError, loadAccount, type Account } from "../lib/mera";
 import { PayError, RequestMode, balanceOfToken, getQuote, loadRequest, payInstant, payTokens, reportPaid, type LoadedRequest } from "../lib/pay";
 import { receiptPath } from "../lib/receipt";
 import { fundingAvailable } from "../lib/funding";
+import { payV2Available } from "../lib/payV2";
+import { PayRequestV2 } from "./PayRequestV2";
 
 const tokenLabel = (t: TokenInfo) => (t.route === "DIRECT_AUSD" ? "Dollars" : t.testnet ? `Test ${t.symbol}` : t.symbol);
 const amountOf = (t: TokenInfo, v: bigint) => (t.route === "DIRECT_AUSD" ? formatDollars(v) : `${fromBaseUnits(v, t.decimals)} ${t.symbol}`);
@@ -145,6 +147,8 @@ export function PayRequest({ requestId }: { requestId: Hex }) {
   }
   if (!req) return null;
   const { request, recipient } = req;
+  // USDC + AUSD instant requests settle through EverpiecePayV2 (the requester chose the asset)
+  if (payV2Available() && request.mode === RequestMode.INSTANT) return <PayRequestV2 loaded={req} requestId={requestId} />;
   const who = `@${recipient.username}`;
   const card = (
     <div className="card center stack">

@@ -112,7 +112,6 @@ export function ruleSpecProblem(s: RuleSpec, nowSec: bigint): RuleProblem | null
   if (l.expiresAt <= nowSec) return "RULE_EXPIRED";
   if (l.expiresAt - nowSec > MAX_RULE_LIFETIME_SEC) return "EXPIRY_TOO_FAR";
   if (s.authorization !== "CONFIRM_EACH" && s.authorization !== "BOUNDED_MODULE") return "INVALID_RULE";
-  if (s.authorization === "BOUNDED_MODULE") return "AUTHORIZATION_NOT_AVAILABLE"; // no module deployed (AUTOMATE.md)
   return null;
 }
 

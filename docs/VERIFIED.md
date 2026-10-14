@@ -457,6 +457,17 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - **Notes:** TODO(VERIFY): the dashboard/appId requirement, whether arbitrary ERC-20s (an Everpiece test dollar) can be deposited, Mera EOA `personal_sign` compatibility, and audit status. Master §28.2 gate items 6–13 must be proven on testnet before launch.
 
 ### 4.11 TACEO Merces (private ERC-20 balances) on Monad
+- **Re-checked 2026-10-09** (docs.taceo.io "Deployments and status"; client SDK `@taceo/merces-client` 0.1.1, maintainers @taceo.io, repo taceolabs/merces):
+  - Mainnet status: "Mainnet, limited users, volume caps".
+  - Merces `0x9Dd5DE40592AdfcDD60F0f3fF3B014553998f7c1`, ID registry `0xF55DFe8242ec117F44Acd932adb5C233b582A04a`, token = Monad USDC.
+  - Group 4 (ANON): fee 0, max 1 USDC per action, 35 actions per epoch, 100 members.
+  - Three query nodes `query.node{0,1,2}.usdc.monad.merces.taceo.network`; compliance `compliance.usdc.monad.merces.taceo.network`.
+  - Live, read-only:
+    - `isRegistered` works;
+    - the Merces contract has code;
+    - `fetchComplianceData` returned a 256-byte attestation for a fresh address.
+  - The SDK submits from the user's own wallet (no relayer documented), so the account needs MON for gas.
+  - Private: a transfer's sender, receiver and amount. Public: registration, deposit and withdrawal amounts and accounts.
 - **Fact:** The privacy provider on Monad's official privacy page
 - **Value:**
   - Wraps existing ERC-20s into private balances. Balances and identifiers are secret-shared across independent MPC nodes (the TACEO Network), and every state change is verified on-chain by a collaborative ZK proof (coSNARK).
@@ -595,6 +606,112 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
   - Withdrawals depend on free reserve liquidity (high utilization can delay a full exit).
   - Smart-contract and oracle risk is Aave's; there is no "safe yield" claim.
 
+### 4.18 Monad USDC as a first-class settlement asset; Aave V3 USDC vault (checked 2026-10-09)
+- **Fact:** Monad mainnet USDC supports the same payee-checked ERC-3009 receive Everpiece relies on for AUSD, so it can be settled directly (no conversion). It lacks AUSD's upgrade flag.
+- **Value:**
+  - USDC `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` (Circle FiatToken proxy; implementation `0xbd520ea8CbB4F81b62aFF3c3FfE7AfFD69800b6d` at block 111,905,431).
+    - `name()` "USDC", `version()` "2", 6 dp, `paused()` false.
+    - `DOMAIN_SEPARATOR()` `0xfe22123edc0dd4aeb912eb7948c5f0e531592c2053b3067612f427db342c93c6` = EIP712Domain("USDC", "2", 143, USDC), recomputed with `cast keccak`.
+    - `receiveWithAuthorization`: both the (v,r,s) and the packed-bytes (FiatToken v2.2) overloads work.
+      - Third-party caller → "FiatTokenV2: caller must be the payee".
+      - Replay → "authorization is used or canceled"; changed amount → "invalid signature"; past validBefore → "authorization is expired".
+      - A receive signature is not valid as transferWithAuthorization.
+    - `isReceiveWithAuthorizationUpgraded()` does **not** exist (the call reverts), so the AUSD fail-closed guard cannot be applied to USDC. USDC contracts rely on the balance checks around every pull and payout instead.
+    - `isBlacklisted(address)` exists: Circle can blacklist an address, and a transfer to or from it reverts atomically.
+  - Aave V3 "Wrapped Aave Monad USDC" ERC-4626 `0xC554aFfE2f581F5E0811e0D42D484ECaC5c6B8e2` (address book `USDC_STATA_TOKEN`): `asset()` = USDC. aUSDC (aToken) `0x35a73BAcb179d3740395A3ceCc87FF2e581d6042`.
+- **Official source:** Circle FiatToken v2.2 source (github.com/circlefin/stablecoin-evm); https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Monad.sol.
+- **Explorer / verified-source reference:** live `cast call`s on rpc.monad.xyz (block 111,907,364).
+- **Proven on a fork:**
+  - `contracts/test/fork/UsdcProbe.t.sol` (9 tests): the receive semantics above.
+  - `contracts/test/fork/EverpiecePayV2Fork.t.sol`: direct USDC and direct AUSD payments on real tokens; USDC↔AUSD through the real Agora pair once APPROVED_SWAPPER is granted (granted in the fork by impersonating the pair's WHITELISTER_ROLE holder); "unavailable" with nothing moved when it is not.
+  - `contracts/test/fork/UsdcVariantsFork.t.sol`: EverpieceEscrowUsdc create/claim/refund; EverpieceEarnUsdc deposit and real accrual on the vault above.
+- **Notes:**
+  - Agora pair quotes at block 111,905,431: exactly 1:1 (100 USDC ↔ 100 AUSD), no fee.
+  - A USDC upgrade by Circle could change the receive semantics without any on-chain flag. This is a residual risk; the balance checks bound the damage to a reverted transaction.
+
+### 4.19 AUSD ↔ USDC permissionless conversion: the Uniswap v4 pool Kuru Flow routes through (checked 2026-10-09)
+- **Fact:** where the permissionless AUSD/USDC liquidity on Monad actually is, and that a fixed adapter can use it without relaying aggregator calldata.
+- **Value:**
+  - Uniswap v4 on Monad (developers.uniswap.org "v4 deployments", chain 143):
+    - PoolManager `0x188d586ddcf52439676ca21a244753fa19f9ea8e`;
+    - V4Quoter `0xa222dd357a9076d1091ed6aa2e16c9742dd26891`;
+    - StateView `0x77395f3b2e73ae90843717371294fa97cc419d64`;
+    - Universal Router `0x0d97dc33264bfc1c226207428a79b26757fb9dc3`;
+    - Permit2 `0x000000000022D473030F116dDEE9F6B43aC78BA3`.
+  - AUSD/USDC pool:
+    - key (currency0 AUSD, currency1 USDC, fee 9 = 0.0009%, tickSpacing 1, hooks 0x0);
+    - pool id `0xd112fde908d7342135fc7297cc53d25bf7a11d6c6e21fe7ac3e73c40f70827e8`;
+    - `StateView.getLiquidity` 3,708,640,259,037 at block ≈111.92M.
+  - How it was found: a real Kuru Flow quote (`ws.kuru.io/api/quote`, router `0xb3e6778480b2E488385E8205eA05E20060B813cb`), executed on a fork and traced. It does `PoolManager.unlock` → `swap(key above)` → `take`/`sync`/`settle` through Kuru's adapter `0x2f84FB8982073f39Ba47c7fcC29119aF074AbbcB`. So Kuru Flow's AUSD/USDC price is this pool.
+  - Kuru's own AUSD_USDC **orderbook** (`0x699abc15308156e9a3ab89ec7387e9cfe1c86a3b`) reverted `MarketStateError()` on a 100 USDC market buy through the Kuru Router `anyToAnySwap` (fork, block 111,919,008), so it is not used.
+  - V4Quoter `quoteExactOutputSingle` (live eth_call):
+    - 100 AUSD out = 99.980370 USDC in;
+    - 100 USDC out = 100.025983 AUSD in.
+- **Official source:** https://developers.uniswap.org/docs/protocols/v4/deployments ; Uniswap v4-core IPoolManager (unlock/swap/take/sync/settle, BalanceDelta packing).
+- **Proven on a fork:**
+  - `contracts/test/fork/StableConverterFork.t.sol` (EverpieceStableConverter, exact output):
+    - 100 AUSD for 99.982929 USDC;
+    - 100 USDC for 100.024270 AUSD;
+    - $1 for 0.999803 USDC;
+    - maxIn enforced; the callback can't be driven by others.
+  - `EverpiecePayV2Fork.t.sol`: USDC→AUSD and AUSD→USDC payments with NO Agora approval; the fallback delivers USDC truthfully.
+  - `RelayerGasV2.t.sol`, cold-state transaction gas:
+
+    | Route | Gas |
+    |---|---|
+    | Direct USDC | 307,702 |
+    | Direct AUSD | 271,199 |
+    | v4 conversion | 628,079 |
+    | Agora conversion | 504,294 |
+    | Agora fails, then v4 (worst case) | 664,077 |
+
+    The worst case completes at the 800k relayer limit.
+- **Notes:**
+  - Concentrated liquidity: large conversions cross many ticks and cost more. The converter refuses partial fills (`PartialFill`).
+  - The relayer caps the signed slippage at 50 bps (`MAX_CONVERT_SLIPPAGE_BPS`).
+
+### 4.20 Anchored aStocks: on-chain StockOracle, issuer contracts and access model (checked 2026-10-09)
+- **Fact:** where a fair reference price for aStocks comes from, and the only documented way to buy at it.
+- **Value:**
+  - StockOracle proxy `0x037848af338c38e1e0ab722be80bf4c2e612a1f7` on Monad (same on Ethereum and Base):
+    - 8-decimal prices; `priceId = keccak256(uppercase(trim(symbol)))`.
+    - Live `latestPrice` at ≈1791570142, session REGULAR, feed ≈19 min old:
+
+      | Symbol | Price | Bid / ask |
+      |---|---|---|
+      | NVDA | 229.52 | 229.51 / 229.53 |
+      | AAPL | 335.27 | 335.24 / 335.30 |
+      | MSFT | 533.605 | 533.55 / 533.66 |
+
+    - Anchored documents the feed may be ~15 min delayed with a 10 min heartbeat, and names 1,500 s as a practical freshness lower bound.
+  - Issuer contracts on Monad (code present, 1,589-byte proxies):
+    - StockRouter `0x4f090d817fd83753988a7b0c1d76f170f8461be8`;
+    - Cashier `0x8c1b182bb0fe4e8407404ffe37c974d6dacef3a9`;
+    - Stock `0x6d202d2f78aa26a7db51491416abf7f7a5003aac`;
+    - OneClickRouter `0x102c30ac544aed8cbf838fdc1b1677ff16df0e65`.
+  - Cash token on Monad: USDC. Production cash config: minimum amount "90" cash-token units (TODO(VERIFY): whole USDC or base units); withdrawal rate 0.9979.
+  - RWA Trading API `https://rwa-api.anchored.finance/rwa/trading`:
+    - HMAC-SHA256 over `METHOD
+URI
+TS
+NONCE
+BODY`, plus headers `x-api-chain-id` and `x-api-p: Anchored`.
+    - Every key needs a non-empty egress-IP whitelist and a `chainId + product + access` scope.
+    - Orders: the API returns StockRouter calldata that the **bound wallet** submits ("API key userAddress matches order user"), or it is sent via One Click delegation. Execution is async by Anchored's backend.
+  - Eligibility: professional/qualified investors after KYC/KYB; US and China residents excluded; a prohibited-jurisdiction list applies.
+- **Today's DEX route vs the oracle** (Kuru Flow USDC→aNVDA, 2026-10-09):
+
+  | Amount | aNVDA out | Effective price | Over oracle |
+  |---|---|---|---|
+  | $1 | 0.0039095 | $255.79 | +11.4% |
+  | $5 | 0.0185845 | $269.04 | +17.2% |
+
+  Everpiece's policy allows at most 3%, so aNVDA is LOW_LIQUIDITY and never executable.
+- **Official source:** https://docs.anchored.finance/trading-api/market-data/stock-oracle ; …/reference/environments-and-chains ; …/guides/self-submit-on-chain ; …/authentication/signature ; …/getting-started/eligibility ; …/getting-started/how-to-onboard.
+- **Code:**
+  - `packages/shared/src/invest.ts` (`ANCHORED_STOCK_ORACLE`, `referenceFromOracle`, `ANCHORED_MONAD`);
+  - `server/relayer/src/anchored.ts` (HMAC client, cross-checked against Python `hmac`).
+
 ### 4.2 Hackathon window
 - **Fact:** Metropolis intake window
 - **Value:** "Intake · Open 1 Sep to 13 Oct" (public landing page). **No time of day or timezone is shown.**
@@ -693,3 +810,9 @@ All §2 facts were verified against **Sourcify-verified deployed source** (full 
 - TODO(VERIFY): Safe UI/Transaction Service on 143 via a test Safe, before transferring escrow ownership (see §4.3).
 - TODO(VERIFY): `@noble/curves` random secp256k1 key API name in the installed version (link package, Oct 4).
 - TODO(VERIFY): USDC / CCTP on Monad — Circle docs (only if cash-out via CCTP is pursued).
+
+### 4.21 Morpho "Grove x Steakhouse High Yield AUSD" vault (Monad mainnet) — checked 2026-10-12
+- Vault `0x32841A8511D5c2c5b253f45668780B99139e476D`: MetaMorpho ERC-4626 + ERC-2612; `asset()` = AUSD; listed by Morpho (api.morpho.org `vaultByAddress`, chain 143).
+- Read on a mainnet fork (`MorphoEarnFork.t.sol`): curator `0x827e8607…eCdB`, timelock 1,209,600 s (14 days), performance fee 0, supply queue length 5.
+- Deposit via AUSD ERC-3009 authorization and withdraw via share permit work through EverpieceEarn with principal intact; measured gas deposit ~739,590, withdraw ~660,258 (relayer earnDeposit limit raised to 850,000).
+- The rate is read live from Morpho's API (`netApy`); no APY constant is stored anywhere.

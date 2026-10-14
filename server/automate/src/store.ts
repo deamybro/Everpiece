@@ -33,9 +33,25 @@ export class AutomateStore {
       CREATE TABLE IF NOT EXISTS legs (execution_id TEXT NOT NULL, leg_index INTEGER NOT NULL, idempotency_key TEXT NOT NULL UNIQUE,
         action TEXT NOT NULL, allocated TEXT NOT NULL, amount TEXT NOT NULL, left_in_balance TEXT NOT NULL, status TEXT NOT NULL,
         reason TEXT, tx_hash TEXT UNIQUE, updated_at INTEGER NOT NULL, PRIMARY KEY (execution_id, leg_index));
+      -- BOUNDED_MODULE: the owner's on-chain EverpieceAutomate grant serving a rule (verified on-chain when linked)
+      CREATE TABLE IF NOT EXISTS grants (rule_id TEXT PRIMARY KEY, grant_id TEXT NOT NULL UNIQUE, owner TEXT NOT NULL, vault TEXT NOT NULL,
+        linked_at INTEGER NOT NULL);
     `);
   }
   close() { this.db.close(); }
+
+  executionsInState(state: string): ExecutionRow[] {
+    return this.db.prepare("SELECT * FROM executions WHERE state = ? ORDER BY created_at LIMIT 200").all(state) as ExecutionRow[];
+  }
+  putGrant(g: { rule_id: string; grant_id: string; owner: string; vault: string; linked_at: number }): void {
+    this.db.prepare(`INSERT INTO grants (rule_id, grant_id, owner, vault, linked_at) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(rule_id) DO UPDATE SET grant_id = excluded.grant_id, owner = excluded.owner, vault = excluded.vault, linked_at = excluded.linked_at`)
+      .run(g.rule_id.toLowerCase(), g.grant_id.toLowerCase(), g.owner.toLowerCase(), g.vault.toLowerCase(), g.linked_at);
+  }
+  grantOf(ruleId: string): { rule_id: string; grant_id: string; owner: string; vault: string } | undefined {
+    return this.db.prepare("SELECT rule_id, grant_id, owner, vault FROM grants WHERE rule_id = ?").get(ruleId.toLowerCase()) as
+      { rule_id: string; grant_id: string; owner: string; vault: string } | undefined;
+  }
 
   getRule(id: string): RuleRow | undefined {
     return this.db.prepare("SELECT * FROM rules WHERE rule_id = ?").get(id.toLowerCase()) as RuleRow | undefined;

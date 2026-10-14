@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import type { Method } from "./config.ts";
 import { publicView, type Relayer } from "./relayer.ts";
 import { log } from "./log.ts";
@@ -12,8 +13,14 @@ const ROUTES: Record<string, Method> = {
   "/v1/payments/refund": "refundExpired",
   "/v1/pay/ausd": "payWithAusd",
   "/v1/pay/token": "payWithToken",
+  "/v1/pay/v2/direct": "payV2Direct",
+  "/v1/pay/v2/convert": "payV2Convert",
   "/v1/earn/deposit": "earnDeposit",
   "/v1/earn/withdraw": "earnWithdraw",
+  "/v1/earn/usdc/deposit": "earnUsdcDeposit",
+  "/v1/earn/usdc/withdraw": "earnUsdcWithdraw",
+  "/v1/automate/grants/activate": "automateActivate",
+  "/v1/automate/grants/revoke": "automateRevoke",
 };
 
 class HttpError extends Error {
@@ -93,9 +100,24 @@ export function createHttpServer(relayer: Relayer): Server {
         else return send(res, 404, { error: "NotFound" }, origin);
         return send(res, out.httpStatus, out.body, origin);
       }
+      if (url.pathname === "/v1/quotes/v2") {
+        if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
+        const out = await relayer.quoteV2(await readJson(req, relayer.cfg.maxBodyBytes), clientIp(req));
+        return send(res, out.httpStatus, out.body, origin);
+      }
       if (url.pathname === "/v1/quotes") {
         if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
         const out = await relayer.quote(await readJson(req, relayer.cfg.maxBodyBytes), clientIp(req));
+        return send(res, out.httpStatus, out.body, origin);
+      }
+      // Internal (the Automate service only): bounded executions under an owner's on-chain grant.
+      if (url.pathname === "/v1/internal/automate/execute") {
+        const key = req.headers["x-internal-key"];
+        const want = relayer.cfg.internalKey;
+        const okKey = typeof key === "string" && want !== undefined && key.length === want.length && timingSafeEqual(Buffer.from(key), Buffer.from(want));
+        if (!okKey) return send(res, 404, { error: "NotFound" }, origin);
+        if (req.method !== "POST") return send(res, 405, { error: "MethodNotAllowed" }, origin);
+        const out = await relayer.submitAction("automateExecute", await readJson(req, relayer.cfg.maxBodyBytes), clientIp(req));
         return send(res, out.httpStatus, out.body, origin);
       }
       const method = ROUTES[url.pathname];

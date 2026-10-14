@@ -4,6 +4,114 @@ Read `MASTER_PROMPT.md` (full v3.2), this file, and the repo before continuing.
 
 ---
 
+## Session 38 — 2026-10-12 — Mainnet live: Earn (Aave+Morpho), claims, Copilot, scoped session, encrypted backup
+
+Owner GO given per step; every spend was verified on-chain at the finalized block. Branch `feat/usdc-first-class` is local only (not pushed).
+
+**Deployed and verified (Monad 143)**
+- AUSD Earn `0x4bb7d4ce29f7c8410576cdf084637c790fd44e5a` (Aave waMonAUSD + Morpho Grove x Steakhouse AUSD vault). Deployer `0xB065b91A2aEDe8A51eF9D453e37Fe67164DB781d` (key root-only on the VPS in `/opt/everpiece-mainnet/mainnet-deployer2.txt` path `/root/mainnet-deployer2.txt`). The old deployer `0x519aEBD2…` key was never saved (3.76 MON stranded unless found).
+- Escrow claim approver rotated on-chain (owner tx `0x5f21415a…3936`) to `0x74d858B94fFc306e87c20c48De3c0A4eCa82ab25`; key in `/opt/everpiece-mainnet/approver.txt`, PHONE_ENC_KEY in `phone-enc.key`.
+- Claims service live (`everpiece-mainnet-claims`, port 47314, Caddy `/svc/claims`). Phone/email send flows enabled in the web build; a real phone-claim canary is NOT confirmed by me.
+- TACEO is reached through same-origin Caddy routes `/svc/taceo/{compliance,n0,n1,n2}` (their servers send no CORS). Join private payments retry still unconfirmed.
+- Canaries passed: USDC to AUSD via Uniswap v4 (tx `0x1286fcf6…f5ec2`), Morpho AUSD deposit+withdraw (`0x3cb08c13…bec40`, `0x38508590…8db6`), direct AUSD to the owner's app account (`0x94230dfe…7cf1`), real BNB Chain USDC payment through Aurora ($0.50, delivery `0xc8421567…677a2b`); a second, confidential-ticked $0.50 payment also arrived (hash not recorded).
+
+**Built this session (committed locally, deployed to the VPS only after the owner runs the deploy commands)**
+- Morpho vault in the Earn registry with a live rate from Morpho's API; minShares now allows 0.5% slippage (a live vault rejected exact previews).
+- Get-paid page and public `/to/<username>` page: anyone pays from 8 chains (Base, Ethereum, Arbitrum, Optimism, Polygon, Avalanche, Gnosis, BNB), USDC only.
+- Copilot (local qwen2.5:3b via Ollama on the VPS, one request at a time): sentence to proposed rule; strict parser; owner reviews and signs. Not yet tried against the real model.
+- Scoped in-memory signing session (5 min, $10/$20/$50 cap enforced by the app, not by Mera) for payments and Earn deposits only.
+- Encrypted address book in a Mera Secret Vault with signed writes (voice store `/v1/vault/<account>`).
+- Owner-only page `/owner-set-approver.html` (static, own CSP) used once; can be removed.
+- Docs: `docs/SUBMISSION.md` (Agora, Aurora texts and shot lists), `docs/AGORA_APPROVAL_REQUEST.md` (to send to Agora), `docs/SESSIONS_AND_VAULT.md`.
+
+**Deploy order on the VPS (all files already uploaded)**
+1. `cd /opt/everpiece-mainnet && bash deploy-services.sh` (now refuses to run without a valid b.tgz; wait for it to finish)
+2. `cd /opt/everpiece-mainnet && tar -xzf /tmp/webdist.tgz -C web && systemctl restart everpiece-mainnet-web`
+Relayer tunnel for canaries: `ssh -N -L 47310:127.0.0.1:47310 optiongenome` in its own window; canary scripts run from PowerShell on the PC.
+
+**Open**
+- Agora APPROVED_SWAPPER for EverpiecePayV2 `0x29D15Bb9…8eb5` (request drafted, owner sends; live conversion is Uniswap v4 until then).
+- Unverified: private-payments join after the forwarder fix; Copilot on the real model; session bar, backup/restore and the stateless/cross-device tests on real devices; confidential cross-chain hiding (cannot be verified from Monad); phone/email claim canary.
+- Parked: Anchored stocks, naira payout, WhatsApp (needs a separate Twilio sender), recovery phrase, Safe owner, offsite backups, push to GitHub.
+- Deadline for the three bounties: 2026-10-14 04:59 GMT+1.
+
+---
+
+## Session 37 — 2026-10-09 — Complete mainnet product (no broadcast)
+
+Current status, blockers and approvals: `docs/MAINNET_AUDIT.md` (rewritten as a short status page).
+
+- **Conversion without Agora:** EverpieceStableConverter on the fixed Uniswap v4 AUSD/USDC pool, the pool Kuru Flow actually routes through (found by tracing a real Kuru quote; VERIFIED §4.19). Kuru's own orderbook reverts `MarketStateError`.
+  - PayV2 tries Agora (only while approved), then the converter, then a signed truthful fallback or a revert.
+  - Gas floors stop a relayer from forcing the fallback.
+- **End to end:**
+  - relayer V2 pay and quote endpoints;
+  - directory `instantV2` / `crossChain` proofs;
+  - indexer V2 (delivered asset);
+  - web Send/Request/Pay with asset choice;
+  - external-wallet request payments via Aurora, no account;
+  - USDC Earn;
+  - feature flags.
+- **EverpieceAutomate:** bounded, unattended Earn legs via one owner grant. Relayer gasless activate/revoke plus an internal execute; the service links grants and executes them.
+- **TACEO Merces:** private balance/send in the app (`/private`). Web build fixed with an `fs/promises` alias; circuits ship as static assets.
+- **Invest:** live Anchored StockOracle reference prices; aNVDA route +11–17% over oracle → LOW_LIQUIDITY. Anchored HMAC client built; access is per-wallet KYC + key (VERIFIED §4.20).
+- **Tests:**
+  - 292+ contract tests;
+  - fork suites (converter, PayV2, gas, Automate, USDC variants);
+  - shared 81, relayer 31, directory 15, automate 11, others green;
+  - indexer 7 (WSL);
+  - web production build OK.
+- **Deploy simulation:** 5 contracts, 12.09M gas, ≤2.44 MON.
+- **Open (owner):**
+  - deploy GO, relayer funding GO, canary GO;
+  - Aurora key;
+  - optional Agora approval;
+  - MON for TACEO users;
+  - Anchored partner access.
+- **Naira:** Coming Soon.
+
+---
+
+## Session 36 — 2026-10-09 — Mainnet audit: USDC + AUSD first-class (no broadcast)
+
+- **Audit (`docs/MAINNET_AUDIT.md`):** EverpiecePay v1 made AUSD mandatory, and on mainnet it could not accept USDC without Agora's approval. **Do not deploy v1.**
+  - Monad USDC has the same payee-checked ERC-3009 receive as AUSD (VERIFIED §4.18).
+  - The escrow, Earn and Pay rejected USDC only because of AUSD's upgrade-flag read.
+- **Built (branch `feat/usdc-first-class`):**
+  - `EverpiecePayV2`: USDC or AUSD settlement, DIRECT or CONVERTED via the Agora pair; one signature; no owner; `quote()` reports unavailable.
+  - `EverpieceEscrowUsdc` and `EverpieceEarnUsdc`: the guard is `internal virtual`, otherwise unchanged.
+  - Shared: `payV2.ts` (USDC is the default) and `flags.ts` (the ten mandated flags, fail-closed).
+  - V2 ABI; `DeployEverpieceMainnetV2.s.sol`.
+- **Tests:**
+  - 265 offline contract tests pass;
+  - 30/30 mainnet-fork tests;
+  - shared 76/76, relayer 22/22;
+  - typecheck clean.
+  - The deploy script simulates on mainnet at ≈7.84M gas, ≤1.58 MON.
+- **Next (code):**
+  - relayer `/v1/pay/v2`, with per-asset escrow, Earn and gas limits (MAINNET_AUDIT §4);
+  - web asset choice, USDC by default;
+  - indexer V2 event;
+  - Automate per-asset;
+  - wiring the flags.
+- **Owner:**
+  - scoped GO for the deploy and canaries;
+  - Agora APPROVED_SWAPPER for the PayV2 address (after the deploy);
+  - Aurora key;
+  - escrow owner (Safe) and claim approver;
+  - F-01.
+
+---
+
+## Session 35 — 2026-10-09 — Working clone, refund check (DoD #15)
+
+- **Working folder is now `C:Everpiece`**, a clone of github.com/deamybro/Everpiece (160 commits, no trailers). The old folder is an archive and is never pushed from.
+  - A clean install of the clone passes: 137 JS/TS tests across 7 workspaces, typecheck clean, 243 contract tests (6 fork tests skipped without `RUN_FORK_TESTS=true`).
+- **O12 / DoD #15 proven live:** the expired $1 testnet payment was refunded through the public relayer. tx `0xe2472401…f428`, block 69472739, CONFIRMED, REFUNDED, sender balance 99.00 → 100.00 AUSD.
+- **Still open (owner):** F-01 decision; mainnet GO with amounts, `everpiece.xyz` for passkeys, Agora `APPROVED_SWAPPER` for EverpiecePay; deadline time; demo video, project text and bounty text; the manual link-claim and real-phone checks in READINESS.md. Internal deadline 12 Oct.
+
+---
+
 ## Session 34 — 2026-10-08 — Invest screen on a fresh mainnet route scan
 
 - **Shared:** Invest model (`packages/shared/src/invest.ts`):

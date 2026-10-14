@@ -16,6 +16,9 @@ export class VoiceStore {
       CREATE TABLE IF NOT EXISTS messages (locator TEXT PRIMARY KEY CHECK (locator = lower(locator)), envelope BLOB NOT NULL,
         size INTEGER NOT NULL, created_at INTEGER NOT NULL);
     `);
+    // Encrypted address-book vaults: one latest ciphertext per account, replaced only by a higher sequence number.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS vaults (account TEXT PRIMARY KEY CHECK (account = lower(account)), vault TEXT NOT NULL,
+      seq INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
     // Additive migration: messages stored before binding existed keep the old 45-day lifetime.
     const cols = (this.db.prepare(`PRAGMA table_info(messages)`).all() as { name: string }[]).map((c) => c.name);
     if (!cols.includes("payment_id")) this.db.exec(`ALTER TABLE messages ADD COLUMN payment_id TEXT`);
@@ -36,6 +39,16 @@ export class VoiceStore {
   }
   bind(locator: string, paymentId: string, deleteAfter: number): void {
     this.db.prepare(`UPDATE messages SET payment_id = ?, delete_after = ? WHERE locator = ?`).run(paymentId, deleteAfter, locator);
+  }
+  getVault(account: string): { vault: string; seq: number; updated_at: number } | undefined {
+    return this.db.prepare(`SELECT vault, seq, updated_at FROM vaults WHERE account = ?`).get(account) as { vault: string; seq: number; updated_at: number } | undefined;
+  }
+  putVault(account: string, vault: string, seq: number, now: number): void {
+    this.db.prepare(`INSERT INTO vaults (account, vault, seq, updated_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(account) DO UPDATE SET vault = excluded.vault, seq = excluded.seq, updated_at = excluded.updated_at`).run(account, vault, seq, now);
+  }
+  vaultCount(): number {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM vaults`).get() as { n: number }).n;
   }
   totalBytes(): number {
     return (this.db.prepare(`SELECT COALESCE(SUM(size), 0) AS s FROM messages`).get() as { s: number }).s;

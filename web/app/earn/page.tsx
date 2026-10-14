@@ -8,7 +8,8 @@ import { Progress, progressText } from "../../components/status";
 import { friendlyError } from "../../lib/api";
 import { formatDollars, parseDollars } from "../../lib/chain";
 import { config, isDevStack } from "../../lib/config";
-import { currentRate, deposit, earnAvailable, opportunity, readPosition, withdraw, type EarnView } from "../../lib/earn";
+import { currentRate, deposit, earnAvailable, opportunities, readPosition, withdraw, type EarnView } from "../../lib/earn";
+import { assetSymbol } from "../../lib/payV2";
 import { friendlyPasskeyError, loadAccount, type Account } from "../../lib/mera";
 import { PayError, balanceOfToken } from "../../lib/pay";
 
@@ -22,6 +23,7 @@ export default function EarnPage() {
   const [account, setAccount] = useState<Account | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [opp, setOpp] = useState<EarnOpportunity | null>(null);
+  const [opps] = useState<EarnOpportunity[]>(() => opportunities());
   const [rate, setRate] = useState<{ aprBps: number; apyBps: number } | null>(null);
   const [view, setView] = useState<EarnView | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -33,7 +35,8 @@ export default function EarnPage() {
   const [done, setDone] = useState("");
 
   const refresh = useCallback(async (a: Account, o: EarnOpportunity) => {
-    const [v, b] = await Promise.all([readPosition(o, a.address), balanceOfToken(config.dollar.address, a.address)]);
+    // the balance in the vault's own asset (USDC for USDC Earn, AUSD for AUSD Earn)
+    const [v, b] = await Promise.all([readPosition(o, a.address), balanceOfToken(o.asset, a.address)]);
     setView(v);
     setBalance(b);
   }, []);
@@ -42,12 +45,21 @@ export default function EarnPage() {
     const a = loadAccount();
     setAccount(a);
     setLoaded(true);
-    const o = opportunity();
+    const o = opportunities()[0] ?? null;
     setOpp(o);
     if (!o) return;
     currentRate(o).then(setRate).catch(() => setRate(null));
     if (a) refresh(a, o).catch((e) => setError(errText(e)));
   }, [refresh]);
+
+  function choose(o: EarnOpportunity) {
+    setOpp(o);
+    setView(null);
+    setRate(null);
+    setDone("");
+    currentRate(o).then(setRate).catch(() => setRate(null));
+    if (account) refresh(account, o).catch((e) => setError(errText(e)));
+  }
 
   if (!loaded) return null;
   if (!account) return <Welcome onReady={setAccount} title="Create your account first." />;
@@ -108,6 +120,15 @@ export default function EarnPage() {
       </div>
       <h1>Earn</h1>
       {!opp && <div className="status warn">Earn isn&apos;t available here yet. Your Dollars stay in your balance.</div>}
+      {opps.length > 1 && (
+        <div className="row" role="group" aria-label="Earn in">
+          {opps.map((o) => (
+            <button key={o.id} className={opp?.id === o.id ? "" : "secondary"} aria-pressed={opp?.id === o.id} onClick={() => choose(o)} disabled={busy}>
+              {assetSymbol(o.asset)} · {o.provider}
+            </button>
+          ))}
+        </div>
+      )}
       {opp && (
         <>
           {opp.simulated && <div className="dev">Simulated yield: this test vault&apos;s earnings are test Dollars added by the test site, not real interest.</div>}

@@ -27,6 +27,11 @@ contracts:
     events:
       # Must match contracts/src/EverpiecePay.sol (checked against the shared ABI in test/abi.test.ts).
       - event: Paid(bytes32 indexed paymentId, bytes32 indexed ref, address indexed sender, address recipient, uint256 amount, address sourceToken, uint256 sourceAmount, address pair)
+  - name: EverpiecePayV2
+    events:
+      # Must match contracts/src/EverpiecePayV2.sol (checked against the shared ABI in test/abi.test.ts).
+      - event: Paid(bytes32 indexed paymentId, bytes32 indexed ref, address indexed sender, address recipient, address deliveredAsset, uint256 amount, address sourceToken, uint256 sourceAmount, address provider)
+      - event: ConversionFallback(bytes32 indexed paymentId, address requestedAsset, address deliveredAsset)
   - name: EverpieceEarn
     events:
       # Must match contracts/src/EverpieceEarn.sol (checked against the shared ABI in test/abi.test.ts).
@@ -53,6 +58,9 @@ chains:
       # Instant payments (deployed after the escrow, so the escrow's start block covers it). Zero address = none.
       - name: EverpiecePay
         address: "${ENVIO_PAY_ADDRESS}"
+      # USDC + AUSD instant payments (EverpiecePayV2). Zero address = none.
+      - name: EverpiecePayV2
+        address: "${ENVIO_PAY_V2_ADDRESS}"
       # Earn router (deployed after the escrow). Zero address = none.
       - name: EverpieceEarn
         address: "${ENVIO_EARN_ADDRESS}"

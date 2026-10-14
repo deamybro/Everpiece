@@ -166,7 +166,8 @@ contract EverpieceEarn is EIP712, ReentrancyGuard {
     }
 
     /// @dev Same fail-closed check as EverpiecePay: AUSD's payee-checked receive must not have been re-routed.
-    function _requireVerifiedAusdReceiveSemantics() private view {
+    ///      Virtual only so EverpieceEarnUsdc can drop this AUSD-only read.
+    function _requireVerifiedAusdReceiveSemantics() internal view virtual {
         try AUSD.isReceiveWithAuthorizationUpgraded() returns (bool upgraded) {
             if (upgraded) revert AusdSemanticsChanged();
         } catch {

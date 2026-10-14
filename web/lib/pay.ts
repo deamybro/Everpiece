@@ -86,14 +86,14 @@ export async function payInstant(
   onStatus("SIGNING");
   let r;
   if (direct) {
-    const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(instantAusdAuthorization(config.pay, payment, config.chainId, token.address)));
+    const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(instantAusdAuthorization(config.pay, payment, config.chainId, token.address)), { spend: payment.amount });
     r = await relayer("/v1/pay/ausd", { payment, ausdSignature });
   } else {
     const nonce = await client.readContract({ address: token.address, abi: erc20, functionName: "nonces", args: [account.address] });
     const { permitSig, payerSignature } = await withSigner(account, async (signer) => ({
       permitSig: await signer.signTypedData(permitTyped(token, account.address, config.pay, maxSource, nonce, deadline)),
       payerSignature: await signer.signTypedData(instantPaymentTyped(config.pay, payment, config.chainId)),
-    }));
+    }), { spend: maxSource });
     const { r: pr, s: ps, v } = hexToSignature(permitSig);
     r = await relayer("/v1/pay/token", { payment, payerSignature, permit: { deadline, v: Number(v), r: pr, s: ps } });
   }
@@ -112,10 +112,12 @@ export type LoadedRequest = {
   problem: string | null;
 };
 
-export async function createRequest(account: Account, amount: bigint, mode: RequestMode, hours = 24): Promise<Hex> {
+/** `asset`: what the requester receives. Instant requests may name USDC or AUSD (EverpiecePayV2); protected ones use
+ *  the escrow's asset. */
+export async function createRequest(account: Account, amount: bigint, mode: RequestMode, hours = 24, asset: Address = config.dollar.address): Promise<Hex> {
   const now = await chainTime();
   const request: PaymentRequest = {
-    version: 1, requestId: randomBytes32(), recipient: account.address, asset: config.dollar.address, amount, mode,
+    version: 1, requestId: randomBytes32(), recipient: account.address, asset: mode === RequestMode.PROTECTED ? config.dollar.address : asset, amount, mode,
     expiresAt: now + BigInt(hours * 3600), memoHash: `0x${"00".repeat(32)}`,
   };
   onlyAfter(requestProblem(request, now, config.chainId));

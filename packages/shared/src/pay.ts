@@ -16,6 +16,7 @@ export const AGORA_TESTNET = {
   ausdFaucet: "0xd236c18D274E54FAccC3dd9DDA4b27965a73ee6C",
 } as const;
 /** USDC on Monad mainnet (Circle; docs/VERIFIED.md §4.14: name "USDC", version "2", 6 decimals, ERC-2612 domain checked). */
+const AUSD_MAINNET = "0x00000000efe302beaa2b3e6e1b18d08d69a9012a";
 export const USDC_MAINNET_ADDRESS = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603" as const;
 /** Agora Instant Settlement AUSD/USDC pair on Monad mainnet ("Protocol Deployments"; on-chain name "AUSD/USDC",
  *  token0 AUSD, token1 USDC). Swappers need APPROVED_SWAPPER, granted by Agora (KYC) on mainnet. */
@@ -215,7 +216,13 @@ export function requestProblem(r: PaymentRequest, now: bigint, chainId: number):
   if (!/^0x[0-9a-f]{64}$/i.test(r.requestId)) return "INVALID_REQUEST";
   if (r.amount <= 0n) return "INVALID_AMOUNT";
   if (r.mode !== RequestMode.INSTANT && r.mode !== RequestMode.PROTECTED) return "INVALID_MODE";
-  if (!ausdFor(chainId) || ausdFor(chainId)!.address.toLowerCase() !== r.asset.toLowerCase()) return "UNSUPPORTED_NETWORK";
+  const dollar = ausdFor(chainId)?.address.toLowerCase();
+  // Instant requests may ask for either first-class settlement asset (USDC or AUSD, EverpiecePayV2); protected requests
+  // stay in the escrow's asset.
+  const instantAssets = chainId === MONAD_MAINNET_CHAIN_ID ? [AUSD_MAINNET, USDC_MAINNET_ADDRESS.toLowerCase()] : [];
+  const asset = r.asset.toLowerCase();
+  const ok = asset === dollar || (r.mode === RequestMode.INSTANT && instantAssets.includes(asset));
+  if (!dollar || !ok) return "UNSUPPORTED_NETWORK";
   if (now >= r.expiresAt) return "REQUEST_EXPIRED";
   return null;
 }
