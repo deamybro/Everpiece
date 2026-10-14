@@ -124,7 +124,7 @@ export default function EarnPage() {
         <div className="row" role="group" aria-label="Earn in">
           {opps.map((o) => (
             <button key={o.id} className={opp?.id === o.id ? "" : "secondary"} aria-pressed={opp?.id === o.id} onClick={() => choose(o)} disabled={busy}>
-              {assetSymbol(o.asset)}
+              {assetSymbol(o.asset)} · {o.provider}
             </button>
           ))}
         </div>
