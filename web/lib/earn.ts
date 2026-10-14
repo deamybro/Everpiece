@@ -141,6 +141,8 @@ export async function deposit(account: Account, o: EarnOpportunity, assets: bigi
   const usdc = isUsdc(o) ? settlementAsset(config.chainId, o.asset) : undefined;
   const typed = usdc
     ? earnAuthorization(router, config.chainId, d, { address: usdc.address, eip712Name: usdc.eip712.name, eip712Version: usdc.eip712.version })
+    // mainnet: the AUSD vaults are funded in AUSD's own domain ("Agora Dollar"/"1"), NOT the app's headline dollar (USDC)
+    : config.chainId === 143 ? earnAusdAuthorization(router, config.chainId, d, getAddress(o.asset))
     : earnAusdAuthorization(router, config.chainId, d, getAddress(config.dollar.address), config.dollar.eip712Name);
   const ausdSignature = await withSigner(account, (signer) => signer.signTypedData(typed), { spend: assets });
   const r = await relayer(usdc ? "/v1/earn/usdc/deposit" : "/v1/earn/deposit", { deposit: d, ausdSignature });

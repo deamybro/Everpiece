@@ -26,6 +26,8 @@ export function proxy(request: NextRequest) {
     origin(process.env.NEXT_PUBLIC_INDEXER_URL),
     origin(process.env.NEXT_PUBLIC_VOICE_URL),
     origin(process.env.NEXT_PUBLIC_DEV_FAUCET_URL),
+    // live Earn rates for the Morpho vault (public API, CORS open, read-only)
+    ...(process.env.NEXT_PUBLIC_EARN_ENABLED === "true" ? ["https://api.morpho.org"] : []),
   ]
     .filter(Boolean)
     .join(" ");
